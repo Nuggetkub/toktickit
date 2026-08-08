@@ -7,7 +7,7 @@
 | PR | Branch | Reviewer verdict |
 |----|--------|------------------|
 | [#5](https://github.com/Nuggetkub/toktickit/pull/5) | feature/1-project-foundation | approved by @Earth2509, merged 2026-08-08 |
-| [#6](https://github.com/Nuggetkub/toktickit/pull/6) | feature/2-health-check | pending |
+| [#6](https://github.com/Nuggetkub/toktickit/pull/6) | feature/2-health-check | approved by @Earth2509, merged 2026-08-08 |
 |    | feature/3-category-seed |  |
 |    | feature/4-category-list |  |
 
