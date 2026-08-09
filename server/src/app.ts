@@ -1,9 +1,6 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import { getPrisma } from "./prisma.js";
-// getPrisma() is your lazy database handle. Call it INSIDE a route when you
-// need the DB (Issue 4). It is intentionally unused until then.
-void getPrisma;
 
 // The Express app is exported separately from app.listen() (see index.ts) so
 // Supertest can import `app` without opening a port. Do not merge these files.
@@ -18,17 +15,21 @@ app.use(express.json());
 // It must return HTTP 200 with JSON: { status: "ok", service: "TokTickIT API" }
 // ---------------------------------------------------------------------------
 app.get("/api/health", (_req: Request, res: Response) => {
-  // TODO(Issue 2): replace this stub with the required 200 response.
-  res.status(501).json({ error: "Not implemented yet" });
+  res.status(200).json({ status: "ok", service: "TokTickIT API" });
 });
 
-// ---------------------------------------------------------------------------
-// Issue 4 — Category list
-// Add:  GET /api/categories
-//   -> read categories from PostgreSQL via getPrisma().category.findMany(...)
-//   -> return each { id, name } in a predictable (id) order
-//   -> on failure, respond 500 with a safe message (no internal details)
-// TODO(Issue 4): implement the route here.
-// ---------------------------------------------------------------------------
+app.get("/api/categories", async (_req: Request, res: Response) => {
+  try {
+    const categories = await getPrisma().category.findMany({
+      select: { id: true, name: true },
+      orderBy: { id: "asc" },
+    });
+    res.status(200).json(categories);
+  } catch (err) {
+    // Log the real cause for us, but never leak it to the client.
+    console.error("GET /api/categories failed:", err);
+    res.status(500).json({ error: "Could not load categories." });
+  }
+});
 
 export default app;

@@ -11,11 +11,20 @@ export interface SystemStatus {
 }
 
 // Issue 2 + Issue 4 — call the backend.
-// Steps: fetch `${API_URL}/api/health`; if not ok, throw.
-//        then fetch `${API_URL}/api/categories`; if not ok, throw.
-//        return { online: true, categories }.
-// Throwing on failure lets the UI show a single Offline/error state.
+// Throwing on failure lets the UI show a single Offline/error state. A server
+// that is down makes fetch() reject on its own, so that path needs no handling
+// here — it surfaces as the same Offline state.
 export async function checkSystem(): Promise<SystemStatus> {
-  // TODO(Issue 2 & 4): implement the two fetch calls described above.
-  throw new Error("checkSystem not implemented yet");
+  const health = await fetch(`${API_URL}/api/health`);
+  if (!health.ok) {
+    throw new Error(`Health check failed (HTTP ${health.status}).`);
+  }
+
+  const response = await fetch(`${API_URL}/api/categories`);
+  if (!response.ok) {
+    throw new Error(`Could not load categories (HTTP ${response.status}).`);
+  }
+
+  const categories = (await response.json()) as Category[];
+  return { online: true, categories };
 }
