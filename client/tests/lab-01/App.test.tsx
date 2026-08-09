@@ -2,27 +2,48 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../../src/App.js";
-import * as api from "../../src/api.js";
 
+// These tests mock at the `fetch` level rather than mocking checkSystem, so the
+// real api.ts runs — including its error translation. Mocking checkSystem would
+// skip that module entirely and leave the translation untested.
 afterEach(() => vi.restoreAllMocks());
 
+const SEEDED = [
+  { id: 1, name: "Account and Access" },
+  { id: 2, name: "Hardware" },
+  { id: 3, name: "Software" },
+  { id: 4, name: "Network" },
+];
+
+function jsonResponse(body: unknown, status = 200) {
+  return { ok: status >= 200 && status < 300, status, json: async () => body };
+}
+
+/** Routes each endpoint to its own response, so ordering bugs cannot hide. */
+function mockFetch(routes: { health?: unknown; categories?: unknown }) {
+  const fetchMock = vi.fn(async (url: string) => {
+    if (url.includes("/api/health")) {
+      return routes.health ?? jsonResponse({ status: "ok", service: "TokTickIT API" });
+    }
+    if (url.includes("/api/categories")) {
+      return routes.categories ?? jsonResponse(SEEDED);
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
 describe("App", () => {
-  // WORKED EXAMPLE — provided for you.
+  // UI-01
   it("renders the TokTickIT heading", () => {
     render(<App />);
     expect(screen.getByText(/TokTickIT/i)).toBeInTheDocument();
   });
 
+  // UI-02
   it("shows Online and the seeded categories on success", async () => {
-    vi.spyOn(api, "checkSystem").mockResolvedValue({
-      online: true,
-      categories: [
-        { id: 1, name: "Account and Access" },
-        { id: 2, name: "Hardware" },
-        { id: 3, name: "Software" },
-        { id: 4, name: "Network" },
-      ],
-    });
+    const fetchMock = mockFetch({});
 
     render(<App />);
     await userEvent.click(screen.getByRole("button", { name: /check system/i }));
@@ -36,19 +57,36 @@ describe("App", () => {
       "Software",
       "Network",
     ]);
+
+    // Both endpoints were really called through api.ts.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/api/health");
+    expect(String(fetchMock.mock.calls[1][0])).toContain("/api/categories");
   });
 
+  // UI-03
   it("shows an Offline error message when the API is unavailable", async () => {
-    vi.spyOn(api, "checkSystem").mockRejectedValue(
-      new Error("Failed to fetch"),
-    );
+    // What the browser actually throws when the server is not running.
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
 
     render(<App />);
     await userEvent.click(screen.getByRole("button", { name: /check system/i }));
 
     expect(await screen.findByText("Offline")).toBeInTheDocument();
-    expect(screen.getByText(/Failed to fetch/i)).toBeInTheDocument();
-    // The category list must not render in the error state.
+    // The raw browser jargon must be translated, not shown to the user.
+    expect(screen.getByText(/Unable to connect to TokTickIT API/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Failed to fetch/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
+  });
+
+  it("shows Offline when the categories endpoint returns an error status", async () => {
+    mockFetch({ categories: jsonResponse({ error: "Could not load categories." }, 500) });
+
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: /check system/i }));
+
+    expect(await screen.findByText("Offline")).toBeInTheDocument();
+    expect(screen.getByText(/HTTP 500/)).toBeInTheDocument();
     expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
   });
 });
