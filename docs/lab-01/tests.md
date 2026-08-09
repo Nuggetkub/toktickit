@@ -42,3 +42,42 @@ Content-Type: application/json; charset=utf-8
 
 {"status":"ok","service":"TokTickIT API"}
 ```
+
+## Issue 3 — Category model and idempotent seed
+
+Migration `20260808153643_init` creates the table and the unique index on `name`:
+
+```sql
+CREATE TABLE "Category" (
+    "id" SERIAL NOT NULL,
+    "name" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Category_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX "Category_name_key" ON "Category"("name");
+```
+
+Idempotency is the requirement here, so the seed was run **twice** (`npm run
+prisma:seed`). Both runs printed the same four rows with the same ids:
+
+```
+Seeded 4 categories:
+  1  Account and Access
+  2  Hardware
+  3  Software
+  4  Network
+```
+
+Confirmed independently in Postgres after the second run — still four rows, no
+duplicates:
+
+```
+toktickit=# SELECT id, name FROM "Category" ORDER BY id;
+ id |        name
+----+--------------------
+  1 | Account and Access
+  2 | Hardware
+  3 | Software
+  4 | Network
+(4 rows)
+```
