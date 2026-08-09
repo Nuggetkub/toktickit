@@ -20,7 +20,11 @@ export async function checkSystem(): Promise<SystemStatus> {
     throw new Error(`Health check failed (HTTP ${health.status}).`);
   }
 
-  // TODO(Issue 4): fetch `${API_URL}/api/categories`, throw if not ok, and
-  // return the real list here instead of the empty one.
-  return { online: true, categories: [] };
+  const response = await fetch(`${API_URL}/api/categories`);
+  if (!response.ok) {
+    throw new Error(`Could not load categories (HTTP ${response.status}).`);
+  }
+
+  const categories = (await response.json()) as Category[];
+  return { online: true, categories };
 }

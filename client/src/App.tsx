@@ -8,8 +8,6 @@ export default function App() {
   const [state, setState] = useState<UiState>("idle");
   const [categories, setCategories] = useState<Category[]>([]);
   const [error, setError] = useState("");
-  // Categories are stored now but not rendered until Issue 4.
-  void categories;
 
   async function handleCheck() {
     setState("loading");
@@ -34,10 +32,29 @@ export default function App() {
         {state === "loading" ? "Loading…" : "Check System"}
       </button>
 
+      {state === "loading" && (
+        <p className="mt-3 mb-0 text-secondary">Checking the API…</p>
+      )}
+
       {state === "success" && (
-        <p className="mt-3 mb-0">
-          Status: <span className="text-success fw-semibold">Online</span>
-        </p>
+        <>
+          <p className="mt-3 mb-2">
+            Status: <span className="text-success fw-semibold">Online</span>
+          </p>
+
+          <h2 className="h6 mt-4">Request categories</h2>
+          {categories.length === 0 ? (
+            <p className="text-secondary mb-0">No categories found.</p>
+          ) : (
+            <ul className="list-group">
+              {categories.map((category) => (
+                <li key={category.id} className="list-group-item">
+                  {category.name}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
 
       {state === "error" && (
@@ -45,8 +62,6 @@ export default function App() {
           Status: <span className="text-danger fw-semibold">Offline</span> — {error}
         </p>
       )}
-
-      {/* TODO(Issue 4): render the category list under the Online status. */}
     </div>
   );
 }
