@@ -49,6 +49,9 @@ describe("App", () => {
     await userEvent.click(screen.getByRole("button", { name: /check system/i }));
 
     expect(await screen.findByText("Online")).toBeInTheDocument();
+    // Wording required by the demo specification.
+    expect(screen.getByText(/System Status:/)).toBeInTheDocument();
+    expect(screen.getByText("Supported Request Categories:")).toBeInTheDocument();
 
     const items = screen.getAllByRole("listitem").map((li) => li.textContent);
     expect(items).toEqual([
@@ -73,6 +76,7 @@ describe("App", () => {
     await userEvent.click(screen.getByRole("button", { name: /check system/i }));
 
     expect(await screen.findByText("Offline")).toBeInTheDocument();
+    expect(screen.getByText(/System Status:/)).toBeInTheDocument();
     // The raw browser jargon must be translated, not shown to the user.
     expect(screen.getByText(/Unable to connect to TokTickIT API/i)).toBeInTheDocument();
     expect(screen.queryByText(/Failed to fetch/i)).not.toBeInTheDocument();
