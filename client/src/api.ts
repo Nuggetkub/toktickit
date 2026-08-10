@@ -10,17 +10,31 @@ export interface SystemStatus {
   categories: Category[];
 }
 
+// Shown to the user whenever the API cannot be reached at all. A rejected fetch
+// gives a raw browser error such as "TypeError: Failed to fetch", which is
+// jargon; the acceptance criterion asks for a useful message instead.
+export const UNREACHABLE_MESSAGE = "Unable to connect to TokTickIT API";
+
+// Wraps fetch so a network-level failure becomes a readable message rather than
+// the browser's raw TypeError. HTTP responses pass straight through — those are
+// handled by the status checks below.
+async function request(url: string): Promise<Response> {
+  try {
+    return await fetch(url);
+  } catch {
+    throw new Error(UNREACHABLE_MESSAGE);
+  }
+}
+
 // Issue 2 + Issue 4 — call the backend.
-// Throwing on failure lets the UI show a single Offline/error state. A server
-// that is down makes fetch() reject on its own, so that path needs no handling
-// here — it surfaces as the same Offline state.
+// Throwing on failure lets the UI show a single Offline/error state.
 export async function checkSystem(): Promise<SystemStatus> {
-  const health = await fetch(`${API_URL}/api/health`);
+  const health = await request(`${API_URL}/api/health`);
   if (!health.ok) {
-    throw new Error(`Health check failed (HTTP ${health.status}).`);
+    throw new Error(`${UNREACHABLE_MESSAGE} (health check returned ${health.status}).`);
   }
 
-  const response = await fetch(`${API_URL}/api/categories`);
+  const response = await request(`${API_URL}/api/categories`);
   if (!response.ok) {
     throw new Error(`Could not load categories (HTTP ${response.status}).`);
   }

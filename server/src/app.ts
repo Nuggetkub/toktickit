@@ -1,12 +1,15 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import { getPrisma } from "./prisma.js";
+import { CLIENT_ORIGIN, SERVICE_NAME } from "./config.js";
 
 // The Express app is exported separately from app.listen() (see index.ts) so
 // Supertest can import `app` without opening a port. Do not merge these files.
 export const app = express();
 
-app.use(cors());          // already wired: lets the Vite dev server call this API
+// Least privilege: only the configured client origin may call this API, rather
+// than the wildcard that cors() sends by default.
+app.use(cors({ origin: CLIENT_ORIGIN }));
 app.use(express.json());
 
 // ---------------------------------------------------------------------------
@@ -15,7 +18,7 @@ app.use(express.json());
 // It must return HTTP 200 with JSON: { status: "ok", service: "TokTickIT API" }
 // ---------------------------------------------------------------------------
 app.get("/api/health", (_req: Request, res: Response) => {
-  res.status(200).json({ status: "ok", service: "TokTickIT API" });
+  res.status(200).json({ status: "ok", service: SERVICE_NAME });
 });
 
 app.get("/api/categories", async (_req: Request, res: Response) => {

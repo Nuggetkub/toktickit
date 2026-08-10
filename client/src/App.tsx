@@ -39,10 +39,10 @@ export default function App() {
       {state === "success" && (
         <>
           <p className="mt-3 mb-2">
-            Status: <span className="text-success fw-semibold">Online</span>
+            System Status: <span className="text-success fw-semibold">Online</span>
           </p>
 
-          <h2 className="h6 mt-4">Request categories</h2>
+          <h2 className="h6 mt-4">Supported Request Categories:</h2>
           {categories.length === 0 ? (
             <p className="text-secondary mb-0">No categories found.</p>
           ) : (
@@ -59,7 +59,7 @@ export default function App() {
 
       {state === "error" && (
         <p className="mt-3 mb-0">
-          Status: <span className="text-danger fw-semibold">Offline</span> — {error}
+          System Status: <span className="text-danger fw-semibold">Offline</span> — {error}
         </p>
       )}
     </div>
