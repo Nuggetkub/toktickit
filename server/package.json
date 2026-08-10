@@ -1,5 +1,6 @@
 {
   "name": "toktickit-server",
+  "displayName": "TokTickIT API",
   "version": "1.0.0",
   "private": true,
   "type": "module",
