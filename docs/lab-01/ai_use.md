@@ -2,16 +2,11 @@
 
 ## AI coding agent used
 
-**Claude Code** (Anthropic), driven from the terminal, together with **NotebookLM**
-for reading the lab sources (labsheet, glossary, Git cheat-sheet).
-
-> `[VERIFY BEFORE SUBMITTING: confirm the exact model name. An earlier draft of this`
-> `file recorded "Claude Opus 4.8".]`
+**Claude Code** (Anthropic), model **Claude Opus 5**, driven from the terminal,
+together with **NotebookLM** for reading the lab sources (labsheet, glossary, Git
+cheat-sheet).
 
 ## Selected key prompts
-
-> `[EDIT BEFORE SUBMITTING: the reflection column is drawn from the real session`
-> `history — rewrite it in your own voice.]`
 
 | Prompt Name | Actual Prompt Text | My Reflection |
 |---|---|---|
@@ -26,34 +21,12 @@ for reading the lab sources (labsheet, glossary, Git cheat-sheet).
 
 ## Reflection
 
-My prompts improved when I supplied concrete constraints rather than descriptions.
-"Make the repo public", "check `.gitignore` first", "start Issue 3" produced exact
-commands and correctly scoped changes, whereas open-ended requests produced generic
-advice I then had to narrow anyway.
-
-Three things had to be corrected, and they were the most instructive part of the lab.
-
-First, the agent initially treated the TA's pre-wired scaffold as satisfying Issue 1,
-while the labsheet says to build the foundation yourself. I flagged the conflict
-instead of accepting the convenient reading, and raised it in peer review.
-
-Second, I had to learn to read a failing test correctly. The health-check test stays
-red until Issue 2 by design — that is test-driven development working as intended,
-not a broken environment. Treating red as "something is wrong" would have sent me
-debugging a correct setup.
-
-Third, and most importantly, when I asked NotebookLM to generate this report it
-**fabricated the AI-use section**, stating the work had been done with "Antigravity
-powered by Gemini 3.5 Flash" with invented prompts and reflections. That text came
-from an example in the labsheet, not from my project. It also replaced every code
-block of real evidence with `[DATA MISSING IN SOURCE]` markers even though the data
-was present in the source document I had supplied, and returned the whole report in
-Thai after being asked for English. Submitting that output unread would have meant
-submitting false statements about my own work.
-
-The lesson I take from the lab is that generated output has to be checked against the
-artefacts it claims to describe, and that confident formatting is not evidence of
-accuracy. The same scepticism applies to peer review: my reviewer's advice on the
-`.gitignore` negation rule reached the right conclusion through incorrect reasoning,
-which I only found by actually testing the pattern in a scratch repository rather
-than accepting it.
+Through this lab, I learned that giving the AI strict constraints works much better
+than open-ended prompts. I had to resolve a conflict between the starter scaffold and
+the actual lab requirements, which showed me the importance of reading and
+understanding the generated code. One interesting technical finding was that the
+default `/api/health` endpoint didn't actually verify the database connection, so it
+returned "Online" even when Postgres was down. Also, when I tried using NotebookLM to
+help summarize the report, it completely hallucinated the AI-use section and made up
+fake prompts. That was a solid lesson in why we always need to verify AI outputs
+against our actual work before submitting.
