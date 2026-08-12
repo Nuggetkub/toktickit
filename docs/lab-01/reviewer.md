@@ -82,48 +82,82 @@ I confirmed this by testing the pattern in a scratch repository before respondin
 
 ## Pull Requests I reviewed for my partner
 
-@Earth2509 rebuilt his repository at
-[github.com/Earth2509/toktickit](https://github.com/Earth2509/toktickit) on
-2026-08-11, so the review below is on the current repository.
+One pull request per issue on
+[github.com/Earth2509/toktickit](https://github.com/Earth2509/toktickit), all four
+reviewed and all four merged on 2026-08-12.
 
-| PR | Branch | Target | My verdict |
-|----|--------|--------|------------|
-| [Earth2509/toktickit#1](https://github.com/Earth2509/toktickit/pull/1) | feature/1-project-foundation | lab1-staging | commented 2026-08-11, approved 2026-08-12 after revision |
+| PR | Issue | Branch | My verdict |
+|----|-------|--------|------------|
+| [#1](https://github.com/Earth2509/toktickit/pull/1) | Issue 1 — project foundation | feature/1-project-foundation | commented, approved after revision |
+| [#6](https://github.com/Earth2509/toktickit/pull/6) | Issue 2 — API health check | feature/2-health-check | approved with notes |
+| [#7](https://github.com/Earth2509/toktickit/pull/7) | Issue 3 — category seed | feature/3-category-seed | approved with notes |
+| [#8](https://github.com/Earth2509/toktickit/pull/8) | Issue 4 — category list | feature/4-category-list | changes requested, approved after two revisions |
+
+On #1 I commented rather than approving, because the branch did not build what its
+description claimed — the PR body listed Prisma configuration and working test
+commands that were not in the tree. He pushed seven commits and replied; I checked
+each claim against the branch before approving.
+
+On #7 I raised something affecting the whole repository rather than that PR: his
+`Closes #N` references were correct but were never firing, because GitHub only
+auto-closes an issue when the closing PR merges into the **default** branch. His
+feature PRs merge into `lab1-staging`, so four issues stayed open next to four merged
+PRs. I checked the same thing on my own repository afterwards.
 
 ### My comment
 
-Posted as a Comment rather than an approval, because the branch did not build what
-its description claimed
-([review](https://github.com/Earth2509/toktickit/pull/1#pullrequestreview-4908971476)):
+The fullest exchange was #8, so it is the one recorded here. I requested changes
+([review](https://github.com/Earth2509/toktickit/pull/8#pullrequestreview-4918403822))
+after cloning the branch and running both suites, rather than reading the diff alone:
 
-> **`Closes #1` points at this pull request, not an issue.** Issues and PRs share one
-> number space on GitHub, and this PR took #1 (...) There are actually no issues in
-> the repo at all.
+> ```text
+> client   Tests  2 failed | 1 passed (3)
+> TypeError: categories.map is not a function
+>  ❯ App src/App.tsx:3:951
+> ```
 >
-> **There is no `server/prisma/schema.prisma`.** (...) `server/package.json` points at
-> that directory twice (...) so on a fresh clone `npm run prisma:migrate` fails with
-> no schema and `npm run prisma:seed` fails with no such file.
+> `check()` now calls `fetchHealth()` and then `fetchCategories()`, but
+> `App.test.tsx` still stubs a single blanket mock, so both calls receive the same
+> health payload — `fetchCategories()` resolves to an object instead of an array.
+
+The stack position `App.tsx:3:951` was the second finding: the component had been
+collapsed onto one 1000-character line, which also dropped `role="status"` from the
+Online state.
+
+He fixed both, but the fix replaced a hard-coded message with `caughtError.message`
+while `api.ts` still had no `try`/`catch` around `fetch` — so a rejected fetch
+rendered the browser's raw error. I probed his component and reported what a user
+would actually see:
+
+> ```text
+> RENDERED ALERT TEXT >>> "System Status: OfflineFailed to fetch"
+> ```
 >
-> **Neither test suite has any tests to run.** (...) `vitest run` exits non-zero with
-> "No test files found", so `npm test` is a failing command on this branch.
->
-> **`docs/lab-01/` still has the template content, and it does not match the repo.**
-> (...) `tests.md` lists 14 tests marked PASSED, including `GET/POST/PATCH
-> /api/tickets`, which is not Lab 1 scope and does not exist in the code.
+> That is your own words on my #6: "raw browser errors like `TypeError: Failed to
+> fetch` leak technical details and degrade UX." Your error test cannot catch it,
+> because it stubs the rejection with the friendly message — the assertion passes on
+> a string the test itself supplied.
+
+I had called that same change a clean fix in my previous review, so I said so rather
+than presenting the correction as something he should have caught alone.
 
 ### Partner's response
 
-He pushed seven commits the next morning and replied:
+> "@Nuggetkub Fixed the network-error regression in `api.ts` and added a regression
+> test using `TypeError("Failed to fetch")`. The alert now shows the friendly
+> connection message and explicitly does not expose the raw browser error. Please
+> re-review when ready."
 
-> "@Nuggetkub I addressed the Issue 1 feedback: added the base Prisma configuration,
-> corrected README and Lab 1 evidence to reflect the actual repository, and made the
-> foundation test commands usable before feature tests are introduced. The four
-> GitHub Issues are now present. Please re-review PR #1 when convenient."
+I re-ran both suites and probed both failure modes before
+[approving](https://github.com/Earth2509/toktickit/pull/8):
 
-I verified each claim against the branch — `server/prisma/schema.prisma` present with
-the `postgresql` provider, issues #2–#5 created, `npm test` green on both sides via
-`--passWithNoTests`, and the three `docs/lab-01/` files rewritten to describe only
-work that exists — then
-[approved](https://github.com/Earth2509/toktickit/pull/1#pullrequestreview-4915251139)
-with four non-blocking follow-ups, the main one being that `Closes #1` now needs to be
-`Closes #2` or issue #2 will stay open after the merge.
+```text
+client   Tests  3 passed (3)
+server   Tests  2 passed (2)
+
+NETWORK-DOWN >>> "System Status: OfflineUnable to connect to TokTickIT API"
+DB-DOWN      >>> "System Status: OfflineUnable to load request categories"
+```
+
+An unreachable API and a reachable API with a failing database now report different
+things, which neither of our repositories did at the start of the lab.
