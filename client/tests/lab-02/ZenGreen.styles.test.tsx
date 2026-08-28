@@ -144,6 +144,32 @@ describe("Field", () => {
     expect(input.compareDocumentPosition(message) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("announces a validation message that appears after submission", () => {
+    // aria-describedby alone is only read when the control takes focus, so an
+    // error revealed by submitting would be silent for a screen-reader user
+    // sitting anywhere else on the form. Re-rendering from valid to invalid is
+    // exactly that transition.
+    const { rerender } = render(
+      <Field id="summary" label="Ticket Summary" required>
+        {(control) => <input type="text" {...control} />}
+      </Field>,
+    );
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    rerender(
+      <Field id="summary" label="Ticket Summary" required error="Summary must be at least 5 characters.">
+        {(control) => <input type="text" {...control} />}
+      </Field>,
+    );
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Summary must be at least 5 characters.");
+    expect(alert).toHaveAttribute("id", "summary-error");
+    // The description wiring stays, for the case where focus does reach the field.
+    expect(screen.getByLabelText(/Ticket Summary/)).toHaveAttribute("aria-describedby", "summary-error");
+  });
+
   it("marks the group invalid so the control can be styled", () => {
     const { container } = render(
       <Field id="description" label="Description" error="Required.">

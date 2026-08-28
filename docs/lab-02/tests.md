@@ -160,8 +160,10 @@ from that run, not from a feature branch and not from memory.
 
 Run on `feature/18-zen-green-foundation` on 2026-08-28, before peer review:
 
-- `cd client && npm test` — 2 files, **27 tests passed**: the four existing Lab 1 tests plus
-  23 new in `client/tests/lab-02/ZenGreen.styles.test.tsx` (STYLE-01).
+- `cd client && npm test` — 2 files, **28 tests passed**: the four existing Lab 1 tests plus
+  24 new in `client/tests/lab-02/ZenGreen.styles.test.tsx` (STYLE-01). The 24th was added
+  in review: a field error revealed after submission must be announced, not merely
+  described (see `reviewer.md`, PR #30).
 - `cd client && npm run build` — passed. The CSS bundle is **6.19 kB**, down from 233 kB,
   because Bootstrap was removed once no Bootstrap class remained.
 

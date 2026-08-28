@@ -60,8 +60,14 @@ export function Field({ id, label, required = false, error, hint, children }: Fi
         "aria-describedby": describedBy || undefined,
       })}
 
+      {/*
+        role="alert" as well as aria-describedby. The description is only read
+        when the control takes focus, so a message that appears on submit — the
+        usual case — would otherwise be silent for anyone not already focused on
+        that field. The live region announces it as it arrives.
+      */}
       {error && (
-        <p className="zen-field__error" id={errorId}>
+        <p className="zen-field__error" id={errorId} role="alert">
           {error}
         </p>
       )}

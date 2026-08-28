@@ -62,7 +62,7 @@ Warning colour is reserved for warnings. It is never used as decoration.
 | Required field | Red asterisk after the label, plus `aria-required`. |
 | Editable field | `--zen-surface` background, `--zen-border` border. |
 | Read-only field | `--zen-readonly` background, no border emphasis, not focusable as an input. Clearly distinct from editable at a glance. |
-| Invalid field | `--zen-error` border, message immediately **below** the field, `aria-describedby` pointing at it. Never a single lumped error at the top of the form. |
+| Invalid field | `--zen-error` border, message immediately **below** the field, with `aria-describedby` pointing at it **and** `role="alert"` on the message. Never a single lumped error at the top of the form. |
 | Focus | Visible `--zen-secondary` focus ring on every interactive element, never removed. |
 | Disabled | Reduced contrast, `aria-disabled`, and not activatable. |
 | Busy button | Text changes to the present participle — "Creating ticket…" — and the button is disabled for the duration. |
@@ -82,7 +82,12 @@ icon-only control has an accessible name and a tooltip.
 ### Announcements
 
 - `role="status"` for loading, submitting and success — polite, does not interrupt.
-- `role="alert"` for failures that need action — assertive.
+- `role="alert"` for failures that need action — assertive. This includes field-level
+  validation messages: `aria-describedby` is only read when the control takes focus, so a
+  message revealed by submitting the form would otherwise be silent for a screen-reader
+  user positioned anywhere else on it. If a future screen routinely fails many fields at
+  once, revisit this — several assertive announcements in a row is its own problem, and the
+  answer then is a polite live region plus an error summary that takes focus.
 
 ---
 
