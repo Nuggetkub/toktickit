@@ -189,6 +189,21 @@ Verified after the change: `lab2_test` holds 4 categories, 7 related systems and
 requesters, while `public` still holds 4 active categories, 7 active related systems and
 4 active requesters — untouched by the run.
 
+**Reset, added in the second review round.** @Earth2509 then pointed out that
+`migrate deploy` applies pending migrations but never clears data, so `lab2_test` carried
+rows from one run to the next — and `seed.test.ts`'s "no tickets" assertion would start
+depending on the previous run as soon as a suite began creating them. `global-setup.ts` now
+drops and recreates the schema before migrating, with a guard that refuses to run if the
+target schema is ever `public`. Verified by planting a stray ticket in `lab2_test` by hand
+and confirming the next run cleared it.
+
+He also reported that `npm run build` fails on a clean install until `prisma generate` is
+run. **That did not reproduce here** — a fresh clone plus `npm ci` produced a client
+containing all four new models, because `@prisma/client` runs `prisma generate` from its own
+postinstall hook. An explicit `"postinstall": "prisma generate"` was added to
+`server/package.json` regardless: depending on a transitive dependency's lifecycle hook is
+fragile, and `npm ci --ignore-scripts` or a stale `node_modules` would break it.
+
 **Honest note on the race.** It is real by construction, but it was *not* reproduced:
 six runs with parallelism forced back on all passed. The mutate-assert-restore window is
 only a few milliseconds wide. The fix stands regardless — a suite that fails one run in a

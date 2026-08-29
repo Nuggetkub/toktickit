@@ -13,7 +13,10 @@ import { resolve } from "node:path";
 // and seeded by tests/global-setup.ts. See also `fileParallelism: false` in
 // vitest.config.ts: an isolated schema stops tests corrupting development data,
 // but only serial execution stops them corrupting each other.
-export const TEST_SCHEMA = "lab2_test";
+// Typed as `string` rather than the literal, so the safety check in
+// global-setup.ts — which refuses to drop "public" — stays meaningful code
+// instead of a comparison TypeScript can prove is always false.
+export const TEST_SCHEMA: string = "lab2_test";
 
 /**
  * Prisma Client loads server/.env itself rather than relying on process.env, so
