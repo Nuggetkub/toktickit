@@ -1,11 +1,19 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import App from "../../src/App.js";
+import SystemCheck from "../../src/SystemCheck.js";
+import { AppShell } from "../../src/components/index.js";
 
 // These tests mock at the `fetch` level rather than mocking checkSystem, so the
 // real api.ts runs — including its error translation. Mocking checkSystem would
 // skip that module entirely and leave the translation untested.
+//
+// UPDATED IN LAB 2 (Issue #20). App.tsx became the router, so the Lab 1 screen
+// now lives in src/SystemCheck.tsx and these tests render it directly. Nothing
+// about the screen's markup, behaviour or assertions changed — only the import
+// and the element under test. It is rendered inside AppShell because that is
+// where the TokTickIT identity has lived since Issue #18, and this test
+// asserts on it.
 afterEach(() => vi.restoreAllMocks());
 
 const SEEDED = [
@@ -34,10 +42,14 @@ function mockFetch(routes: { health?: unknown; categories?: unknown }) {
   return fetchMock;
 }
 
-describe("App", () => {
+describe("System check screen", () => {
   // UI-01
   it("renders the TokTickIT heading", () => {
-    render(<App />);
+    render(
+      <AppShell>
+        <SystemCheck />
+      </AppShell>,
+    );
     expect(screen.getByText(/TokTickIT/i)).toBeInTheDocument();
   });
 
@@ -45,7 +57,11 @@ describe("App", () => {
   it("shows Online and the seeded categories on success", async () => {
     const fetchMock = mockFetch({});
 
-    render(<App />);
+    render(
+      <AppShell>
+        <SystemCheck />
+      </AppShell>,
+    );
     await userEvent.click(screen.getByRole("button", { name: /check system/i }));
 
     expect(await screen.findByText("Online")).toBeInTheDocument();
@@ -72,7 +88,11 @@ describe("App", () => {
     // What the browser actually throws when the server is not running.
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
 
-    render(<App />);
+    render(
+      <AppShell>
+        <SystemCheck />
+      </AppShell>,
+    );
     await userEvent.click(screen.getByRole("button", { name: /check system/i }));
 
     expect(await screen.findByText("Offline")).toBeInTheDocument();
@@ -86,7 +106,11 @@ describe("App", () => {
   it("shows Offline when the categories endpoint returns an error status", async () => {
     mockFetch({ categories: jsonResponse({ error: "Could not load categories." }, 500) });
 
-    render(<App />);
+    render(
+      <AppShell>
+        <SystemCheck />
+      </AppShell>,
+    );
     await userEvent.click(screen.getByRole("button", { name: /check system/i }));
 
     expect(await screen.findByText("Offline")).toBeInTheDocument();

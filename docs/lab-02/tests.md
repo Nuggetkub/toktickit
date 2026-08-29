@@ -69,7 +69,7 @@ E2E rows below are not claimed runnable until it merges.
 | API-13 | API | AC-15 | Soft removal returns `200` with reason, timestamp and remover; metadata still lists the attachment; a later download returns `404`; a second removal returns `409 ATTACHMENT_ALREADY_REMOVED` without overwriting the first reason. | `server/tests/lab-02/attachments.api.test.ts` | Planned |
 | API-14 | API | AC-13 | Downloading an active attachment returns `200`, the recorded MIME type, and a `Content-Disposition` filename that is sanitised. | `server/tests/lab-02/attachments.api.test.ts` | Planned |
 | UI-01 | UI | AC-01 | The selector lists active requesters only, states that it is a testing mechanism and not a login, and renders loading, empty and failure states. | `client/tests/lab-02/RequesterSelector.test.tsx` | Planned |
-| UI-02 | UI | AC-02 | Opening a requester-scoped route with nothing selected renders the selector, and no ticket data is requested. | `client/tests/lab-02/RequesterRouteGuard.test.tsx` | Planned |
+| UI-02 | UI | AC-02 | Opening a requester-scoped route with nothing selected renders the selector, no ticket data is shown, the navigation is hidden, a stored requester who is no longer active is dropped, and a returning requester is not bounced while the stored id resolves. | `client/tests/lab-02/RequesterRouteGuard.test.tsx` | Planned |
 | UI-03 | UI | AC-03 | Create Ticket loads categories and related systems from the API and shows the selected requester as a read-only field. | `client/tests/lab-02/CreateTicket.test.tsx` | Planned |
 | UI-04 | UI | AC-05 | Invalid input renders a message beneath each offending field, the submit stays disabled while busy, and entered values survive the failed attempt. | `client/tests/lab-02/CreateTicket.test.tsx` | Planned |
 | UI-05 | UI | AC-04 | A successful create renders the returned Ticket Number and Ticket Date, and offers the next action. | `client/tests/lab-02/CreateTicket.test.tsx` | Planned |
@@ -182,6 +182,35 @@ is under test is which of two transactions the index rejects.
 Tickets. Now that this issue creates real ones in the same schema, that assertion would have
 depended on which file ran first. It now captures the count, re-seeds, and asserts the count
 is unchanged — which is the claim actually being made: *seeding* creates no tickets.
+### Issue #20 feature-branch verification
+
+Run on `feature/20-requester-context` on 2026-08-29, before peer review:
+
+- `cd client && npm test` — 5 files, **44 tests passed** (up from 2 files / 28).
+- `cd client && npm run build` — passed.
+
+**Routing arrived with this issue.** AC-02 is a claim about opening a URL directly, so it
+needs real routes rather than a conditional render — `react-router-dom` is now a client
+dependency, and `RequireRequester` guards `/create` and `/tickets`. The guard is a route
+wrapper rather than a check inside each screen, so a screen added in #22 or #24 cannot
+forget it. It is a usability guard, not a security one: the server enforces ownership on
+every request regardless (BR-08).
+
+**Two consequences worth recording, because both touched existing tests:**
+
+1. `App.tsx` became the router, so the Lab 1 system-check screen moved to
+   `src/SystemCheck.tsx` unchanged. `tests/lab-01/App.test.tsx` now renders that component
+   inside `AppShell` — inside the shell because that is where the TokTickIT identity has
+   lived since #18, and the test asserts on it. No assertion about the screen's behaviour
+   changed.
+2. The selected requester's name deliberately appears twice — in the shell banner and in
+   the page body — so exact-text queries match both elements. The affected assertions use
+   `getAllByText`. This surfaced as three failing tests on the first run rather than as a
+   silent pass, which is the right way round.
+
+**`apiClient.test.ts` is the first `.test.ts` in the client suite.** Until #18 widened the
+Vitest glob from `*.test.tsx`, a file with that extension would never have run — so UI-12
+would have been listed as covered while never executing.
 
 ### Issue #19 feature-branch verification
 

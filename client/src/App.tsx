@@ -1,78 +1,88 @@
-import { useState } from "react";
-import { checkSystem, Category } from "./api.js";
-import {
-  AppShell,
-  Button,
-  Card,
-  EmptyState,
-  ErrorAlert,
-  StatusMessage,
-  type NavItem,
-} from "./components/index.js";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { AppShell, Card, type NavItem } from "./components/index.js";
+import SystemCheck from "./SystemCheck.js";
+import { RequesterProvider, RequesterSelector, RequireRequester, useRequester } from "./requester/index.js";
 
-// UI states you must handle for Issue 4: idle, loading, success, error.
-type UiState = "idle" | "loading" | "success" | "error";
-
-// Create Ticket and My Tickets arrive with Issues #22 and #24. They are shown
-// disabled rather than hidden so the shell is honest about what exists.
-const NAV_ITEMS: NavItem[] = [
-  { key: "system-check", label: "System Check" },
-  { key: "create-ticket", label: "Create Ticket", disabled: true },
-  { key: "my-tickets", label: "My Tickets", disabled: true },
-];
+// Routes, so that AC-02 — opening a requester-scoped route directly shows the
+// selector — is a real claim about a real URL rather than about which branch of
+// a conditional happened to render.
 
 export default function App() {
-  const [state, setState] = useState<UiState>("idle");
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [error, setError] = useState("");
+  return (
+    <RequesterProvider>
+      <Shell />
+    </RequesterProvider>
+  );
+}
 
-  async function handleCheck() {
-    setState("loading");
-    setError("");
-    try {
-      const status = await checkSystem();
-      setCategories(status.categories);
-      setState("success");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not reach the API.");
-      setState("error");
-    }
+function Shell() {
+  const { requester, clear } = useRequester();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Navigation is hidden until a Requester is chosen: on the selector screen
+  // there is nothing behind those links yet, and offering them would invite the
+  // guard to bounce the user straight back.
+  const navItems: NavItem[] = requester
+    ? [
+        { key: "/create", label: "Create Ticket", onSelect: () => navigate("/create") },
+        { key: "/tickets", label: "My Tickets", onSelect: () => navigate("/tickets") },
+      ]
+    : [];
+
+  function changeRequester() {
+    // BR-11: drop the context first, so requester-scoped screens unmount before
+    // the selector appears rather than briefly showing the old requester's data.
+    clear();
+    navigate("/select-requester", { replace: true });
   }
 
   return (
-    <AppShell navItems={NAV_ITEMS} activeKey="system-check">
-      <Card title="IT Service Desk" as="h1">
-        <Button variant="primary" onClick={handleCheck} busy={state === "loading"} busyLabel="Loading…">
-          Check System
-        </Button>
-
-        {state === "loading" && <StatusMessage>Checking the API…</StatusMessage>}
-
-        {state === "success" && (
-          <>
-            <p>
-              System Status: <span className="zen-text-success">Online</span>
-            </p>
-
-            <h2 className="zen-section-title">Supported Request Categories:</h2>
-            {categories.length === 0 ? (
-              <EmptyState title="No categories found." />
-            ) : (
-              <ul className="zen-list">
-                {categories.map((category) => (
-                  <li key={category.id}>{category.name}</li>
-                ))}
-              </ul>
-            )}
-          </>
-        )}
-
-        {state === "error" && (
-          <ErrorAlert onRetry={handleCheck}>
-            System Status: <span className="zen-text-error">Offline</span> — {error}
-          </ErrorAlert>
-        )}
-      </Card>
+    <AppShell
+      navItems={navItems}
+      activeKey={location.pathname}
+      requesterName={requester?.fullName}
+      onChangeRequester={requester ? changeRequester : undefined}
+    >
+      <Routes>
+        <Route path="/select-requester" element={<RequesterSelector />} />
+        <Route
+          path="/create"
+          element={
+            <RequireRequester>
+              <ComingSoon title="Create Ticket" issue={22} />
+            </RequireRequester>
+          }
+        />
+        <Route
+          path="/tickets"
+          element={
+            <RequireRequester>
+              <ComingSoon title="My Tickets" issue={24} />
+            </RequireRequester>
+          }
+        />
+        <Route path="/system-check" element={<SystemCheck />} />
+        <Route path="*" element={<Navigate to="/tickets" replace />} />
+      </Routes>
     </AppShell>
+  );
+}
+
+/**
+ * A screen that exists as a route but not yet as a feature. Shown rather than
+ * hidden so the shell, the navigation and the guard are all real and reviewable
+ * now, and says which issue delivers it rather than implying it is broken.
+ */
+function ComingSoon({ title, issue }: { title: string; issue: number }) {
+  const { requester } = useRequester();
+
+  return (
+    <Card title={title} as="h1">
+      <p>
+        This screen is delivered by Issue #{issue}. The Development Requester context is
+        already in place: you are working as <strong>{requester?.fullName}</strong>.
+      </p>
+    </Card>
   );
 }
