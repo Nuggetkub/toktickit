@@ -151,10 +151,35 @@ npx playwright test e2e/lab-02
 
 ## 6. Final Results
 
-*Implementation has not started.* This section will carry the real terminal output for the
+*Implementation is in progress.* This section will carry the real terminal output for the
 unit, API and UI suites captured from `main` after the release merge, together with the
 Playwright run and the responsive screenshots. Test counts and file paths will be filled in
 from that run, not from a feature branch and not from memory.
+
+### Issue #18 feature-branch verification
+
+Run on `feature/18-zen-green-foundation` on 2026-08-28, before peer review:
+
+- `cd client && npm test` — 2 files, **28 tests passed**: the four existing Lab 1 tests plus
+  24 new in `client/tests/lab-02/ZenGreen.styles.test.tsx` (STYLE-01). The 24th was added
+  in review: a field error revealed after submission must be announced, not merely
+  described (see `reviewer.md`, PR #30).
+- `cd client && npm run build` — passed. The CSS bundle is **6.19 kB**, down from 233 kB,
+  because Bootstrap was removed once no Bootstrap class remained.
+
+This is feature-branch evidence only. STYLE-01 stays `Planned` in the table above until it
+runs on `main` after the release merge.
+
+**Two configuration defects were found and fixed while writing STYLE-01**, both of which
+would have silently weakened this plan:
+
+- `client/vite.config.ts` included only `tests/**/*.test.tsx`, so the planned
+  `client/tests/lab-02/apiClient.test.ts` (UI-12) would never have run. The glob is now
+  `tests/**/*.test.{ts,tsx}`.
+- The first draft of STYLE-01 read the stylesheet through Vite's `?raw` import. Vitest
+  disables CSS processing, so that import resolves to an **empty string** and all seven
+  token assertions passed vacuously. The suite now reads the file from disk, which is why
+  `@types/node` and `noEmit` appear in this issue's diff.
 
 ---
 
