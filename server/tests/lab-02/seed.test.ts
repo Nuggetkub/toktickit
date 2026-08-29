@@ -46,8 +46,15 @@ describe("reference data seed", () => {
     expect(REQUESTERS.filter((r) => r.isActive).length).toBeGreaterThanOrEqual(4);
     expect(REQUESTERS.filter((r) => !r.isActive).length).toBeGreaterThanOrEqual(1);
 
-    // And no tickets, so evidence screenshots can only show tickets the
-    // application actually created (decision D-11).
-    expect(await prisma.ticket.count()).toBe(0);
+    // And the seed creates no tickets, so evidence screenshots can only show
+    // tickets the application actually created (decision D-11).
+    //
+    // Asserted as a delta rather than an absolute zero: the create-ticket suite
+    // now makes real tickets in this schema, and an absolute count would make
+    // this test depend on which file ran first. What is actually being claimed
+    // is that *seeding* adds none.
+    const ticketsBefore = await prisma.ticket.count();
+    await seedReferenceData(prisma);
+    expect(await prisma.ticket.count()).toBe(ticketsBefore);
   });
 });
