@@ -51,7 +51,9 @@ E2E rows below are not claimed runnable until it merges.
 | UNIT-04 | Unit | AC-14 | The active-attachment count ignores rows with `removedAt` set, so removing one frees a slot. | `server/tests/lab-02/attachment-rules.test.ts` | Planned |
 | UNIT-05 | Unit | AC-15 | Removal reason is trimmed and bounded to 5–250 characters. | `server/tests/lab-02/attachment-rules.test.ts` | Planned |
 | UNIT-06 | Unit | AC-09 | Query parsing accepts only the whitelisted sort fields, sort orders and page sizes, requires `page` ≥ 1, and reports each rejection as a field error. | `server/tests/lab-02/ticket-query.test.ts` | Planned |
-| API-01 | API | AC-01 | Categories, related systems and requesters return active rows only; the inactive requester never appears. | `server/tests/lab-02/reference.api.test.ts` | Planned |
+| API-01 | API | AC-01 | Categories, related systems and requesters return active rows only, ordered by name and exposing only the contracted fields; a deactivated category disappears; the inactive requester never appears. | `server/tests/lab-02/reference.api.test.ts` | Planned |
+| API-15 | API | AC-01 | With the database unreachable, all three reference endpoints return `503 DEPENDENCY_UNAVAILABLE` in the documented envelope and leak no cause, SQL or stack trace. | `server/tests/lab-02/reference-failure.api.test.ts` | Planned |
+| UNIT-07 | Unit | AC-01 | The seed is idempotent: a second run creates no duplicates, restores a requester deactivated by hand, and seeds no tickets. | `server/tests/lab-02/seed.test.ts` | Planned |
 | API-02 | API | AC-04 | A valid create returns `201` with a `TKT-` number, `NEW`, a server `ticketDate`, and the `requesterId` taken from `X-Dev-Requester-Id` rather than the body. | `server/tests/lab-02/create-ticket.api.test.ts` | Planned |
 | API-03 | API | AC-05 | Each broken field rule returns `400 VALIDATION_FAILED` with that field named in `fieldErrors`, and no ticket is persisted. | `server/tests/lab-02/create-ticket.api.test.ts` | Planned |
 | API-04 | API | AC-06 | Replaying an `Idempotency-Key` with an identical payload returns `200` and the original ticket with no duplicate row; replaying it with a changed payload returns `409 IDEMPOTENCY_KEY_CONFLICT` and creates nothing. | `server/tests/lab-02/create-ticket.api.test.ts` | Planned |
@@ -91,7 +93,7 @@ Every acceptance criterion in `specification.md` §9 maps to at least one planne
 
 | AC | Planned tests |
 |---|---|
-| AC-01 Selector lists active requesters only | API-01, UI-01 |
+| AC-01 Selector lists active requesters only | UNIT-07, API-01, API-15, UI-01 |
 | AC-02 Unselected visitor sees the selector | UI-02 |
 | AC-03 Create Ticket loads reference data | UI-03 |
 | AC-04 Valid create saves one ticket with an official number | UNIT-01, API-02, UI-05, E2E-01 |
@@ -155,6 +157,65 @@ npx playwright test e2e/lab-02
 unit, API and UI suites captured from `main` after the release merge, together with the
 Playwright run and the responsive screenshots. Test counts and file paths will be filled in
 from that run, not from a feature branch and not from memory.
+
+### Issue #19 feature-branch verification
+
+Run on `feature/19-data-and-reference-apis` on 2026-08-29, before peer review:
+
+- `npx prisma migrate dev --name lab2_data_model` — the migration was **generated and
+  applied by Prisma against the real database**, not hand-written. `migration_lock.toml`
+  and `20260829081823_lab2_data_model/migration.sql` are both committed.
+- `npm run prisma:seed`, run **twice** — 4 categories, 7 related systems, 5 requesters
+  (4 active, 1 inactive), 0 tickets. Row counts read directly out of PostgreSQL after the
+  second run were identical, and `tests/lab-02/seed.test.ts` now asserts this in CI rather
+  than relying on someone remembering to run it twice.
+- `cd server && npm test` — 5 files, **17 tests passed**.
+- `cd server && npm run build` — passed.
+
+**Test isolation, added in review.** @Earth2509 pointed out on PR #31 that two suites
+deactivate a seeded row to prove active-only filtering, and that Vitest runs test files in
+parallel by default — so `categories.test.ts`, which asserts four active categories, could
+run while one of them was switched off, and a suite failing before its cleanup would leave
+the shared development database wrong. Both are correct. Three changes:
+
+1. `tests/global-setup.ts` creates, migrates (`prisma migrate deploy`) and seeds an
+   isolated `lab2_test` PostgreSQL schema once per run; `tests/setup-env.ts` points each
+   worker's client at it. **The suite no longer touches the development database at all.**
+2. `fileParallelism: false` in `vitest.config.ts`. An isolated schema stops the tests
+   corrupting development data; only serial execution stops them corrupting each other.
+3. The restore in `finally` is kept as defence in depth.
+
+Verified after the change: `lab2_test` holds 4 categories, 7 related systems and 5
+requesters, while `public` still holds 4 active categories, 7 active related systems and
+4 active requesters — untouched by the run.
+
+**Reset, added in the second review round.** @Earth2509 then pointed out that
+`migrate deploy` applies pending migrations but never clears data, so `lab2_test` carried
+rows from one run to the next — and `seed.test.ts`'s "no tickets" assertion would start
+depending on the previous run as soon as a suite began creating them. `global-setup.ts` now
+drops and recreates the schema before migrating, with a guard that refuses to run if the
+target schema is ever `public`. Verified by planting a stray ticket in `lab2_test` by hand
+and confirming the next run cleared it.
+
+He also reported that `npm run build` fails on a clean install until `prisma generate` is
+run. **That did not reproduce here** — a fresh clone plus `npm ci` produced a client
+containing all four new models, because `@prisma/client` runs `prisma generate` from its own
+postinstall hook. An explicit `"postinstall": "prisma generate"` was added to
+`server/package.json` regardless: depending on a transitive dependency's lifecycle hook is
+fragile, and `npm ci --ignore-scripts` or a stale `node_modules` would break it.
+
+**Honest note on the race.** It is real by construction, but it was *not* reproduced:
+six runs with parallelism forced back on all passed. The mutate-assert-restore window is
+only a few milliseconds wide. The fix stands regardless — a suite that fails one run in a
+hundred is worse than one that fails every time, because the first gets re-run until it
+passes and the second gets fixed.
+
+**One contract change to note.** `GET /api/categories` previously returned rows in id
+order, which was the Lab 1 contract. `api-spec.md` §2 — written and merged in Issue #17,
+before this implementation — specifies that all three reference endpoints order by name so
+the dropdowns read alphabetically. The endpoint follows the newer contract, and
+`tests/lab-01/categories.test.ts` was updated to match, with the reason recorded in the
+file itself. Only the ordering assertions changed; the `{ id, name }` shape did not.
 
 ### Issue #18 feature-branch verification
 

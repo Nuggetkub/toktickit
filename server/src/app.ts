@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import { getPrisma } from "./prisma.js";
 import { CLIENT_ORIGIN, SERVICE_NAME } from "./config.js";
+import { sendDependencyUnavailable } from "./errors.js";
 
 // The Express app is exported separately from app.listen() (see index.ts) so
 // Supertest can import `app` without opening a port. Do not merge these files.
@@ -21,17 +22,54 @@ app.get("/api/health", (_req: Request, res: Response) => {
   res.status(200).json({ status: "ok", service: SERVICE_NAME });
 });
 
+// ---------------------------------------------------------------------------
+// Issue 19 — Lab 2 reference data (api-spec.md §2)
+//
+// These three are not requester-scoped and take no identity header: the
+// selector has to be able to load before a Requester has been chosen at all.
+//
+// All three return active rows only and are ordered by name, so the dropdowns
+// that consume them read alphabetically rather than in insertion order. An
+// empty array is a valid answer — the interface treats it as an empty state,
+// not as an error.
+// ---------------------------------------------------------------------------
+
 app.get("/api/categories", async (_req: Request, res: Response) => {
   try {
     const categories = await getPrisma().category.findMany({
+      where: { isActive: true },
       select: { id: true, name: true },
-      orderBy: { id: "asc" },
+      orderBy: { name: "asc" },
     });
     res.status(200).json(categories);
   } catch (err) {
-    // Log the real cause for us, but never leak it to the client.
-    console.error("GET /api/categories failed:", err);
-    res.status(500).json({ error: "Could not load categories." });
+    sendDependencyUnavailable(res, "GET /api/categories", err);
+  }
+});
+
+app.get("/api/related-systems", async (_req: Request, res: Response) => {
+  try {
+    const relatedSystems = await getPrisma().relatedSystem.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+    res.status(200).json(relatedSystems);
+  } catch (err) {
+    sendDependencyUnavailable(res, "GET /api/related-systems", err);
+  }
+});
+
+app.get("/api/requesters", async (_req: Request, res: Response) => {
+  try {
+    const requesters = await getPrisma().requester.findMany({
+      where: { isActive: true },
+      select: { id: true, fullName: true, email: true },
+      orderBy: { fullName: "asc" },
+    });
+    res.status(200).json(requesters);
+  } catch (err) {
+    sendDependencyUnavailable(res, "GET /api/requesters", err);
   }
 });
 
