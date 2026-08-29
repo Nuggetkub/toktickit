@@ -62,6 +62,23 @@ describe("GET /api/related-systems", () => {
       expect(Object.keys(system).sort()).toEqual(["id", "name"]);
     }
   });
+
+  it("excludes a related system that has been deactivated", async () => {
+    const prisma = getPrisma();
+    const target = await prisma.relatedSystem.findUniqueOrThrow({ where: { name: "VPN" } });
+
+    try {
+      await prisma.relatedSystem.update({ where: { id: target.id }, data: { isActive: false } });
+
+      const res = await request(app).get("/api/related-systems");
+      const names = res.body.map((system: { name: string }) => system.name);
+
+      expect(names).not.toContain("VPN");
+      expect(names).toHaveLength(RELATED_SYSTEM_NAMES.length - 1);
+    } finally {
+      await prisma.relatedSystem.update({ where: { id: target.id }, data: { isActive: true } });
+    }
+  });
 });
 
 describe("GET /api/requesters", () => {

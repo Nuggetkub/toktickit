@@ -169,8 +169,31 @@ Run on `feature/19-data-and-reference-apis` on 2026-08-29, before peer review:
   (4 active, 1 inactive), 0 tickets. Row counts read directly out of PostgreSQL after the
   second run were identical, and `tests/lab-02/seed.test.ts` now asserts this in CI rather
   than relying on someone remembering to run it twice.
-- `cd server && npm test` — 5 files, **16 tests passed**.
+- `cd server && npm test` — 5 files, **17 tests passed**.
 - `cd server && npm run build` — passed.
+
+**Test isolation, added in review.** @Earth2509 pointed out on PR #31 that two suites
+deactivate a seeded row to prove active-only filtering, and that Vitest runs test files in
+parallel by default — so `categories.test.ts`, which asserts four active categories, could
+run while one of them was switched off, and a suite failing before its cleanup would leave
+the shared development database wrong. Both are correct. Three changes:
+
+1. `tests/global-setup.ts` creates, migrates (`prisma migrate deploy`) and seeds an
+   isolated `lab2_test` PostgreSQL schema once per run; `tests/setup-env.ts` points each
+   worker's client at it. **The suite no longer touches the development database at all.**
+2. `fileParallelism: false` in `vitest.config.ts`. An isolated schema stops the tests
+   corrupting development data; only serial execution stops them corrupting each other.
+3. The restore in `finally` is kept as defence in depth.
+
+Verified after the change: `lab2_test` holds 4 categories, 7 related systems and 5
+requesters, while `public` still holds 4 active categories, 7 active related systems and
+4 active requesters — untouched by the run.
+
+**Honest note on the race.** It is real by construction, but it was *not* reproduced:
+six runs with parallelism forced back on all passed. The mutate-assert-restore window is
+only a few milliseconds wide. The fix stands regardless — a suite that fails one run in a
+hundred is worse than one that fails every time, because the first gets re-run until it
+passes and the second gets fixed.
 
 **One contract change to note.** `GET /api/categories` previously returned rows in id
 order, which was the Lab 1 contract. `api-spec.md` §2 — written and merged in Issue #17,
