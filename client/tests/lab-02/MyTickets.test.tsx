@@ -32,7 +32,20 @@ function page(items: ReturnType<typeof ticket>[], overrides: Record<string, numb
   return { items, page: 1, pageSize: 10, totalItems: items.length, totalPages: 1, ...overrides };
 }
 
-/** Records every /api/tickets request so query building can be asserted. */
+/** A promise the test resolves when it chooses, for loading and ordering tests. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}
+
+/**
+ * Records every /api/tickets request so query building can be asserted, and lets
+ * a test return a pending promise so the states between request and response are
+ * reachable rather than only their endpoints.
+ */
 function mockApi(listFor: (url: URL) => unknown = () => page([ticket(1, "Campus Wi-Fi drops nightly")])) {
   const listUrls: URL[] = [];
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
@@ -40,7 +53,7 @@ function mockApi(listFor: (url: URL) => unknown = () => page([ticket(1, "Campus 
 
     if (url.pathname === "/api/tickets") {
       listUrls.push(url);
-      const body = listFor(url);
+      const body = await listFor(url);
       if (body instanceof Error) throw body;
       return { ok: true, status: 200, json: async () => body, headers: init?.headers };
     }
@@ -61,6 +74,12 @@ async function renderList(requesterId = "1") {
     </MemoryRouter>,
   );
   await screen.findByRole("heading", { name: "My Tickets" });
+  // The filter dropdowns are populated by a separate request. Waiting for it here
+  // stops every test that touches a filter from racing it — which showed up as a
+  // pass in the full suite and a failure when run alone.
+  await waitFor(() =>
+    expect(within(screen.getByLabelText("Category")).getAllByRole("option").length).toBeGreaterThan(1),
+  );
 }
 
 afterEach(() => {
@@ -192,6 +211,143 @@ describe("My Tickets — empty and no-results are different", () => {
     // Telling someone to clear filters they never set would be the wrong advice,
     // and offering "Create Ticket" here answers a question they did not ask.
     expect(screen.queryByText("You have not created any Tickets yet.")).not.toBeInTheDocument();
+  });
+});
+
+describe("My Tickets — behaviour between request and response", () => {
+  it("shows the loading state, then the list it resolves to", async () => {
+    // Asked for in review: the previous tests only saw the endpoints of the
+    // request, never the state in between.
+    const gate = deferred<unknown>();
+    mockApi(() => gate.promise);
+    await renderList();
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading your Tickets");
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+
+    gate.resolve(page([ticket(1, "Resolved at last")]));
+
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(screen.getByText("Resolved at last")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("ignores a stale response that arrives after a newer one", async () => {
+    // The `active` flag exists for exactly this. Deliberate behaviour with no
+    // test is behaviour that disappears in the next refactor.
+    const gates: Array<{ resolve: (value: unknown) => void }> = [];
+    mockApi(() => {
+      const gate = deferred<unknown>();
+      gates.push(gate);
+      return gate.promise;
+    });
+    await renderList();
+
+    await userEvent.selectOptions(screen.getByLabelText("Category"), "3");
+    await waitFor(() => expect(gates.length).toBe(2));
+
+    // The newer request answers first, then the abandoned one arrives late.
+    gates[1].resolve(page([ticket(2, "Newer answer")]));
+    expect(await screen.findByText("Newer answer")).toBeInTheDocument();
+
+    gates[0].resolve(page([ticket(1, "Stale answer")]));
+    await new Promise((settle) => setTimeout(settle, 60));
+
+    expect(screen.queryByText("Stale answer")).not.toBeInTheDocument();
+    expect(screen.getByText("Newer answer")).toBeInTheDocument();
+  });
+});
+
+describe("My Tickets — each control changes what is displayed", () => {
+  // Distinct fixtures per query, so an assertion can be about the rows on screen
+  // rather than only about the URL that asked for them.
+  function fixtures(url: URL) {
+    if (url.searchParams.get("categoryId") === "3") return page([ticket(2, "Hardware fault")]);
+    if (url.searchParams.get("relatedSystemId") === "5") return page([ticket(3, "Wi-Fi fault")]);
+    if (url.searchParams.get("requestedPriority") === "URGENT") return page([ticket(4, "Urgent fault")]);
+    if (url.searchParams.get("sortBy") === "ticketNumber") return page([ticket(5, "Sorted by number")]);
+    return page([ticket(1, "Unfiltered result")]);
+  }
+
+  it.each([
+    ["Category", "3", "Hardware fault", "categoryId", "3"],
+    ["Related System", "5", "Wi-Fi fault", "relatedSystemId", "5"],
+    ["Requested Priority", "URGENT", "Urgent fault", "requestedPriority", "URGENT"],
+    ["Sort", "ticketNumber:asc", "Sorted by number", "sortBy", "ticketNumber"],
+  ])("%s replaces the rows on screen, not just the query", async (label, choice, expected, param, value) => {
+    const { listUrls } = mockApi(fixtures);
+    await renderList();
+    expect(await screen.findByText("Unfiltered result")).toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByLabelText(label as string), choice as string);
+
+    expect(await screen.findByText(expected as string)).toBeInTheDocument();
+    expect(screen.queryByText("Unfiltered result")).not.toBeInTheDocument();
+    expect(listUrls.at(-1)!.searchParams.get(param as string)).toBe(value);
+  });
+});
+
+describe("My Tickets — paging moves through the list", () => {
+  function twoPages(url: URL) {
+    const requested = Number(url.searchParams.get("page") ?? "1");
+    const rows = Array.from({ length: 10 }, (_, index) =>
+      ticket(requested * 100 + index, `Page ${requested} ticket ${index + 1}`),
+    );
+    return { items: rows, page: requested, pageSize: 10, totalItems: 20, totalPages: 2 };
+  }
+
+  it("requests and renders the next page, then comes back", async () => {
+    const { listUrls } = mockApi(twoPages);
+    await renderList();
+    await screen.findByRole("table");
+
+    expect(screen.getByText("Page 1 ticket 1")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
+    const next = screen.getByRole("button", { name: "Next" });
+    expect(next).toBeEnabled();
+
+    await userEvent.click(next);
+
+    expect(await screen.findByText("Page 2 ticket 1")).toBeInTheDocument();
+    expect(screen.queryByText("Page 1 ticket 1")).not.toBeInTheDocument();
+    expect(listUrls.at(-1)!.searchParams.get("page")).toBe("2");
+
+    const nav = screen.getByRole("navigation", { name: "Ticket list pages" });
+    expect(nav).toHaveTextContent("Showing 11–20 of 20 Tickets");
+    expect(nav).toHaveTextContent("Page 2 of 2");
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Previous" }));
+
+    expect(await screen.findByText("Page 1 ticket 1")).toBeInTheDocument();
+    expect(listUrls.at(-1)!.searchParams.get("page")).toBe("1");
+  });
+});
+
+describe("My Tickets — changing requester reloads under the new identity", () => {
+  it("selects a second requester and shows their list, not the first one's", async () => {
+    // The earlier test stopped at the selector. What matters is what happens
+    // after: the list must come back under the new identity.
+    const { fetchMock } = mockApi((url) => {
+      const header = url.searchParams; // identity is not here — see the header check below
+      void header;
+      return page([ticket(1, "Belongs to whoever asked")]);
+    });
+    await renderList("1");
+    await screen.findByRole("table");
+
+    await userEvent.click(screen.getByRole("button", { name: "Change Requester" }));
+    await screen.findByRole("heading", { name: "Development Requester Selection" });
+
+    await userEvent.selectOptions(await screen.findByLabelText(/Development Requester/), "2");
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(screen.getAllByText("Somchai Pattana").length).toBeGreaterThan(0);
+
+    const listCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes("/api/tickets"));
+    const lastHeaders = (listCalls.at(-1)![1] as RequestInit).headers as Record<string, string>;
+    expect(lastHeaders["X-Dev-Requester-Id"]).toBe("2");
   });
 });
 

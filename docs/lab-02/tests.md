@@ -163,7 +163,22 @@ from that run, not from a feature branch and not from memory.
 
 Run on `feature/24-my-tickets-screen` on 2026-08-30, before peer review:
 
-- `cd client && npm test` — 7 files, **75 tests passed** (up from 6 files / 61).
+- `cd client && npm test` — 7 files, **83 tests passed** (up from 6 files / 61).
+
+**Eight of those came from review.** @Earth2509 pointed out that the suite asserted *query
+construction* rather than what a user sees: it checked that selecting a Category put
+`categoryId=3` in the URL, never that the rows on screen changed. Added: a deferred response
+proving the loading state resolves to a list; per-control fixtures so Category, Related
+System, Requested Priority and Sort each visibly replace the rows; real paging through Next
+and Previous with the rendered page asserted; a completed requester change that reloads under
+the new identity; and a regression test for the stale-response guard.
+
+**The stale-response test was verified by breaking the code.** A regression test that has
+never failed is unproven, so the `active` guard was removed temporarily: the test failed with
+the stale answer on screen, and passed again once restored. That also exposed a flake of our
+own — several tests selected a filter before the reference-data request had populated the
+dropdowns, which passed in the full suite and failed when run alone. `renderList` now waits
+for the filters before returning.
 - `cd client && npm run build` — passed.
 
 **Three findings from reviewing the peer's My Tickets screen were applied here before they
