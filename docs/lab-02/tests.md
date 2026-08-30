@@ -159,6 +159,31 @@ unit, API and UI suites captured from `main` after the release merge, together w
 Playwright run and the responsive screenshots. Test counts and file paths will be filled in
 from that run, not from a feature branch and not from memory.
 
+### Issue #24 feature-branch verification
+
+Run on `feature/24-my-tickets-screen` on 2026-08-30, before peer review:
+
+- `cd client && npm test` — 7 files, **75 tests passed** (up from 6 files / 61).
+- `cd client && npm run build` — passed.
+
+**Three findings from reviewing the peer's My Tickets screen were applied here before they
+could be repeated.** Search is debounced to one request per completed term rather than one
+per keystroke; the pagination line announces the result count, not only "Page 1 of 3"; and
+Clear filters is enabled by a sort-only change, because it resets sort as well — a button
+that refuses to do what it claims is worse than no button.
+
+**A real defect, found by a test that was wrong first.** The pagination label computed the
+last row as `page x pageSize`, which is correct for a full page and a lie for any page the
+server trims. It now derives from the rows actually returned. The test that exposed it was
+itself unrealistic — one row with a total of 24 — so the fix was to correct both.
+
+**My own earlier suites used a blanket fetch mock, and it bit exactly as predicted.**
+`RequesterSelector.test.tsx` and `RequesterRouteGuard.test.tsx` answered every URL with the
+requester list. That was harmless while `/tickets` was a placeholder, and broke the moment
+the screen really fetched — the ticket list received an array of requesters. Both are now
+routed per endpoint. This is the third time this pattern has been raised in review on the
+peer's code; it is worth recording that it was in ours too.
+
 ### Issue #23 feature-branch verification
 
 Run on `feature/23-my-tickets-api` on 2026-08-30, before peer review:

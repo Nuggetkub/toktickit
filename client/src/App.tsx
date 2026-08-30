@@ -3,6 +3,7 @@ import { AppShell, Card, type NavItem } from "./components/index.js";
 import SystemCheck from "./SystemCheck.js";
 import { RequesterProvider, RequesterSelector, RequireRequester, useRequester } from "./requester/index.js";
 import CreateTicket from "./tickets/CreateTicket.js";
+import MyTickets from "./tickets/MyTickets.js";
 
 // Routes, so that AC-02 — opening a requester-scoped route directly shows the
 // selector — is a real claim about a real URL rather than about which branch of
@@ -59,7 +60,15 @@ function Shell() {
           path="/tickets"
           element={
             <RequireRequester>
-              <ComingSoon title="My Tickets" issue={24} />
+              <MyTickets />
+            </RequireRequester>
+          }
+        />
+        <Route
+          path="/tickets/:ticketId"
+          element={
+            <RequireRequester>
+              <ComingSoon title="Ticket Detail" issue={26} />
             </RequireRequester>
           }
         />
