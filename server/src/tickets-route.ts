@@ -4,6 +4,12 @@ import { getPrisma } from "./prisma.js";
 import { sendDependencyUnavailable, sendError } from "./errors.js";
 import { resolveRequester } from "./requester-context.js";
 import {
+  DEFAULT_PAGE_SIZE,
+  totalPages as pageCount,
+  validateTicketListQuery,
+  type TicketListQuery,
+} from "./ticket-query.js";
+import {
   formatTicketNumber,
   isSameTicket,
   validateTicketCreate,
@@ -202,4 +208,153 @@ async function createWithNumber(
       select: ticketSelect,
     });
   });
+}
+
+// ---------------------------------------------------------------------------
+// Issue 23 — My Tickets (api-spec.md §3)
+// ---------------------------------------------------------------------------
+
+// The list carries what the table shows and nothing more. `description` runs to
+// 4000 characters and is never rendered in a row, so shipping it would send up
+// to 200 kB of unused text per page — it belongs on the detail response only.
+const listSelect = {
+  id: true,
+  ticketNumber: true,
+  summary: true,
+  requestedPriority: true,
+  currentStatus: true,
+  createdAt: true,
+  category: { select: { id: true, name: true } },
+  relatedSystem: { select: { id: true, name: true } },
+  _count: { select: { attachments: { where: { removedAt: null } } } },
+} satisfies Prisma.TicketSelect;
+
+type ListRow = Prisma.TicketGetPayload<{ select: typeof listSelect }>;
+
+function serializeRow(ticket: ListRow) {
+  return {
+    id: ticket.id,
+    ticketNumber: ticket.ticketNumber,
+    ticketDate: ticket.createdAt,
+    summary: ticket.summary,
+    category: ticket.category,
+    relatedSystem: ticket.relatedSystem,
+    requestedPriority: ticket.requestedPriority,
+    currentStatus: ticket.currentStatus,
+    attachmentCount: ticket._count.attachments,
+  };
+}
+
+function orderBy(query: TicketListQuery): Prisma.TicketOrderByWithRelationInput[] {
+  const direction = query.sortOrder;
+  const primary =
+    query.sortBy === "ticketDate"
+      ? { createdAt: direction }
+      : query.sortBy === "ticketNumber"
+        ? { ticketNumber: direction }
+        : { requestedPriority: direction };
+
+  // Ticket Number descending is always the tie-breaker, so paging is stable:
+  // without it, two tickets sharing a timestamp can swap between pages and one
+  // of them is never seen (BR-24).
+  return [primary, { ticketNumber: "desc" }];
+}
+
+export async function listTickets(req: Request, res: Response): Promise<void> {
+  const context = await resolveRequester(req).catch(() => null);
+  if (context === null) {
+    sendDependencyUnavailable(res, "GET /api/tickets (requester lookup)", new Error("lookup failed"));
+    return;
+  }
+  if (!context.requester) {
+    sendError(res, 401, "REQUESTER_CONTEXT_REQUIRED", "Select a Development Requester to see your Tickets.");
+    return;
+  }
+
+  const validation = validateTicketListQuery(req.query as Record<string, unknown>);
+  if (!validation.value) {
+    sendError(res, 400, "VALIDATION_FAILED", "The Ticket list query is not valid.", validation.fieldErrors);
+    return;
+  }
+
+  const query = validation.value;
+
+  // Scoped to the requester before anything else is applied (BR-21). This is the
+  // whole of the ownership guarantee for the list: it is a database predicate,
+  // not something the caller can influence.
+  const where: Prisma.TicketWhereInput = {
+    requesterId: context.requester.id,
+    ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+    ...(query.relatedSystemId ? { relatedSystemId: query.relatedSystemId } : {}),
+    ...(query.requestedPriority ? { requestedPriority: query.requestedPriority } : {}),
+    ...(query.search
+      ? {
+          OR: [
+            { ticketNumber: { contains: query.search, mode: "insensitive" } },
+            { summary: { contains: query.search, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
+
+  try {
+    const prisma = getPrisma();
+    const [totalItems, items] = await Promise.all([
+      prisma.ticket.count({ where }),
+      prisma.ticket.findMany({
+        where,
+        orderBy: orderBy(query),
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        select: listSelect,
+      }),
+    ]);
+
+    res.status(200).json({
+      items: items.map(serializeRow),
+      page: query.page,
+      pageSize: query.pageSize,
+      totalItems,
+      totalPages: pageCount(totalItems, query.pageSize),
+    });
+  } catch (error) {
+    sendDependencyUnavailable(res, "GET /api/tickets", error);
+  }
+}
+
+export async function getTicket(req: Request, res: Response): Promise<void> {
+  const context = await resolveRequester(req).catch(() => null);
+  if (context === null) {
+    sendDependencyUnavailable(res, "GET /api/tickets/:id (requester lookup)", new Error("lookup failed"));
+    return;
+  }
+  if (!context.requester) {
+    sendError(res, 401, "REQUESTER_CONTEXT_REQUIRED", "Select a Development Requester to open a Ticket.");
+    return;
+  }
+
+  const ticketId = Number(req.params.ticketId);
+  if (!Number.isSafeInteger(ticketId) || ticketId < 1) {
+    // Indistinguishable from a ticket that exists but is not yours (D-04).
+    sendError(res, 404, "TICKET_NOT_FOUND", "That Ticket could not be found.");
+    return;
+  }
+
+  try {
+    // Ownership is part of the query, so another requester's ticket is not
+    // fetched and then refused — it is never read at all (BR-10).
+    const ticket = await getPrisma().ticket.findFirst({
+      where: { id: ticketId, requesterId: context.requester.id },
+      select: ticketSelect,
+    });
+
+    if (!ticket) {
+      sendError(res, 404, "TICKET_NOT_FOUND", "That Ticket could not be found.");
+      return;
+    }
+
+    res.status(200).json(serialize(ticket));
+  } catch (error) {
+    sendDependencyUnavailable(res, "GET /api/tickets/:id", error);
+  }
 }
