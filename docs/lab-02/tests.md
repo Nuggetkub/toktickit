@@ -159,6 +159,34 @@ unit, API and UI suites captured from `main` after the release merge, together w
 Playwright run and the responsive screenshots. Test counts and file paths will be filled in
 from that run, not from a feature branch and not from memory.
 
+### Issue #23 feature-branch verification
+
+Run on `feature/23-my-tickets-api` on 2026-08-30, before peer review:
+
+- `cd server && npm test` — 12 files, **89 tests passed** (up from 9 files / 55).
+- `cd server && npm run build` — passed.
+
+**These run against the real database rather than a mocked Prisma.** Owner scoping is the
+security-relevant claim in the sprint, and a mocked `findMany` returns what the mock was told
+— so it can only prove the route builds a `where` clause, never that PostgreSQL honours it.
+The same argument was put to the peer on his PR #24; it applies here.
+
+**Three decisions the tests pin down:**
+
+- **Invalid query parameters are rejected, not ignored** (BR-27). "No results" and "you asked
+  the wrong question" are different answers and a caller cannot tell them apart from the
+  outside, so a bad `sortBy` returns `400` with a field error rather than a plausible empty
+  page. That includes a `currentStatus` filter, which Lab 2 does not have (BR-30) — silently
+  ignoring it would hand unfiltered results to a client that believes they are filtered.
+- **A repeated parameter is rejected.** Express turns `?page=1&page=99` into an array;
+  quietly picking one would make the query mean something the caller did not write.
+- **`totalPages` is never below 1**, so an empty result reads "page 1 of 1" rather than
+  "page 1 of 0" — the same correction raised on the peer's PR #24.
+
+The list response omits `description` deliberately: at 4000 characters a row, and never
+rendered in the table, it would be up to 200 kB of unused text per page. A test asserts the
+exact key set so it cannot drift back in.
+
 ### Issue #22 feature-branch verification
 
 Run on `feature/22-create-ticket-screen` on 2026-08-30, before peer review:

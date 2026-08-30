@@ -3,7 +3,7 @@ import cors from "cors";
 import { getPrisma } from "./prisma.js";
 import { CLIENT_ORIGIN, SERVICE_NAME } from "./config.js";
 import { sendDependencyUnavailable } from "./errors.js";
-import { createTicket } from "./tickets-route.js";
+import { createTicket, getTicket, listTickets } from "./tickets-route.js";
 
 // The Express app is exported separately from app.listen() (see index.ts) so
 // Supertest can import `app` without opening a port. Do not merge these files.
@@ -81,5 +81,10 @@ app.get("/api/requesters", async (_req: Request, res: Response) => {
 // the body, so this route describes a Ticket and nothing else (decision D-01).
 // ---------------------------------------------------------------------------
 app.post("/api/tickets", createTicket);
+
+// Issue 23 — My Tickets. Both are requester-scoped: the list is filtered by the
+// header identity and the detail is fetched by (id, requesterId) together.
+app.get("/api/tickets", listTickets);
+app.get("/api/tickets/:ticketId", getTicket);
 
 export default app;
