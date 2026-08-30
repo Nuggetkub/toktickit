@@ -159,6 +159,33 @@ unit, API and UI suites captured from `main` after the release merge, together w
 Playwright run and the responsive screenshots. Test counts and file paths will be filled in
 from that run, not from a feature branch and not from memory.
 
+### Issue #22 feature-branch verification
+
+Run on `feature/22-create-ticket-screen` on 2026-08-30, before peer review:
+
+- `cd client && npm test` — 6 files, **55 tests passed** (up from 5 files / 44).
+- `cd client && npm run build` — passed. It again caught a type error the test run did not:
+  `typeof envelope` narrows to `null` after its initialiser, so the parsed error body was
+  being cast to `never`. Three issues running, the build has found something `npm test`
+  could not.
+- Server suite re-run unchanged: 9 files, 55 tests passed.
+
+**Attachment selection is validated but not uploaded.** BR-34 puts upload after the Ticket
+exists, and the upload endpoint arrives in #25, so this screen checks the files and says
+plainly on the success panel that they were *not* stored and will need choosing again. Part 6
+still gets its evidence — one valid and one invalid file, with the valid one kept and each
+rejection named — without the screen claiming to have done something it has not.
+
+**Two test bugs of mine, both worth recording because they are easy to repeat:**
+
+1. `aria-describedby` on a field with *both* a hint and an error lists two ids, so asserting
+   equality against `"summary-error"` fails. The assertion now checks containment.
+2. `userEvent.upload()` honours the input's `accept` attribute and silently drops a
+   disallowed file, so the component never saw the invalid one and the rejection never fired.
+   The test now uses `fireEvent.change`. This is the more interesting of the two: `accept` is
+   a hint that drag-and-drop ignores, which is precisely why the validation cannot live in
+   the attribute — and a test driven through `upload()` would have quietly asserted nothing.
+
 ### Issue #21 feature-branch verification
 
 Run on `feature/21-create-ticket-api` on 2026-08-29, before peer review:
