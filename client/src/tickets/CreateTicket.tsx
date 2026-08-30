@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   ApiError,
   REQUESTED_PRIORITIES,
@@ -36,6 +36,10 @@ const SUMMARY_MAX = 120;
 const DESCRIPTION_MIN = 20;
 const DESCRIPTION_MAX = 4000;
 
+// The order the fields appear on screen. "First invalid" has to mean first as
+// the user reads it, not first as an object happens to enumerate.
+const FIELD_ORDER = ["categoryId", "relatedSystemId", "summary", "requestedPriority", "description"] as const;
+
 type FormValues = {
   categoryId: string;
   relatedSystemId: string;
@@ -58,6 +62,8 @@ function newIdempotencyKey(): string {
 
 export default function CreateTicket() {
   const { requester } = useRequester();
+  const navigate = useNavigate();
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [values, setValues] = useState<FormValues>(EMPTY);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState("");
@@ -130,7 +136,10 @@ export default function CreateTicket() {
 
     const errors = validate();
     setFieldErrors(errors);
-    if (Object.keys(errors).length > 0 || !requester) return;
+    if (Object.keys(errors).length > 0 || !requester) {
+      focusFirstInvalid(errors);
+      return;
+    }
 
     setSubmitting(true);
     setSubmitError("");
@@ -153,12 +162,45 @@ export default function CreateTicket() {
       if (error instanceof ApiError) {
         setFieldErrors(error.fieldErrors ?? {});
         setSubmitError(error.fieldErrors ? "Some details need correcting." : error.message);
+        // A rule the server enforced deserves the same treatment as one the
+        // client caught: send the user straight to the field that needs fixing.
+        if (error.fieldErrors) focusFirstInvalid(error.fieldErrors);
       } else {
         setSubmitError("The Ticket could not be created. Please try again.");
       }
     } finally {
       setSubmitting(false);
     }
+  }
+
+  /**
+   * Moves focus to the first invalid control in reading order (ui-spec.md §6).
+   * Without this a screen-reader or keyboard user is told the form failed and
+   * then left wherever they were, with no way to find the offending field except
+   * by walking the whole form.
+   */
+  function focusFirstInvalid(errors: Record<string, string>) {
+    const first = FIELD_ORDER.find((field) => errors[field]);
+    if (!first) return;
+    document.getElementById(first)?.focus();
+  }
+
+  const hasUnsavedInput =
+    values.categoryId !== "" ||
+    values.relatedSystemId !== "" ||
+    values.summary.trim() !== "" ||
+    values.description.trim() !== "" ||
+    values.requestedPriority !== "" ||
+    files.length > 0;
+
+  function cancel() {
+    // Leaving without warning would throw away a half-written ticket on a
+    // mis-click. Nothing is stored yet, so the only copy is what is on screen.
+    if (hasUnsavedInput) {
+      setConfirmingCancel(true);
+      return;
+    }
+    navigate("/tickets");
   }
 
   function createAnother() {
@@ -353,9 +395,26 @@ export default function CreateTicket() {
           </ul>
         )}
 
-        <Button type="submit" busy={submitting} busyLabel="Creating ticket…" disabled={referenceState !== "ready"}>
-          Submit Ticket
-        </Button>
+        {confirmingCancel && (
+          <div className="zen-alert" role="alertdialog" aria-label="Discard this Ticket?">
+            <p>Discard this Ticket? Nothing has been saved, so the details on screen will be lost.</p>
+            <Button variant="destructive" onClick={() => navigate("/tickets")}>
+              Discard Ticket
+            </Button>
+            <Button variant="secondary" onClick={() => setConfirmingCancel(false)}>
+              Keep editing
+            </Button>
+          </div>
+        )}
+
+        <div className="zen-shell__nav">
+          <Button type="submit" busy={submitting} busyLabel="Creating ticket…" disabled={referenceState !== "ready"}>
+            Submit Ticket
+          </Button>
+          <Button variant="secondary" onClick={cancel} disabled={submitting}>
+            Cancel
+          </Button>
+        </div>
       </form>
     </Card>
   );

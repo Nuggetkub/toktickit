@@ -203,6 +203,88 @@ describe("Create Ticket — submission", () => {
   });
 });
 
+describe("Create Ticket — focus and cancel", () => {
+  it("moves focus to the first invalid field in reading order", async () => {
+    mockApi();
+    await renderCreateTicket();
+
+    await userEvent.click(screen.getByRole("button", { name: "Submit Ticket" }));
+
+    // Category is first on the screen, so that is where focus belongs — not
+    // wherever the user happened to be, and not whichever key an object
+    // enumerated first.
+    expect(screen.getByLabelText(/Category/)).toHaveFocus();
+  });
+
+  it("focuses the first field that is still invalid, not simply the first field", async () => {
+    mockApi();
+    await renderCreateTicket();
+
+    // Fix the two selects; Summary becomes the first offender.
+    await userEvent.selectOptions(screen.getByLabelText(/Category/), "2");
+    await userEvent.selectOptions(screen.getByLabelText(/Related System/), "5");
+    await userEvent.click(screen.getByRole("button", { name: "Submit Ticket" }));
+
+    expect(screen.getByLabelText(/Ticket Summary/)).toHaveFocus();
+  });
+
+  it("focuses the field a server-side error names", async () => {
+    mockApi({
+      create: () => ({
+        status: 400,
+        body: {
+          error: {
+            code: "VALIDATION_FAILED",
+            message: "The Ticket could not be created.",
+            fieldErrors: { description: "Description must be 20-4000 characters." },
+          },
+        },
+      }),
+    });
+    await renderCreateTicket();
+    await fillValidForm();
+    await userEvent.click(screen.getByRole("button", { name: "Submit Ticket" }));
+
+    await screen.findByText("Description must be 20-4000 characters.");
+    expect(screen.getByLabelText(/Description/)).toHaveFocus();
+  });
+
+  it("leaves immediately when Cancel is pressed on an untouched form", async () => {
+    mockApi();
+    await renderCreateTicket();
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(await screen.findByRole("heading", { name: "My Tickets" })).toBeInTheDocument();
+  });
+
+  it("asks before discarding a part-written ticket, and can be waved off", async () => {
+    mockApi();
+    await renderCreateTicket();
+    await userEvent.type(screen.getByLabelText(/Ticket Summary/), "Half a thought");
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("alertdialog", { name: /Discard this Ticket/i })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "My Tickets" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    // Nothing typed is lost by asking.
+    expect(screen.getByLabelText(/Ticket Summary/)).toHaveValue("Half a thought");
+  });
+
+  it("discards and leaves once the discard is confirmed", async () => {
+    mockApi();
+    await renderCreateTicket();
+    await userEvent.type(screen.getByLabelText(/Ticket Summary/), "Half a thought");
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(screen.getByRole("button", { name: "Discard Ticket" }));
+
+    expect(await screen.findByRole("heading", { name: "My Tickets" })).toBeInTheDocument();
+  });
+});
+
 describe("Create Ticket — attachments", () => {
   function file(name: string, type: string, size: number) {
     const created = new File(["x"], name, { type });

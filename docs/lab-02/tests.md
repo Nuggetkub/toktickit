@@ -163,7 +163,15 @@ from that run, not from a feature branch and not from memory.
 
 Run on `feature/22-create-ticket-screen` on 2026-08-30, before peer review:
 
-- `cd client && npm test` — 6 files, **55 tests passed** (up from 5 files / 44).
+- `cd client && npm test` — 6 files, **61 tests passed** (up from 5 files / 44).
+
+**Six of those came from review.** @Earth2509 found two places where the screen did not meet
+`ui-spec.md` §6: there was no Cancel action, and focus did not move to the first invalid
+field after a failed submit. Both were requirements this repository had written down and then
+not implemented — the spec was right and the code was behind it. Cancel now confirms before
+discarding part-written input, focus moves to the first invalid control *in reading order*
+(not whichever key an object enumerated first), and a server-side field error focuses the
+field it names.
 - `cd client && npm run build` — passed. It again caught a type error the test run did not:
   `typeof envelope` narrows to `null` after its initialiser, so the parsed error body was
   being cast to `never`. Three issues running, the build has found something `npm test`
