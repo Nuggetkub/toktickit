@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-
 import { AppShell, Card, type NavItem } from "./components/index.js";
 import SystemCheck from "./SystemCheck.js";
 import { RequesterProvider, RequesterSelector, RequireRequester, useRequester } from "./requester/index.js";
+import CreateTicket from "./tickets/CreateTicket.js";
 
 // Routes, so that AC-02 — opening a requester-scoped route directly shows the
 // selector — is a real claim about a real URL rather than about which branch of
@@ -50,7 +51,7 @@ function Shell() {
           path="/create"
           element={
             <RequireRequester>
-              <ComingSoon title="Create Ticket" issue={22} />
+              <CreateTicket />
             </RequireRequester>
           }
         />
