@@ -6,6 +6,8 @@ import type { Response } from "express";
 export type ErrorCode =
   | "VALIDATION_FAILED"
   | "REQUESTER_CONTEXT_REQUIRED"
+  | "IDEMPOTENCY_KEY_REQUIRED"
+  | "IDEMPOTENCY_KEY_CONFLICT"
   | "TICKET_NOT_FOUND"
   | "REFERENCE_NOT_FOUND"
   | "INTERNAL_ERROR"

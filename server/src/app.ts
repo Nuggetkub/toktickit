@@ -3,6 +3,7 @@ import cors from "cors";
 import { getPrisma } from "./prisma.js";
 import { CLIENT_ORIGIN, SERVICE_NAME } from "./config.js";
 import { sendDependencyUnavailable } from "./errors.js";
+import { createTicket } from "./tickets-route.js";
 
 // The Express app is exported separately from app.listen() (see index.ts) so
 // Supertest can import `app` without opening a port. Do not merge these files.
@@ -72,5 +73,13 @@ app.get("/api/requesters", async (_req: Request, res: Response) => {
     sendDependencyUnavailable(res, "GET /api/requesters", err);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Issue 21 — Create Ticket (api-spec.md §3)
+//
+// Requester-scoped: identity arrives in the X-Dev-Requester-Id header, never in
+// the body, so this route describes a Ticket and nothing else (decision D-01).
+// ---------------------------------------------------------------------------
+app.post("/api/tickets", createTicket);
 
 export default app;

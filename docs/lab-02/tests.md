@@ -57,7 +57,8 @@ E2E rows below are not claimed runnable until it merges.
 | API-02 | API | AC-04 | A valid create returns `201` with a `TKT-` number, `NEW`, a server `ticketDate`, and the `requesterId` taken from `X-Dev-Requester-Id` rather than the body. | `server/tests/lab-02/create-ticket.api.test.ts` | Planned |
 | API-03 | API | AC-05 | Each broken field rule returns `400 VALIDATION_FAILED` with that field named in `fieldErrors`, and no ticket is persisted. | `server/tests/lab-02/create-ticket.api.test.ts` | Planned |
 | API-04 | API | AC-06 | Replaying an `Idempotency-Key` with an identical payload returns `200` and the original ticket with no duplicate row; replaying it with a changed payload returns `409 IDEMPOTENCY_KEY_CONFLICT` and creates nothing. | `server/tests/lab-02/create-ticket.api.test.ts` | Planned |
-| API-05 | API | AC-12 | A missing, malformed, or inactive `X-Dev-Requester-Id` returns `401 REQUESTER_CONTEXT_REQUIRED` on every requester-scoped route. | `server/tests/lab-02/requester-context.api.test.ts` | Planned |
+| API-05 | API | AC-12 | A missing, malformed, or inactive `X-Dev-Requester-Id` returns `401 REQUESTER_CONTEXT_REQUIRED`, and the three causes are indistinguishable to the caller. | `server/tests/lab-02/requester-context.api.test.ts` | Planned |
+| API-16 | API | AC-06 | Two simultaneous creates sharing one `Idempotency-Key` produce exactly one Ticket: one `201`, one `200`, and the same id from both. | `server/tests/lab-02/create-ticket.api.test.ts` | Planned |
 | API-06 | API | AC-08 | The list is scoped to the header's requester: A's tickets are returned for A and are absent for B, with no query parameter involved. | `server/tests/lab-02/my-tickets.api.test.ts` | Planned |
 | API-07 | API | AC-09 | Search, each filter, sorting and paging return the correct subset with correct `page`, `pageSize`, `totalItems` and `totalPages`; a page past the end returns an empty array with `200`. | `server/tests/lab-02/my-tickets.api.test.ts` | Planned |
 | API-08 | API | AC-10 | Sorting by `requestedPriority` ascending returns `LOW`, `MEDIUM`, `HIGH`, `URGENT` in severity order, not alphabetical order. | `server/tests/lab-02/my-tickets.api.test.ts` | Planned |
@@ -98,7 +99,7 @@ Every acceptance criterion in `specification.md` §9 maps to at least one planne
 | AC-03 Create Ticket loads reference data | UI-03 |
 | AC-04 Valid create saves one ticket with an official number | UNIT-01, API-02, UI-05, E2E-01 |
 | AC-05 Invalid create shows field errors and saves nothing | UNIT-02, API-03, UI-04 |
-| AC-06 Idempotent retry creates no duplicate | API-04 |
+| AC-06 Idempotent retry creates no duplicate | API-04, API-16 |
 | AC-07 Backend failure is safe and preserves input | UI-06, UI-12 |
 | AC-08 Tickets are scoped to the selected requester | API-06, UI-07, E2E-01, E2E-02 |
 | AC-09 Search, filter, sort, page and metadata are correct | UNIT-06, API-07, API-09, UI-08 |
@@ -158,6 +159,29 @@ unit, API and UI suites captured from `main` after the release merge, together w
 Playwright run and the responsive screenshots. Test counts and file paths will be filled in
 from that run, not from a feature branch and not from memory.
 
+### Issue #21 feature-branch verification
+
+Run on `feature/21-create-ticket-api` on 2026-08-29, before peer review:
+
+- `npx prisma migrate dev --name lab2_ticket_number_sequence` — generated and applied by
+  Prisma against the real database.
+- `cd server && npm test` — 9 files, **55 tests passed** (was 5 files / 17).
+- `cd server && npm run build` — passed. It caught a type error the test run did not:
+  Vitest does not type-check, so `npm test` alone is not evidence that the code compiles.
+- Numbering verified in PostgreSQL rather than inferred: the suite produced
+  `TKT-2026-00001` … `TKT-2026-00008` with `TicketNumberSequence` at `year=2026,
+  lastValue=8`, and `public."Ticket"` remained empty throughout.
+
+**A note on why the create tests use the real database.** Creation is the one place a mocked
+Prisma proves least: the unique index on `idempotencyKey` and the per-year counter are
+database behaviour, and a mock returns only what it was told. API-16 in particular — two
+simultaneous requests sharing a key — cannot be written against a mock at all, because what
+is under test is which of two transactions the index rejects.
+
+**`seed.test.ts` was made order-independent.** It previously asserted an absolute zero
+Tickets. Now that this issue creates real ones in the same schema, that assertion would have
+depended on which file ran first. It now captures the count, re-seeds, and asserts the count
+is unchanged — which is the claim actually being made: *seeding* creates no tickets.
 ### Issue #20 feature-branch verification
 
 Run on `feature/20-requester-context` on 2026-08-29, before peer review:

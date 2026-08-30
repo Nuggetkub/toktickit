@@ -120,3 +120,15 @@ model Attachment {
   // The five-active-attachment count (BR-33) is the hottest attachment query.
   @@index([ticketId, removedAt])
 }
+
+// One row per calendar year, holding the last Ticket Number issued in it.
+//
+// BR-02 specifies a per-year sequence — TKT-2026-00001 starts again at 00001 in
+// 2027 — so the number cannot be derived from the Ticket's own autoincrement id,
+// which is global and would only ever look per-year. The counter is incremented
+// inside the same transaction as the insert, with `ON CONFLICT DO UPDATE` taking
+// a row lock, so two concurrent creates cannot be issued the same number.
+model TicketNumberSequence {
+  year      Int @id
+  lastValue Int @default(0)
+}
