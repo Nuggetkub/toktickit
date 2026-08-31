@@ -12,3 +12,6 @@ server/prisma/*.db
 # logs & OS
 *.log
 .DS_Store
+
+# Attachment bytes written at runtime — metadata lives in the database.
+server/storage/
