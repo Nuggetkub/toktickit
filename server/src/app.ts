@@ -2,8 +2,16 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import { getPrisma } from "./prisma.js";
 import { CLIENT_ORIGIN, SERVICE_NAME } from "./config.js";
-import { sendDependencyUnavailable } from "./errors.js";
+import { sendDependencyUnavailable, sendError } from "./errors.js";
 import { createTicket, getTicket, listTickets } from "./tickets-route.js";
+import multer from "multer";
+import { MAX_BYTES } from "./attachment-rules.js";
+import {
+  downloadAttachment,
+  listAttachments,
+  removeAttachment,
+  uploadAttachment,
+} from "./attachments-route.js";
 
 // The Express app is exported separately from app.listen() (see index.ts) so
 // Supertest can import `app` without opening a port. Do not merge these files.
@@ -86,5 +94,47 @@ app.post("/api/tickets", createTicket);
 // header identity and the detail is fetched by (id, requesterId) together.
 app.get("/api/tickets", listTickets);
 app.get("/api/tickets/:ticketId", getTicket);
+
+// ---------------------------------------------------------------------------
+// Issue 25 — Attachments (api-spec.md §4)
+//
+// The size limit is enforced by multer as well as by the rules module: without
+// it a 500 MB upload is buffered in full before anything gets to reject it, so
+// the ceiling has to exist at the point bytes are read, not only after.
+// ---------------------------------------------------------------------------
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_BYTES } });
+
+app.post("/api/tickets/:ticketId/attachments", upload.single("file"), uploadAttachment);
+app.get("/api/tickets/:ticketId/attachments", listAttachments);
+app.get("/api/tickets/:ticketId/attachments/:attachmentId/download", downloadAttachment);
+app.patch("/api/tickets/:ticketId/attachments/:attachmentId", removeAttachment);
+
+// Multer rejects an oversized body before the route runs, so its error needs
+// translating into the documented envelope rather than reaching Express's
+// default handler, which would answer with an HTML stack trace.
+app.use((error: unknown, _req: Request, res: Response, next: express.NextFunction) => {
+  if (error instanceof multer.MulterError) {
+    if (error.code === "LIMIT_FILE_SIZE") {
+      sendError(res, 413, "ATTACHMENT_TOO_LARGE", "Each attachment must be 5 MB or smaller.");
+      return;
+    }
+    sendError(res, 400, "VALIDATION_FAILED", "The upload could not be processed.");
+    return;
+  }
+
+  if (error instanceof SyntaxError && "body" in error) {
+    sendError(res, 400, "VALIDATION_FAILED", "The request body is not valid JSON.");
+    return;
+  }
+
+  if (error) {
+    // Anything else is ours, not the caller's: a 500, and never a stack trace.
+    console.error("Unhandled error:", error);
+    sendError(res, 500, "INTERNAL_ERROR", "Something went wrong. Please try again.");
+    return;
+  }
+
+  next();
+});
 
 export default app;
