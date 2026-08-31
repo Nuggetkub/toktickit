@@ -14,8 +14,17 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
-function mockFetch(body: unknown = REQUESTERS) {
-  const fetchMock = vi.fn(async () => ({ ok: true, status: 200, json: async () => body }));
+function mockFetch(bodyForRequesters: unknown = REQUESTERS) {
+  const fetchMock = vi.fn(async (input: string) => {
+    const url = new URL(String(input), "http://localhost");
+    if (url.pathname === "/api/tickets") {
+      return { ok: true, status: 200, json: async () => ({ items: [], page: 1, pageSize: 10, totalItems: 0, totalPages: 1 }) };
+    }
+    if (url.pathname === "/api/categories" || url.pathname === "/api/related-systems") {
+      return { ok: true, status: 200, json: async () => [] };
+    }
+    return { ok: true, status: 200, json: async () => bodyForRequesters };
+  });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }

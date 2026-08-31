@@ -410,3 +410,148 @@ body {
     width: auto;
   }
 }
+
+/* ---------------------------------------------------------------- toolbar */
+
+.zen-toolbar {
+  display: flex;
+  gap: var(--zen-space-3);
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-bottom: var(--zen-space-4);
+  padding: var(--zen-space-4);
+  border: 1px solid var(--zen-border);
+  border-radius: var(--zen-radius);
+  background: var(--zen-page);
+}
+
+.zen-toolbar .zen-field {
+  flex: 1 1 200px;
+  margin-bottom: 0;
+}
+
+.zen-toolbar__actions {
+  display: flex;
+  gap: var(--zen-space-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ---------------------------------------------------------------- table */
+
+/* The wrapper scrolls, not the page: a wide table must never make the whole
+   document scroll sideways (ui-spec.md §9). */
+.zen-table-wrap {
+  overflow-x: auto;
+}
+
+.zen-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--zen-surface);
+}
+
+.zen-table th,
+.zen-table td {
+  padding: var(--zen-space-3);
+  border-bottom: 1px solid var(--zen-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.zen-table thead th {
+  border-bottom: 2px solid var(--zen-primary);
+  color: var(--zen-text);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.zen-table tbody tr:hover {
+  background: var(--zen-pale);
+}
+
+.zen-table a {
+  color: var(--zen-secondary);
+  font-weight: 600;
+}
+
+.zen-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------------------------------------------------------------- pagination */
+
+.zen-pagination {
+  display: flex;
+  gap: var(--zen-space-3);
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--zen-space-4);
+}
+
+.zen-pagination p {
+  margin: 0;
+  color: var(--zen-text-muted);
+}
+
+/* ---------------------------------------------------------------- mobile */
+
+@media (max-width: 767px) {
+  /* The table becomes one card per Ticket. Each cell carries its own label from
+     data-label, so a value is never orphaned from the column it belonged to. */
+  .zen-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .zen-table,
+  .zen-table tbody,
+  .zen-table tr,
+  .zen-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .zen-table tr {
+    margin-bottom: var(--zen-space-4);
+    border: 1px solid var(--zen-border);
+    border-radius: var(--zen-radius);
+    overflow: hidden;
+  }
+
+  .zen-table td {
+    display: flex;
+    gap: var(--zen-space-3);
+    justify-content: space-between;
+    border-bottom: 1px solid var(--zen-border);
+  }
+
+  .zen-table td::before {
+    content: attr(data-label);
+    color: var(--zen-text-muted);
+    font-weight: 700;
+    flex: 0 0 45%;
+  }
+
+  .zen-table td:last-child {
+    border-bottom: 0;
+  }
+
+  .zen-pagination {
+    justify-content: center;
+    text-align: center;
+  }
+}

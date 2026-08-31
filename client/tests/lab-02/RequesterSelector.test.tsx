@@ -24,8 +24,20 @@ afterEach(() => {
  * defect this project has already reviewed once on a partner PR.
  */
 function mockFetch(handler: (url: string) => unknown) {
-  const fetchMock = vi.fn(async (url: string) => {
-    const body = handler(String(url));
+  const fetchMock = vi.fn(async (input: string) => {
+    const url = new URL(String(input), "http://localhost");
+
+    // Routed per endpoint. Answering every URL with the requester list is the
+    // blanket-mock pattern this project has flagged twice in review — and it
+    // would hand a requester array to the ticket list, which now really fetches.
+    if (url.pathname === "/api/tickets") {
+      return { ok: true, status: 200, json: async () => ({ items: [], page: 1, pageSize: 10, totalItems: 0, totalPages: 1 }) };
+    }
+    if (url.pathname === "/api/categories" || url.pathname === "/api/related-systems") {
+      return { ok: true, status: 200, json: async () => [] };
+    }
+
+    const body = handler(url.pathname);
     if (body instanceof Error) throw body;
     return { ok: true, status: 200, json: async () => body };
   });

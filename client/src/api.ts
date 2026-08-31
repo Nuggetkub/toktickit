@@ -174,3 +174,59 @@ export async function createTicket(
     body: JSON.stringify(ticket),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Issue 24 — My Tickets
+// ---------------------------------------------------------------------------
+
+export interface TicketListItem {
+  id: number;
+  ticketNumber: string;
+  ticketDate: string;
+  summary: string;
+  category: { id: number; name: string };
+  relatedSystem: { id: number; name: string };
+  requestedPriority: RequestedPriority;
+  currentStatus: string;
+  attachmentCount: number;
+}
+
+export interface TicketListResponse {
+  items: TicketListItem[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+export interface TicketListParams {
+  search?: string;
+  categoryId?: number;
+  relatedSystemId?: number;
+  requestedPriority?: RequestedPriority;
+  sortBy?: "ticketDate" | "ticketNumber" | "requestedPriority";
+  sortOrder?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
+}
+
+/**
+ * Only parameters with a value are sent. The API rejects unknown or empty ones
+ * rather than ignoring them (BR-27), so an empty filter must be absent from the
+ * query string rather than present and blank.
+ */
+export async function fetchTickets(
+  params: TicketListParams,
+  requesterId: number,
+): Promise<TicketListResponse> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === "" || value === null) continue;
+    query.set(key, String(value));
+  }
+
+  const suffix = query.toString();
+  return requestJson<TicketListResponse>(`/api/tickets${suffix ? `?${suffix}` : ""}`, {
+    headers: { "X-Dev-Requester-Id": String(requesterId) },
+  });
+}
