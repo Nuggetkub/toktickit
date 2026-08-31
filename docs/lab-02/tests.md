@@ -159,6 +159,35 @@ unit, API and UI suites captured from `main` after the release merge, together w
 Playwright run and the responsive screenshots. Test counts and file paths will be filled in
 from that run, not from a feature branch and not from memory.
 
+### Issue #25 feature-branch verification
+
+Run on `feature/25-attachment-api` on 2026-08-31, before peer review:
+
+- `cd server && npm test` — 14 files, **124 tests passed** (up from 12 files / 89).
+- `cd server && npm run build` — passed.
+
+**Both defects found in the peer's attachment PR were designed out rather than repeated.**
+
+- **The permitted type is decided by the file's leading bytes**, and the client's declared
+  `Content-Type` is ignored entirely rather than merely cross-checked. An executable
+  announced as `image/png` is refused with `415`, and a test asserts no row is written.
+- **The five-active limit holds under concurrent uploads.** The count and the insert run in
+  one transaction with `SELECT ... FOR UPDATE` on the Ticket row, so six simultaneous uploads
+  produce five created and one `409`. A multi-file picker uploading in parallel is the
+  ordinary case, not an exotic one.
+
+**The concurrency test was verified by breaking the code**, on the principle that a
+concurrency test which has never failed proves nothing about concurrency. Removing
+`FOR UPDATE` made it fail with six attachments created — precisely the defect reported on the
+peer's PR #26 — and restoring it made it pass. Slot reuse is covered too: removing one of
+five frees a place, so a Ticket that has held five is not stranded (BR-33).
+
+**A test bug worth recording.** The first version of the filename test wrote a Windows path
+through a shell heredoc that collapsed the escapes, so the string literal contained no
+separator at all and the path-stripping assertion tested nothing. The test now builds the
+separator from a character code. A test for path stripping that contains no path separator
+belongs to the same family as a mock that answers every URL: green, and empty.
+
 ### Issue #24 feature-branch verification
 
 Run on `feature/24-my-tickets-screen` on 2026-08-30, before peer review:
