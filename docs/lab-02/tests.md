@@ -163,7 +163,7 @@ from that run, not from a feature branch and not from memory.
 
 Run on `feature/24-my-tickets-screen` on 2026-08-30, before peer review:
 
-- `cd client && npm test` — 7 files, **83 tests passed** (up from 6 files / 61).
+- `cd client && npm test` — 7 files, **84 tests passed** (up from 6 files / 61).
 
 **Eight of those came from review.** @Earth2509 pointed out that the suite asserted *query
 construction* rather than what a user sees: it checked that selecting a Category put
@@ -172,6 +172,14 @@ proving the loading state resolves to a list; per-control fixtures so Category, 
 System, Requested Priority and Sort each visibly replace the rows; real paging through Next
 and Previous with the rendered page asserted; a completed requester change that reloads under
 the new identity; and a regression test for the stale-response guard.
+
+**A second review round found the requester-change test proving the wrong thing.** It
+returned the same fixture for both requesters, so it showed that `X-Dev-Requester-Id`
+changed and not the AC-08 behaviour that one requester's tickets disappear and the other's
+appear. The fixture now varies by the header — which meant passing the headers into the mock,
+since identity does not travel in the URL. A second test covers BR-11: a filter and a page
+are applied *before* switching, and the new requester starts on page 1 with the filters
+cleared, asserted both in the request and in the controls.
 
 **The stale-response test was verified by breaking the code.** A regression test that has
 never failed is unproven, so the `active` guard was removed temporarily: the test failed with

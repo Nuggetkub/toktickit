@@ -46,14 +46,17 @@ function deferred<T>() {
  * a test return a pending promise so the states between request and response are
  * reachable rather than only their endpoints.
  */
-function mockApi(listFor: (url: URL) => unknown = () => page([ticket(1, "Campus Wi-Fi drops nightly")])) {
+function mockApi(
+  listFor: (url: URL, headers: Record<string, string>) => unknown = () => page([ticket(1, "Campus Wi-Fi drops nightly")]),
+) {
   const listUrls: URL[] = [];
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
     const url = new URL(String(input), "http://localhost");
 
     if (url.pathname === "/api/tickets") {
       listUrls.push(url);
-      const body = await listFor(url);
+      const headers = (init?.headers ?? {}) as Record<string, string>;
+      const body = await listFor(url, headers);
       if (body instanceof Error) throw body;
       return { ok: true, status: 200, json: async () => body, headers: init?.headers };
     }
@@ -325,29 +328,69 @@ describe("My Tickets — paging moves through the list", () => {
 });
 
 describe("My Tickets — changing requester reloads under the new identity", () => {
-  it("selects a second requester and shows their list, not the first one's", async () => {
-    // The earlier test stopped at the selector. What matters is what happens
-    // after: the list must come back under the new identity.
-    const { fetchMock } = mockApi((url) => {
-      const header = url.searchParams; // identity is not here — see the header check below
-      void header;
-      return page([ticket(1, "Belongs to whoever asked")]);
-    });
+  // The fixture depends on the requester header, so "A's tickets disappear and
+  // B's appear" is actually observable. A shared fixture would prove only that
+  // the header changed, which is not what AC-08 claims.
+  function perRequester(url: URL, headers: Record<string, string>) {
+    const who = headers["X-Dev-Requester-Id"];
+    if (who === "2") return page([ticket(20, "Somchai's own ticket")]);
+    const requested = Number(url.searchParams.get("page") ?? "1");
+    return {
+      items: [ticket(requested * 10, `Nadia page ${requested} ticket`)],
+      page: requested,
+      pageSize: 10,
+      totalItems: 20,
+      totalPages: 2,
+    };
+  }
+
+  it("replaces the first requester's tickets with the second requester's", async () => {
+    const { fetchMock } = mockApi(perRequester);
     await renderList("1");
-    await screen.findByRole("table");
+
+    expect(await screen.findByText("Nadia page 1 ticket")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Change Requester" }));
     await screen.findByRole("heading", { name: "Development Requester Selection" });
-
     await userEvent.selectOptions(await screen.findByLabelText(/Development Requester/), "2");
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
-    expect(await screen.findByRole("table")).toBeInTheDocument();
-    expect(screen.getAllByText("Somchai Pattana").length).toBeGreaterThan(0);
+    expect(await screen.findByText("Somchai's own ticket")).toBeInTheDocument();
+    // AC-08: the previous requester's ticket must be gone, not merely re-fetched.
+    expect(screen.queryByText("Nadia page 1 ticket")).not.toBeInTheDocument();
 
     const listCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes("/api/tickets"));
     const lastHeaders = (listCalls.at(-1)![1] as RequestInit).headers as Record<string, string>;
     expect(lastHeaders["X-Dev-Requester-Id"]).toBe("2");
+  });
+
+  it("starts the new requester on page 1 with the filters cleared", async () => {
+    // BR-11: changing Requester clears requester-scoped state. Carrying a filter
+    // or a page number across would show the new requester a view shaped by
+    // somebody else's session.
+    const { listUrls } = mockApi(perRequester);
+    await renderList("1");
+    await screen.findByRole("table");
+
+    await userEvent.selectOptions(screen.getByLabelText("Category"), "3");
+    await waitFor(() => expect(listUrls.at(-1)!.searchParams.get("categoryId")).toBe("3"));
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(listUrls.at(-1)!.searchParams.get("page")).toBe("2"));
+
+    await userEvent.click(screen.getByRole("button", { name: "Change Requester" }));
+    await screen.findByRole("heading", { name: "Development Requester Selection" });
+    await userEvent.selectOptions(await screen.findByLabelText(/Development Requester/), "2");
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(await screen.findByText("Somchai's own ticket")).toBeInTheDocument();
+
+    const afterSwitch = listUrls.at(-1)!;
+    expect(afterSwitch.searchParams.get("page")).toBe("1");
+    expect(afterSwitch.searchParams.has("categoryId")).toBe(false);
+
+    // And the controls agree with the request that was sent.
+    expect(screen.getByLabelText("Category")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Clear filters" })).toBeDisabled();
   });
 });
 
