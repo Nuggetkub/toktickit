@@ -2,8 +2,8 @@ import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import type { Request, Response } from "express";
-import type { Prisma } from "@prisma/client";
 import { getPrisma } from "./prisma.js";
+import { attachmentSelect } from "./attachment-view.js";
 import { sendDependencyUnavailable, sendError } from "./errors.js";
 import { resolveRequester } from "./requester-context.js";
 import { MAX_ACTIVE, checkAttachment, safeDownloadName, validateRemovalReason } from "./attachment-rules.js";
@@ -12,19 +12,6 @@ import { MAX_ACTIVE, checkAttachment, safeDownloadName, validateRemovalReason } 
 // plans worse for no gain (decision D-06). The directory is configurable so the
 // test run and the E2E run do not write into a developer's working copy.
 const storageDirectory = path.resolve(process.env.ATTACHMENT_STORAGE_DIR ?? path.join(process.cwd(), "storage", "attachments"));
-
-// storageKey is never returned: it is an internal locator, and disclosing it
-// invites someone to ask for it directly.
-const attachmentSelect = {
-  id: true,
-  originalFilename: true,
-  mimeType: true,
-  sizeBytes: true,
-  uploadedAt: true,
-  removedAt: true,
-  removedByRequesterId: true,
-  removalReason: true,
-} satisfies Prisma.AttachmentSelect;
 
 type RequesterContext = { id: number; fullName: string };
 

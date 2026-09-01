@@ -241,13 +241,16 @@ export default function CreateTicket() {
         {files.length > 0 && (
           <p>
             {files.length} selected {files.length === 1 ? "file was" : "files were"} checked but{" "}
-            <strong>not uploaded</strong> — attachments are added from the Ticket Detail screen,
-            which arrives with Issue #26. Nothing has been stored, so they will need choosing again.
+            <strong>not uploaded</strong> — attachments are added from this Ticket's detail screen
+            (BR-34). Nothing has been stored, so they will need choosing again there.
           </p>
         )}
 
         <div className="zen-shell__nav">
-          <Link className="zen-button zen-button--primary" to="/tickets">
+          <Link className="zen-button zen-button--primary" to={`/tickets/${created.id}`}>
+            Open this Ticket
+          </Link>
+          <Link className="zen-button zen-button--secondary" to="/tickets">
             View My Tickets
           </Link>
           <Button variant="secondary" onClick={createAnother}>

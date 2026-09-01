@@ -1,9 +1,10 @@
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { AppShell, Card, type NavItem } from "./components/index.js";
+import { AppShell, type NavItem } from "./components/index.js";
 import SystemCheck from "./SystemCheck.js";
 import { RequesterProvider, RequesterSelector, RequireRequester, useRequester } from "./requester/index.js";
 import CreateTicket from "./tickets/CreateTicket.js";
 import MyTickets from "./tickets/MyTickets.js";
+import TicketDetail from "./tickets/TicketDetail.js";
 
 // Routes, so that AC-02 — opening a requester-scoped route directly shows the
 // selector — is a real claim about a real URL rather than about which branch of
@@ -68,7 +69,7 @@ function Shell() {
           path="/tickets/:ticketId"
           element={
             <RequireRequester>
-              <ComingSoon title="Ticket Detail" issue={26} />
+              <TicketDetail />
             </RequireRequester>
           }
         />
@@ -76,23 +77,5 @@ function Shell() {
         <Route path="*" element={<Navigate to="/tickets" replace />} />
       </Routes>
     </AppShell>
-  );
-}
-
-/**
- * A screen that exists as a route but not yet as a feature. Shown rather than
- * hidden so the shell, the navigation and the guard are all real and reviewable
- * now, and says which issue delivers it rather than implying it is broken.
- */
-function ComingSoon({ title, issue }: { title: string; issue: number }) {
-  const { requester } = useRequester();
-
-  return (
-    <Card title={title} as="h1">
-      <p>
-        This screen is delivered by Issue #{issue}. The Development Requester context is
-        already in place: you are working as <strong>{requester?.fullName}</strong>.
-      </p>
-    </Card>
   );
 }
