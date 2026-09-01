@@ -278,12 +278,12 @@ export default function CreateTicket() {
 
       {submitError && <ErrorAlert>{submitError}</ErrorAlert>}
 
-      <form onSubmit={submit} noValidate>
+      <form className="zen-form-grid" onSubmit={submit} noValidate>
         {/* System-assigned values, shown from the start so their place on the
             screen is not a surprise once they are filled in (ui-spec.md §6). */}
         <ReadOnlyField label="Ticket Number" value="Assigned after saving" />
         <ReadOnlyField label="Ticket Date" value="Assigned after saving" />
-        <ReadOnlyField label="Requester" value={requester?.fullName ?? "No Requester selected"} />
+        <ReadOnlyField label="Requester" value={requester?.fullName ?? "No Requester selected"} wide />
 
         <Field id="categoryId" label="Category" required error={fieldErrors.categoryId}>
           {(control) => (
@@ -325,6 +325,7 @@ export default function CreateTicket() {
           id="summary"
           label="Ticket Summary"
           required
+          wide
           error={fieldErrors.summary}
           hint={`${SUMMARY_MIN}-${SUMMARY_MAX} characters. ${values.summary.trim().length} so far.`}
         >
@@ -359,6 +360,7 @@ export default function CreateTicket() {
           id="description"
           label="Description"
           required
+          wide
           error={fieldErrors.description}
           hint={`${DESCRIPTION_MIN}-${DESCRIPTION_MAX} characters. ${values.description.trim().length} so far.`}
         >
@@ -374,6 +376,7 @@ export default function CreateTicket() {
         <Field
           id="attachments"
           label="Attachments"
+          wide
           error={fileError}
           hint={`${PERMITTED_TYPE_LABEL}, up to 5 MB each, ${MAX_FILES} files maximum. Files are checked now and uploaded from the Ticket Detail screen.`}
         >

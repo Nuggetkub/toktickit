@@ -1,5 +1,4 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { baseDatabaseUrl, withSchema } from "../src/database-url.js";
 
 // Tests never run against the development database.
 //
@@ -18,38 +17,11 @@ import { resolve } from "node:path";
 // instead of a comparison TypeScript can prove is always false.
 export const TEST_SCHEMA: string = "lab2_test";
 
-/**
- * Prisma Client loads server/.env itself rather than relying on process.env, so
- * DATABASE_URL is not set in the Vitest process. Read the file directly instead
- * of adding a dotenv dependency for one variable.
- */
-function readDatabaseUrlFromEnvFile(): string | undefined {
-  try {
-    const contents = readFileSync(resolve(process.cwd(), ".env"), "utf8");
-    for (const line of contents.split(/\r?\n/)) {
-      const match = /^\s*DATABASE_URL\s*=\s*(.*)\s*$/.exec(line);
-      if (match) return match[1].trim().replace(/^["']|["']$/g, "");
-    }
-  } catch {
-    // No .env — fall through to the environment.
-  }
-  return undefined;
-}
+// The E2E run uses `lab2_e2e`, prepared by scripts/prepare-e2e.ts. Both live on
+// the same database as the development schema and neither may ever be "public";
+// the URL handling they share is in src/database-url.ts.
+export { baseDatabaseUrl };
 
-export function baseDatabaseUrl(): string {
-  const url = process.env.DATABASE_URL ?? readDatabaseUrlFromEnvFile();
-  if (!url) {
-    throw new Error(
-      "DATABASE_URL is not set and server/.env could not be read. " +
-        "Copy .env.example to .env before running the tests.",
-    );
-  }
-  return url;
-}
-
-/** The same database, a different schema. */
 export function testDatabaseUrl(): string {
-  const url = new URL(baseDatabaseUrl());
-  url.searchParams.set("schema", TEST_SCHEMA);
-  return url.toString();
+  return withSchema(TEST_SCHEMA);
 }

@@ -623,3 +623,29 @@ body {
     align-items: stretch;
   }
 }
+
+/* ------------------------------------------------------------- form layout
+   ui-spec.md 9 asks for a multi-column form from 768px up, with Summary and
+   Description keeping useful width. Two columns for the short fields, and
+   anything marked --wide spans both, so a long value is never squeezed into
+   half a card to satisfy a grid. Below 768px the grid collapses and every
+   field stacks, which is what the same section asks for. */
+
+@media (min-width: 768px) {
+  .zen-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: var(--zen-space-6);
+  }
+
+  /* Long fields, and everything that is not a field — alerts, action rows,
+     lists — run the full width of the card. */
+  .zen-form-grid > .zen-field--wide,
+  .zen-form-grid > .zen-alert,
+  .zen-form-grid > .zen-status,
+  .zen-form-grid > .zen-shell__nav,
+  .zen-form-grid > ul,
+  .zen-form-grid > p {
+    grid-column: 1 / -1;
+  }
+}
