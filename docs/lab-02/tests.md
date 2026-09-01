@@ -64,6 +64,7 @@ E2E rows below are not claimed runnable until it merges.
 | API-08 | API | AC-10 | Sorting by `requestedPriority` ascending returns `LOW`, `MEDIUM`, `HIGH`, `URGENT` in severity order, not alphabetical order. | `server/tests/lab-02/my-tickets.api.test.ts` | Planned |
 | API-09 | API | AC-09 | An unknown `sortBy`, an unknown `sortOrder`, a `pageSize` outside {10, 25, 50}, a `page` below 1, and an unrecognised priority each return `400` rather than being ignored. | `server/tests/lab-02/my-tickets.api.test.ts` | Planned |
 | API-10 | API | AC-12 | An owned ticket returns `200`; a ticket owned by another requester returns `404 TICKET_NOT_FOUND`, identical to the response for a nonexistent id. | `server/tests/lab-02/ticket-detail.api.test.ts` | Planned |
+| API-17 | API | AC-12, AC-15 | Ticket Detail returns full attachment metadata with removed entries present and marked, never the storage key; a non-owner is answered `404` and no filename is disclosed. | `server/tests/lab-02/ticket-detail.api.test.ts` | Planned |
 | API-11 | API | AC-13 | A permitted file under the ceiling returns `201` with active metadata and a stored key that is not derived from the original filename. | `server/tests/lab-02/attachments.api.test.ts` | Planned |
 | API-12 | API | AC-14 | Unsupported type returns `415`; oversize returns `413`; a sixth active file returns `409 ATTACHMENT_LIMIT_REACHED`; upload to another requester's ticket returns `404`. No metadata row is written in any case. | `server/tests/lab-02/attachments.api.test.ts` | Planned |
 | API-13 | API | AC-15 | Soft removal returns `200` with reason, timestamp and remover; metadata still lists the attachment; a later download returns `404`; a second removal returns `409 ATTACHMENT_ALREADY_REMOVED` without overwriting the first reason. | `server/tests/lab-02/attachments.api.test.ts` | Planned |
@@ -77,8 +78,8 @@ E2E rows below are not claimed runnable until it merges.
 | UI-07 | UI | AC-08 | Changing requester clears filters and paging and reloads the list for the new context. | `client/tests/lab-02/MyTickets.test.tsx` | Planned |
 | UI-08 | UI | AC-09 | Search, filters, sort and pagination controls drive the request and render the returned metadata, including page and total counts. | `client/tests/lab-02/MyTickets.test.tsx` | Planned |
 | UI-09 | UI | AC-11 | Owning no tickets and matching no tickets render different messages and different recovery actions. | `client/tests/lab-02/MyTickets.test.tsx` | Planned |
-| UI-10 | UI | AC-15 | Detail renders every field read-only, shows a removed attachment as retained metadata with a Removed badge, and offers no working download for it. | `client/tests/lab-02/TicketDetail.test.tsx` | Planned |
-| UI-11 | UI | AC-14 | A rejected file is named in the error together with its reason, and other selected files are unaffected. | `client/tests/lab-02/TicketDetail.test.tsx` | Planned |
+| UI-10 | UI | AC-15 | Detail renders every field read-only, shows a removed attachment as retained metadata with a Removed badge, and offers no working download for it. Removal needs a confirmation and a typed reason before anything is sent. | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Planned |
+| UI-11 | UI | AC-14 | A rejected file is named in the error together with its reason, and other selected files are unaffected. A server rejection is reported beside the attachment section, naming the file. | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Planned |
 | UI-12 | UI | AC-07 | The API client converts a thrown `TypeError: Failed to fetch` into a human message before it reaches a component. | `client/tests/lab-02/apiClient.test.ts` | Planned |
 | STYLE-01 | UI style | AC-16 | Zen Green tokens are applied; required fields carry an asterisk; validation messages render beneath their field; read-only and editable fields are visually distinct; button variants and busy/disabled states are correct; `role="status"` and `role="alert"` are used as specified. | `client/tests/lab-02/ZenGreen.styles.test.tsx` | Planned |
 | RESP-01 | Responsive | AC-16 | Create Ticket, My Tickets and Ticket Detail at 1440×900, 834×1112 and 390×844: no horizontal page scroll, no clipped labels, no overlapping messages. Screenshots are written to `artifacts/lab-02/screenshots/`. | `e2e/lab-02/responsive.spec.ts` | Planned |
@@ -105,10 +106,10 @@ Every acceptance criterion in `specification.md` §9 maps to at least one planne
 | AC-09 Search, filter, sort, page and metadata are correct | UNIT-06, API-07, API-09, UI-08 |
 | AC-10 Priority sorts by severity | API-08 |
 | AC-11 Empty and no-results are distinct | UI-09 |
-| AC-12 Cross-requester access is refused as not found | API-05, API-10, E2E-02 |
+| AC-12 Cross-requester access is refused as not found | API-05, API-10, API-17, E2E-02 |
 | AC-13 Permitted upload and download work | API-11, API-14, E2E-03 |
 | AC-14 Invalid, oversize and excess uploads are refused | UNIT-03, UNIT-04, API-12, UI-11 |
-| AC-15 Soft removal retains metadata and blocks download | UNIT-05, API-13, UI-10, E2E-03 |
+| AC-15 Soft removal retains metadata and blocks download | UNIT-05, API-13, API-17, UI-10, E2E-03 |
 | AC-16 Three viewports render without clipping or overflow | STYLE-01, RESP-01 |
 
 ---
@@ -158,6 +159,41 @@ npx playwright test e2e/lab-02
 unit, API and UI suites captured from `main` after the release merge, together with the
 Playwright run and the responsive screenshots. Test counts and file paths will be filled in
 from that run, not from a feature branch and not from memory.
+
+### Issue #26 feature-branch verification
+
+Run on `feature/26-ticket-detail-and-attachments` on 2026-09-01, before peer review:
+
+- `cd client && npm test` — 8 files, **97 tests passed** (up from 7 files / 84).
+- `cd server && npm test` — 14 files, **126 tests passed** (up from 124).
+- `cd client && npm run build` and `cd server && npm run build` — both passed.
+
+**The detail endpoint was not keeping its own promise.** `api-spec.md` §3 says
+`GET /api/tickets/:ticketId` returns full attachment metadata with removed entries present
+and marked; the handler returned a hard-coded empty array, and the existing API-10 test
+asserted exactly that empty array on a ticket that had no attachments — true, and worth
+nothing. The screen would have shown "no files attached" for every Ticket. API-17 now uploads
+two files, removes one, and asserts both come back with the removal reason on the second and
+no `storageKey` on either. **Verified by breaking the code**: reverting the handler to the
+empty array made API-17 fail with `expected [] to have a length of 2`.
+
+**Three UI claims were proved the same way**, since a test that has never failed proves
+nothing:
+
+- Rendering the Download and Remove actions unconditionally instead of only for active
+  attachments made UI-10 fail on both the removed-metadata case and the after-removal case.
+- Removing the reason-length gate on the destructive confirm button made the removal test
+  fail at `expect(confirm).toBeDisabled()`.
+- The rejected-file test uses `fireEvent`, not `userEvent.upload`, for the same reason
+  `CreateTicket.test.tsx` does: `userEvent` honours the `accept` attribute and would drop
+  `payload.exe` before the component saw it, leaving the client-side type check untested. A
+  browser treats `accept` as a hint, and drag-and-drop ignores it.
+
+**Download goes through `fetch`, not an `<a href>`.** The endpoint is requester-scoped and
+identity travels in `X-Dev-Requester-Id` (D-01); a browser navigation cannot carry a custom
+header, so a plain link would arrive without context and be answered `401`. The bytes are
+fetched with the header and saved through an object URL, which is revoked immediately — the
+test asserts both the header on the request and the revoke.
 
 ### Issue #25 feature-branch verification
 

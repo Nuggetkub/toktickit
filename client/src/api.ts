@@ -117,32 +117,40 @@ type ErrorEnvelope = {
   error?: { code?: string; message?: string; fieldErrors?: Record<string, string> };
 };
 
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  let response: Response;
+/**
+ * Turns a failed response into the error envelope the UI can display. Shared by
+ * the JSON calls and the attachment download, which fails with the same envelope
+ * even though it succeeds with bytes.
+ */
+async function toApiError(response: Response): Promise<ApiError> {
+  // Named rather than inferred: `typeof envelope` narrows to `null` after the
+  // initialiser, so casting to it would collapse the parsed body to `never`.
+  let envelope: ErrorEnvelope | null = null;
   try {
-    response = await fetch(`${API_URL}${path}`, init);
+    envelope = (await response.json()) as ErrorEnvelope;
+  } catch {
+    // A non-JSON error body is itself a failure worth reporting safely.
+  }
+  return new ApiError(
+    envelope?.error?.message ?? "The request could not be completed.",
+    envelope?.error?.code,
+    envelope?.error?.fieldErrors,
+    response.status,
+  );
+}
+
+async function send(path: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(`${API_URL}${path}`, init);
   } catch {
     // The browser's raw TypeError never reaches a component (BR-43).
     throw new ApiError(UNREACHABLE_MESSAGE);
   }
+}
 
-  if (!response.ok) {
-    // Named rather than inferred: `typeof envelope` narrows to `null` after the
-    // initialiser, so casting to it would collapse the parsed body to `never`.
-    let envelope: ErrorEnvelope | null = null;
-    try {
-      envelope = (await response.json()) as ErrorEnvelope;
-    } catch {
-      // A non-JSON error body is itself a failure worth reporting safely.
-    }
-    throw new ApiError(
-      envelope?.error?.message ?? "The request could not be completed.",
-      envelope?.error?.code,
-      envelope?.error?.fieldErrors,
-      response.status,
-    );
-  }
-
+async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await send(path, init);
+  if (!response.ok) throw await toApiError(response);
   return (await response.json()) as T;
 }
 
@@ -229,4 +237,100 @@ export async function fetchTickets(
   return requestJson<TicketListResponse>(`/api/tickets${suffix ? `?${suffix}` : ""}`, {
     headers: { "X-Dev-Requester-Id": String(requesterId) },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Issue 26 — Ticket Detail and attachments
+// ---------------------------------------------------------------------------
+
+/**
+ * Attachment metadata as the API returns it (api-spec.md §4). A removed
+ * attachment keeps every field it had and gains the three removal ones, because
+ * BR-37 makes removal a record rather than a deletion.
+ */
+export interface Attachment {
+  id: number;
+  originalFilename: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+  removedAt: string | null;
+  removedByRequesterId: number | null;
+  removalReason: string | null;
+}
+
+/** The detail response: the create shape, with the attachments filled in. */
+export interface TicketDetail extends CreatedTicket {
+  attachments: Attachment[];
+}
+
+export async function fetchTicket(ticketId: number, requesterId: number): Promise<TicketDetail> {
+  return requestJson<TicketDetail>(`/api/tickets/${ticketId}`, {
+    headers: { "X-Dev-Requester-Id": String(requesterId) },
+  });
+}
+
+export async function fetchAttachments(ticketId: number, requesterId: number): Promise<Attachment[]> {
+  return requestJson<Attachment[]>(`/api/tickets/${ticketId}/attachments`, {
+    headers: { "X-Dev-Requester-Id": String(requesterId) },
+  });
+}
+
+/**
+ * One file per request, under the field name the API expects.
+ *
+ * `Content-Type` is deliberately not set: the browser has to write it itself so
+ * that it carries the multipart boundary. Setting it by hand produces a body the
+ * server cannot parse, which then looks like a validation bug rather than a
+ * transport one.
+ */
+export async function uploadAttachment(
+  ticketId: number,
+  file: File,
+  requesterId: number,
+): Promise<Attachment> {
+  const body = new FormData();
+  body.append("file", file);
+
+  return requestJson<Attachment>(`/api/tickets/${ticketId}/attachments`, {
+    method: "POST",
+    headers: { "X-Dev-Requester-Id": String(requesterId) },
+    body,
+  });
+}
+
+export async function removeAttachment(
+  ticketId: number,
+  attachmentId: number,
+  removalReason: string,
+  requesterId: number,
+): Promise<Attachment> {
+  return requestJson<Attachment>(`/api/tickets/${ticketId}/attachments/${attachmentId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Dev-Requester-Id": String(requesterId),
+    },
+    body: JSON.stringify({ removalReason }),
+  });
+}
+
+/**
+ * Downloads through fetch rather than a plain link.
+ *
+ * The endpoint is requester-scoped and identity travels in `X-Dev-Requester-Id`
+ * (D-01), and a browser navigation cannot carry a custom header — an `<a href>`
+ * would arrive without context and be answered `401`. So the bytes are fetched
+ * with the header and handed to the caller to save.
+ */
+export async function downloadAttachment(
+  ticketId: number,
+  attachmentId: number,
+  requesterId: number,
+): Promise<Blob> {
+  const response = await send(`/api/tickets/${ticketId}/attachments/${attachmentId}/download`, {
+    headers: { "X-Dev-Requester-Id": String(requesterId) },
+  });
+  if (!response.ok) throw await toApiError(response);
+  return response.blob();
 }

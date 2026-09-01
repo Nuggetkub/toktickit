@@ -3,6 +3,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { getPrisma } from "./prisma.js";
 import { sendDependencyUnavailable, sendError } from "./errors.js";
 import { resolveRequester } from "./requester-context.js";
+import { attachmentSelect, type AttachmentView } from "./attachment-view.js";
 import {
   DEFAULT_PAGE_SIZE,
   totalPages as pageCount,
@@ -37,7 +38,12 @@ const ticketSelect = {
 
 type TicketRow = Prisma.TicketGetPayload<{ select: typeof ticketSelect }>;
 
-function serialize(ticket: TicketRow) {
+/**
+ * `attachments` defaults to empty because a Ticket has none at the moment it is
+ * created — the create response in api-spec.md §3 shows exactly that. Ticket
+ * Detail passes the real rows, removed ones included (BR-39).
+ */
+function serialize(ticket: TicketRow, attachments: AttachmentView[] = []) {
   return {
     id: ticket.id,
     ticketNumber: ticket.ticketNumber,
@@ -52,7 +58,7 @@ function serialize(ticket: TicketRow) {
     description: ticket.description,
     requestedPriority: ticket.requestedPriority,
     currentStatus: ticket.currentStatus,
-    attachments: [] as unknown[],
+    attachments,
     createdAt: ticket.createdAt,
     updatedAt: ticket.updatedAt,
   };
@@ -353,7 +359,16 @@ export async function getTicket(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    res.status(200).json(serialize(ticket));
+    // Read only after ownership is established, and only for this ticket, so the
+    // detail response cannot become a way to enumerate someone else's files.
+    // Removed rows are included: BR-39 keeps them visible as marked metadata.
+    const attachments = await getPrisma().attachment.findMany({
+      where: { ticketId: ticket.id },
+      orderBy: { uploadedAt: "asc" },
+      select: attachmentSelect,
+    });
+
+    res.status(200).json(serialize(ticket, attachments));
   } catch (error) {
     sendDependencyUnavailable(res, "GET /api/tickets/:id", error);
   }
