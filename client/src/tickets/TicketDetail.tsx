@@ -230,19 +230,22 @@ export default function TicketDetail() {
     <>
       <Card title={`Ticket ${ticket.ticketNumber}`} as="h1">
         {/* Every field is read-only. Lab 2 has no edit, so nothing here should
-            look like it invites one (ui-spec.md §8). */}
-        <ReadOnlyField label="Ticket Number" value={ticket.ticketNumber} />
-        <ReadOnlyField label="Ticket Date" value={moment(ticket.ticketDate)} />
-        <ReadOnlyField label="Requester" value={ticket.requester.fullName} />
-        <ReadOnlyField label="Category" value={ticket.category.name} />
-        <ReadOnlyField label="Related System" value={ticket.relatedSystem.name} />
-        <ReadOnlyField label="Ticket Summary" value={ticket.summary} />
-        <ReadOnlyField
-          label="Requested Priority"
-          value={<Badge tone={PRIORITY_TONE[ticket.requestedPriority]}>{ticket.requestedPriority}</Badge>}
-        />
-        <ReadOnlyField label="Current Status" value={<Badge tone="success">{ticket.currentStatus}</Badge>} />
-        <ReadOnlyField label="Description" value={ticket.description} />
+            look like it invites one (ui-spec.md §8). Two columns from 768px up
+            (§9); Summary and Description keep the full width. */}
+        <div className="zen-form-grid">
+          <ReadOnlyField label="Ticket Number" value={ticket.ticketNumber} />
+          <ReadOnlyField label="Ticket Date" value={moment(ticket.ticketDate)} />
+          <ReadOnlyField label="Requester" value={ticket.requester.fullName} />
+          <ReadOnlyField label="Category" value={ticket.category.name} />
+          <ReadOnlyField label="Related System" value={ticket.relatedSystem.name} />
+          <ReadOnlyField label="Ticket Summary" value={ticket.summary} wide />
+          <ReadOnlyField
+            label="Requested Priority"
+            value={<Badge tone={PRIORITY_TONE[ticket.requestedPriority]}>{ticket.requestedPriority}</Badge>}
+          />
+          <ReadOnlyField label="Current Status" value={<Badge tone="success">{ticket.currentStatus}</Badge>} />
+          <ReadOnlyField label="Description" value={ticket.description} wide />
+        </div>
 
         <Link className="zen-button zen-button--secondary" to="/tickets">
           Back to My Tickets

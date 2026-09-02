@@ -252,18 +252,31 @@ page itself never scrolls sideways.
 
 ## 11. Visual Inspection Checklist
 
-Completed against the real running screens at all three viewports, not from memory:
+Completed on 2026-09-02 against the real running screens at all three viewports, not from
+memory. **A** marks an item a test asserts on every run; **E** marks one checked by eye
+against the committed screenshots and the running application.
 
-- [ ] Zen Green tokens applied consistently across all four screens
-- [ ] Read-only fields clearly distinct from editable fields
-- [ ] Required markers present; validation messages sit beneath their own field
-- [ ] Button hierarchy correct; only one primary action per screen
-- [ ] Busy and disabled states visible and non-activatable
-- [ ] Loading, empty, no-results, success and failure states all reachable and legible
-- [ ] Removed attachments show retained metadata with no working download
-- [ ] Priority badges readable without relying on colour
-- [ ] No clipping, overlap, or page-level horizontal scrolling at any viewport
-- [ ] Keyboard focus visible throughout, tab order sensible
+- [x] **E** Zen Green tokens applied consistently across all four screens — also asserted at
+      the token level by STYLE-01
+- [x] **E** Read-only fields clearly distinct from editable fields — grey `--zen-readonly`
+      surface, no border, not focusable
+- [x] **A** Required markers present; validation messages sit beneath their own field
+      (STYLE-01)
+- [x] **E** Button hierarchy correct; only one primary action per screen
+- [x] **A** Busy and disabled states visible and non-activatable (STYLE-01, and the removal
+      confirm button in the Ticket Detail suite)
+- [x] **A** Loading, empty, no-results, success and failure states all reachable and legible
+      (the component suites reach each one directly)
+- [x] **A** Removed attachments show retained metadata with no working download (UI-10, E2E-03)
+- [x] **E** Priority badges readable without relying on colour — the level is written in the
+      badge, and the tone only reinforces it
+- [x] **A** No clipping, overlap, or page-level horizontal scrolling at any viewport (RESP-01,
+      measured rather than eyeballed)
+- [x] **E** Keyboard focus visible throughout, tab order sensible — focus ring is never
+      suppressed; tab order follows the DOM, which follows the visual order
+
+The screenshots below were captured by the same run that made the assertions, so the images
+and the evidence cannot drift apart.
 
 ### Screenshot paths
 

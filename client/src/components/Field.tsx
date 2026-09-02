@@ -16,6 +16,10 @@ type FieldProps = {
   /** Validation message. Its presence is what marks the field invalid. */
   error?: string;
   hint?: string;
+  /** Spans both columns of a form grid — for fields that need the width, such
+   *  as Summary and Description (ui-spec.md §9). Ignored below 768px, where
+   *  everything is one column anyway. */
+  wide?: boolean;
   children: (control: FieldControlProps) => ReactNode;
 };
 
@@ -28,12 +32,14 @@ type FieldProps = {
  * so that `id`, `aria-invalid` and `aria-describedby` are always connected. A
  * caller cannot accidentally ship an unlabelled or undescribed input.
  */
-export function Field({ id, label, required = false, error, hint, children }: FieldProps) {
+export function Field({ id, label, required = false, error, hint, wide = false, children }: FieldProps) {
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
   const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(" ");
 
-  const classes = ["zen-field", error ? "zen-field--invalid" : null].filter(Boolean).join(" ");
+  const classes = ["zen-field", error ? "zen-field--invalid" : null, wide ? "zen-field--wide" : null]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div className={classes}>
@@ -79,6 +85,8 @@ type ReadOnlyFieldProps = {
   label: string;
   /** Placeholder wording used before the backend has assigned the value. */
   value: ReactNode;
+  /** Spans both columns of a form grid. See Field. */
+  wide?: boolean;
 };
 
 /**
@@ -86,9 +94,9 @@ type ReadOnlyFieldProps = {
  * the read-only surface so it is visibly distinct from an editable field, and
  * not focusable as an input, because Lab 2 never lets a requester edit these.
  */
-export function ReadOnlyField({ label, value }: ReadOnlyFieldProps) {
+export function ReadOnlyField({ label, value, wide = false }: ReadOnlyFieldProps) {
   return (
-    <div className="zen-field zen-field--readonly">
+    <div className={`zen-field zen-field--readonly${wide ? " zen-field--wide" : ""}`}>
       <span className="zen-field__label">{label}</span>
       <p className="zen-field__value">{value}</p>
     </div>

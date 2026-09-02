@@ -94,12 +94,19 @@ reached it shows the offline status and an error message.
 ## Tests
 
 ```bash
-cd server && npm test    # Vitest + Supertest — API-01, API-02
-cd client && npm test    # Vitest + Testing Library — UI-01, UI-02, UI-03
+cd server && npm test    # Vitest + Supertest — unit and API
+cd client && npm test    # Vitest + Testing Library — UI component and UI style
+npm run e2e              # Playwright — end-to-end and responsive, from the root
 ```
 
-Six tests in total. See [`docs/lab-01/tests.md`](docs/lab-01/tests.md) for the test
-plan and recorded evidence.
+`npm run e2e` starts the API and the client itself; nothing needs to be running first.
+It does need `server/.env` (or an `E2E_DATABASE_URL`), and `npm run e2e:install` once to
+fetch the browser. It uses its own database schema, its own ports and its own upload
+directory, so it never touches development data — the table in
+[`docs/lab-02/tests.md`](docs/lab-02/tests.md) §5 lists exactly what it uses.
+
+See [`docs/lab-02/tests.md`](docs/lab-02/tests.md) for the Lab 2 test plan and evidence,
+and [`docs/lab-01/tests.md`](docs/lab-01/tests.md) for Lab 1.
 
 ## API
 
@@ -116,13 +123,19 @@ error server-side and returns a generic message, so no internal detail is expose
 
 ```text
 client/
-  src/            React app (App.tsx, api.ts)
+  src/            React app (App.tsx, api.ts, components/, requester/, tickets/)
   tests/lab-01/   UI tests
+  tests/lab-02/   UI component and UI style tests
 server/
-  src/            Express app (app.ts, index.ts, prisma.ts)
+  src/            Express app (app.ts, index.ts, prisma.ts, routes and rules)
   prisma/         schema, migrations, seed
+  scripts/        prepare-e2e.ts — resets the E2E schema
   tests/lab-01/   API tests
+  tests/lab-02/   unit and API tests
+e2e/lab-02/       Playwright end-to-end and responsive specs
+artifacts/lab-02/screenshots/   committed responsive evidence
 docs/lab-01/      tests.md, reviewer.md, ai_use.md
+docs/lab-02/      specification.md, api-spec.md, ui-spec.md, tests.md, reviewer.md, ai-use.md
 ```
 
 ## Branching model

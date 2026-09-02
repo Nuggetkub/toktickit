@@ -82,9 +82,9 @@ E2E rows below are not claimed runnable until it merges.
 | UI-11 | UI | AC-14 | A rejected file is named in the error together with its reason, and other selected files are unaffected. A server rejection is reported beside the attachment section, naming the file. | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Planned |
 | UI-12 | UI | AC-07 | The API client converts a thrown `TypeError: Failed to fetch` into a human message before it reaches a component. | `client/tests/lab-02/apiClient.test.ts` | Planned |
 | STYLE-01 | UI style | AC-16 | Zen Green tokens are applied; required fields carry an asterisk; validation messages render beneath their field; read-only and editable fields are visually distinct; button variants and busy/disabled states are correct; `role="status"` and `role="alert"` are used as specified. | `client/tests/lab-02/ZenGreen.styles.test.tsx` | Planned |
-| RESP-01 | Responsive | AC-16 | Create Ticket, My Tickets and Ticket Detail at 1440×900, 834×1112 and 390×844: no horizontal page scroll, no clipped labels, no overlapping messages. Screenshots are written to `artifacts/lab-02/screenshots/`. | `e2e/lab-02/responsive.spec.ts` | Planned |
+| RESP-01 | Responsive | AC-16 | Create Ticket, My Tickets and Ticket Detail at 1440×900, 834×1112 and 390×844: no page-level horizontal scroll, no clipped label, no control outside the viewport, no attachment name cut off, and a 44 px minimum control height on mobile. Screenshots are written to `artifacts/lab-02/screenshots/` and committed. | `e2e/lab-02/responsive.spec.ts` | Planned |
 | E2E-01 | E2E | AC-04, AC-08 | Select a requester, create a ticket, see its official number, then find that number in My Tickets. | `e2e/lab-02/create-and-find.spec.ts` | Planned |
-| E2E-02 | E2E | AC-08, AC-12 | Switch requester and confirm the first requester's tickets disappear; then open the first requester's ticket URL directly and confirm it is refused. | `e2e/lab-02/ownership.spec.ts` | Planned |
+| E2E-02 | E2E | AC-02, AC-08, AC-12 | Switch requester and confirm the first requester's tickets disappear from a search; open the first requester's ticket URL directly and confirm it is refused in the same words as a ticket that never existed; open a requester-scoped URL with no requester selected and get the selector. | `e2e/lab-02/ownership.spec.ts` | Planned |
 | E2E-03 | E2E | AC-13, AC-15 | Upload a permitted attachment, download it, soft-remove it with a reason, and confirm the download is then blocked while the metadata remains. | `e2e/lab-02/attachments.spec.ts` | Planned |
 
 ---
@@ -124,15 +124,20 @@ Checked at each viewport for Create Ticket, My Tickets and Ticket Detail:
 | Tablet | 834×1112 | Two columns where practical; Summary and Description keep useful width. |
 | Mobile | 390×844 | Fields stack; touch targets stay usable; the table becomes cards; no page-level horizontal scroll. |
 
-- [ ] No clipped labels at any width
-- [ ] No overlapping validation messages
-- [ ] No hidden or unreachable buttons
-- [ ] Attachment filenames remain readable, truncating with an accessible full value
-- [ ] Required markers and field errors stay beside their field
-- [ ] Read-only fields remain visually distinct from editable fields
-- [ ] Loading, empty, no-results, success, error, busy and removed-attachment states all visible
-- [ ] Zen Green tokens consistent across all three screens
-- [ ] Priority and status badges legible without relying on colour alone
+Checked on 2026-09-02; the full record, marking which items a test asserts and which were
+checked by eye, is `ui-spec.md` §11.
+
+- [x] No clipped labels at any width — RESP-01 measures `scrollWidth` against `clientWidth`
+- [x] No overlapping validation messages
+- [x] No hidden or unreachable buttons — RESP-01 fails any enabled control whose box falls
+      outside the viewport
+- [x] Attachment filenames remain readable — the name wraps rather than truncating, so there
+      is no hidden value to expose
+- [x] Required markers and field errors stay beside their field
+- [x] Read-only fields remain visually distinct from editable fields
+- [x] Loading, empty, no-results, success, error, busy and removed-attachment states all visible
+- [x] Zen Green tokens consistent across all three screens
+- [x] Priority and status badges legible without relying on colour alone
 
 Screenshots are stored under `artifacts/lab-02/screenshots/{create-ticket,my-tickets,ticket-detail}/`.
 
@@ -147,9 +152,30 @@ cd server && npm test
 # UI component + UI style
 cd client && npm test
 
-# responsive + E2E (available after issue #27)
-npx playwright test e2e/lab-02
+# responsive + E2E, from the repository root
+npm install          # once — the root package holds only Playwright
+npm run e2e:install  # once — downloads the Chromium build Playwright drives
+npm run e2e
 ```
+
+### What the E2E command needs, and what it touches
+
+`npm run e2e` starts both services itself; nothing has to be running first. It needs
+`server/.env` to exist with a working `DATABASE_URL` — the same file the application already
+uses — or an `E2E_DATABASE_URL` in the environment.
+
+It then keeps every piece of its state away from development state:
+
+| | Development | E2E run |
+|---|---|---|
+| Database schema | `public` | `lab2_e2e`, dropped and recreated on every run |
+| API port | 3000 | 3101 |
+| Client port | 5173 | 4173 |
+| Attachment bytes | `server/storage/` | `artifacts/lab-02/e2e-runtime/uploads/` |
+
+The schema is prepared by `server/scripts/prepare-e2e.ts`, which refuses to run against
+`public`. Screenshots are written to `artifacts/lab-02/screenshots/` and are committed; the
+HTML report, traces and uploads are regenerated output and are ignored.
 
 ---
 
@@ -159,6 +185,45 @@ npx playwright test e2e/lab-02
 unit, API and UI suites captured from `main` after the release merge, together with the
 Playwright run and the responsive screenshots. Test counts and file paths will be filled in
 from that run, not from a feature branch and not from memory.
+
+### Issue #27 feature-branch verification
+
+Run on `feature/27-e2e-and-visual-evidence` on 2026-09-02, before peer review:
+
+- `npm run e2e` (repository root) — **10 tests passed**, four spec files, nine screenshots
+  written to `artifacts/lab-02/screenshots/`.
+- `cd client && npm test` — 8 files, 97 passed. `cd server && npm test` — 14 files, 126
+  passed. Both builds passed.
+
+**The responsive tests assert; the screenshots are only evidence.** Nine images prove nothing
+on their own and nobody compares them pixel by pixel, so every capture is paired with the
+checks a person would otherwise make by eye: no page-level horizontal scroll, no label whose
+`scrollWidth` exceeds its `clientWidth`, no enabled control whose box falls outside the
+viewport, no attachment filename cut off, and a 44 px minimum control height on mobile.
+
+**Both of those were verified by breaking the code**, since a responsive check that has never
+failed proves nothing about responsiveness:
+
+- `.zen-card { min-width: 900px }` failed the mobile run with `the page scrolls horizontally
+  — Expected: <= 1, Received: 522`.
+- Constraining `.zen-field__label` to 24 px with `overflow: hidden` failed the desktop run
+  with eleven clipped labels listed by name.
+
+Both were reverted and the suite returns to 10 passed.
+
+**A screenshot that showed something untrue.** The first `my-tickets/mobile.png` had a Ticket
+Number in the search box and all eight Tickets listed beneath it. The search is debounced by
+300 ms and the assertion — that a row matching the number exists — was satisfied by the
+*unfiltered* list, so the capture raced the refetch. The test now waits for
+`Showing 1–1 of 1 Ticket` before capturing. The assertion was weak in exactly the way that
+produces confident, wrong evidence, and only looking at the image caught it.
+
+**The visual inspection found a real gap against our own specification.** `ui-spec.md` §9
+requires a multi-column form at desktop; Create Ticket and Ticket Detail were rendering a
+single tall column of full-width fields at 1440 px. A `zen-form-grid` now lays the short
+fields out in two columns from 768 px up, with Ticket Summary, Description and Attachments
+spanning both so they keep their width. Below 768 px the grid collapses and everything
+stacks, as §9 also requires.
 
 ### Issue #26 feature-branch verification
 

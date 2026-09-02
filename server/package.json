@@ -10,6 +10,8 @@
     "start": "node dist/index.js",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
+    "e2e:prepare": "tsx scripts/prepare-e2e.ts",
+    "e2e:server": "npm run e2e:prepare && tsx src/index.ts",
     "test": "vitest run",
     "postinstall": "prisma generate"
   },
