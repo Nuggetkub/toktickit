@@ -122,12 +122,13 @@ and [`docs/lab-01/tests.md`](docs/lab-01/tests.md) for Lab 1.
 
 ## API
 
-Ten capabilities. The full contract — request and response shapes, every error code, and
-the rules behind them — is [`docs/lab-02/api-spec.md`](docs/lab-02/api-spec.md).
+Eleven endpoints: the Lab 1 health check, plus the ten capabilities Lab 2 requires. The full
+contract — request and response shapes, every error code, and the rules behind them — is
+[`docs/lab-02/api-spec.md`](docs/lab-02/api-spec.md).
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/health` | Liveness; touches no database |
+| GET | `/api/health` | Liveness; touches no database. **Lab 1** |
 | GET | `/api/categories` | Active Categories |
 | GET | `/api/related-systems` | Active Related Systems |
 | GET | `/api/requesters` | Active Development Requesters for the selector |
