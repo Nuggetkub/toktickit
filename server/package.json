@@ -10,13 +10,20 @@
     "start": "node dist/index.js",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
-    "test": "vitest run"
+    "e2e:prepare": "tsx scripts/prepare-e2e.ts",
+    "e2e:server": "npm run e2e:prepare && tsx src/index.ts",
+    "test": "vitest run",
+    "postinstall": "prisma generate"
   },
-  "prisma": { "seed": "tsx prisma/seed.ts" },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "@types/multer": "^2.2.0",
     "cors": "^2.8.5",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "multer": "^2.3.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

@@ -1,0 +1,651 @@
+/*
+ * Zen Green design system — Lab 2 foundation (Issue #18).
+ * The contract for this file is docs/lab-02/ui-spec.md. Later labs extend these
+ * rules rather than inventing a new visual system per screen, so every value a
+ * component needs lives here as a token.
+ *
+ * The four palette values fixed by the labsheet (#006B3C, #0B7A46, #EAF6EF,
+ * #F5F7F6) are asserted by client/tests/lab-02/ZenGreen.styles.test.tsx, so an
+ * accidental edit fails the suite rather than quietly changing the theme.
+ */
+
+:root {
+  /* Palette */
+  --zen-primary: #006B3C;
+  --zen-secondary: #0B7A46;
+  --zen-pale: #EAF6EF;
+  --zen-page: #F5F7F6;
+  --zen-surface: #FFFFFF;
+  --zen-text: #12241C;
+  --zen-text-muted: #4A5A52;
+  --zen-border: #D6DFDA;
+  --zen-readonly: #EFF2F0;
+  --zen-error: #A32020;
+  --zen-error-surface: #FDF2F2;
+  --zen-warning: #B26A00;
+  --zen-warning-surface: #FDF6E9;
+  --zen-success: #006B3C;
+
+  /* 4px spacing scale */
+  --zen-space-1: 4px;
+  --zen-space-2: 8px;
+  --zen-space-3: 12px;
+  --zen-space-4: 16px;
+  --zen-space-6: 24px;
+  --zen-space-8: 32px;
+
+  --zen-radius: 8px;
+  --zen-radius-pill: 999px;
+  --zen-content-max: 1080px;
+  --zen-font: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+
+  color: var(--zen-text);
+  background: var(--zen-page);
+  font-family: var(--zen-font);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  color: var(--zen-text);
+  background: var(--zen-page);
+  font-family: var(--zen-font);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* Focus is never removed — keyboard users must always see where they are. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--zen-secondary);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------- shell */
+
+.zen-shell {
+  min-height: 100vh;
+  background: var(--zen-page);
+}
+
+.zen-shell__header {
+  border-bottom: 3px solid var(--zen-primary);
+  background: var(--zen-surface);
+}
+
+.zen-shell__bar {
+  display: flex;
+  gap: var(--zen-space-4);
+  align-items: center;
+  justify-content: space-between;
+  width: min(100%, var(--zen-content-max));
+  margin: 0 auto;
+  padding: var(--zen-space-4);
+}
+
+.zen-shell__brand {
+  margin: 0;
+  color: var(--zen-primary);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.zen-shell__nav {
+  display: flex;
+  gap: var(--zen-space-2);
+}
+
+.zen-nav__item {
+  padding: var(--zen-space-2) var(--zen-space-3);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  color: var(--zen-text-muted);
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.zen-nav__item:hover:not(:disabled) {
+  color: var(--zen-secondary);
+}
+
+/* Active route is shown by colour AND an underline, so the cue survives a
+   colour-blind reading. */
+.zen-nav__item--active {
+  color: var(--zen-primary);
+  border-bottom-color: var(--zen-primary);
+}
+
+.zen-nav__item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.zen-shell__context {
+  display: flex;
+  gap: var(--zen-space-2);
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  color: var(--zen-text-muted);
+  font-size: 0.9rem;
+}
+
+.zen-shell__requester {
+  color: var(--zen-text);
+  font-weight: 700;
+}
+
+.zen-shell__main {
+  width: min(100%, var(--zen-content-max));
+  margin: 0 auto;
+  padding: var(--zen-space-6) var(--zen-space-4);
+}
+
+/* ---------------------------------------------------------------- card */
+
+.zen-card {
+  padding: var(--zen-space-6);
+  border: 1px solid var(--zen-border);
+  border-radius: var(--zen-radius);
+  background: var(--zen-surface);
+  box-shadow: 0 8px 24px rgb(18 36 28 / 6%);
+}
+
+.zen-card + .zen-card {
+  margin-top: var(--zen-space-6);
+}
+
+.zen-card__title {
+  margin: 0 0 var(--zen-space-4);
+  font-size: 1.35rem;
+}
+
+/* ---------------------------------------------------------------- button */
+
+.zen-button {
+  min-height: 44px; /* touch target floor, per ui-spec §9 */
+  padding: var(--zen-space-2) var(--zen-space-4);
+  border: 1px solid transparent;
+  border-radius: var(--zen-radius);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.zen-button--primary {
+  color: var(--zen-surface);
+  background: var(--zen-primary);
+}
+
+.zen-button--primary:hover:not(:disabled) {
+  background: var(--zen-secondary);
+}
+
+.zen-button--secondary {
+  color: var(--zen-primary);
+  background: var(--zen-surface);
+  border-color: var(--zen-primary);
+}
+
+.zen-button--tertiary {
+  padding-inline: var(--zen-space-2);
+  color: var(--zen-secondary);
+  background: none;
+  text-decoration: underline;
+}
+
+.zen-button--destructive {
+  color: var(--zen-error);
+  background: var(--zen-surface);
+  border-color: var(--zen-error);
+}
+
+.zen-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ---------------------------------------------------------------- field */
+
+.zen-field {
+  margin-bottom: var(--zen-space-4);
+}
+
+.zen-field__label {
+  display: block;
+  margin-bottom: var(--zen-space-1);
+  font-weight: 700;
+}
+
+.zen-field__required {
+  margin-left: var(--zen-space-1);
+  color: var(--zen-error);
+}
+
+.zen-field__hint {
+  margin: 0 0 var(--zen-space-1);
+  color: var(--zen-text-muted);
+  font-size: 0.9rem;
+}
+
+.zen-field input,
+.zen-field select,
+.zen-field textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--zen-space-2) var(--zen-space-3);
+  border: 1px solid var(--zen-border);
+  border-radius: var(--zen-radius);
+  color: var(--zen-text);
+  background: var(--zen-surface);
+  font: inherit;
+}
+
+.zen-field textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+
+/* Read-only values are visibly distinct from editable ones (ui-spec §3). */
+.zen-field--readonly .zen-field__value {
+  padding: var(--zen-space-2) var(--zen-space-3);
+  border: 1px solid var(--zen-border);
+  border-radius: var(--zen-radius);
+  color: var(--zen-text);
+  background: var(--zen-readonly);
+}
+
+.zen-field--invalid input,
+.zen-field--invalid select,
+.zen-field--invalid textarea {
+  border-color: var(--zen-error);
+}
+
+/* The message sits directly beneath its own field, never lumped at the top. */
+.zen-field__error {
+  margin: var(--zen-space-1) 0 0;
+  color: var(--zen-error);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- feedback */
+
+.zen-status,
+.zen-alert,
+.zen-empty {
+  margin: var(--zen-space-4) 0;
+  padding: var(--zen-space-4);
+  border-radius: var(--zen-radius);
+}
+
+.zen-status {
+  color: var(--zen-text);
+  background: var(--zen-pale);
+}
+
+.zen-alert {
+  color: var(--zen-error);
+  background: var(--zen-error-surface);
+  border: 1px solid var(--zen-error);
+}
+
+.zen-empty {
+  border: 1px dashed var(--zen-border);
+  background: var(--zen-surface);
+  text-align: center;
+}
+
+.zen-empty__title {
+  margin: 0 0 var(--zen-space-1);
+  font-size: 1.05rem;
+}
+
+.zen-empty__description {
+  margin: 0 0 var(--zen-space-3);
+  color: var(--zen-text-muted);
+}
+
+/* ---------------------------------------------------------------- badge */
+
+.zen-badge {
+  display: inline-block;
+  padding: var(--zen-space-1) var(--zen-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--zen-radius-pill);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.zen-badge--neutral {
+  color: var(--zen-text);
+  background: var(--zen-pale);
+  border-color: var(--zen-border);
+}
+
+.zen-badge--success {
+  color: var(--zen-surface);
+  background: var(--zen-success);
+}
+
+.zen-badge--warning {
+  color: var(--zen-warning);
+  background: var(--zen-warning-surface);
+  border-color: var(--zen-warning);
+}
+
+.zen-badge--danger {
+  color: var(--zen-error);
+  background: var(--zen-error-surface);
+  border-color: var(--zen-error);
+}
+
+/* ---------------------------------------------------------------- lists */
+
+.zen-list {
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--zen-border);
+  border-radius: var(--zen-radius);
+  list-style: none;
+  overflow: hidden;
+}
+
+.zen-list li + li {
+  border-top: 1px solid var(--zen-border);
+}
+
+.zen-list li {
+  padding: var(--zen-space-3) var(--zen-space-4);
+  background: var(--zen-surface);
+}
+
+.zen-text-success { color: var(--zen-success); font-weight: 700; }
+.zen-text-error { color: var(--zen-error); font-weight: 700; }
+.zen-section-title { margin: var(--zen-space-6) 0 var(--zen-space-2); font-size: 1.05rem; }
+
+/* ---------------------------------------------------------------- responsive
+   Breakpoints are fixed by the labsheet: desktop >= 992px, tablet 768-991px,
+   mobile < 768px. Nothing here may cause page-level horizontal scrolling. */
+
+@media (max-width: 991px) {
+  .zen-shell__main {
+    padding: var(--zen-space-4) var(--zen-space-3);
+  }
+
+  .zen-card {
+    padding: var(--zen-space-4);
+  }
+}
+
+@media (max-width: 767px) {
+  .zen-shell__bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .zen-shell__nav {
+    flex-wrap: wrap;
+  }
+
+  .zen-shell__context {
+    justify-content: flex-start;
+  }
+
+  .zen-button {
+    width: 100%;
+  }
+
+  .zen-shell__nav .zen-button,
+  .zen-nav__item {
+    width: auto;
+  }
+}
+
+/* ---------------------------------------------------------------- toolbar */
+
+.zen-toolbar {
+  display: flex;
+  gap: var(--zen-space-3);
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-bottom: var(--zen-space-4);
+  padding: var(--zen-space-4);
+  border: 1px solid var(--zen-border);
+  border-radius: var(--zen-radius);
+  background: var(--zen-page);
+}
+
+.zen-toolbar .zen-field {
+  flex: 1 1 200px;
+  margin-bottom: 0;
+}
+
+.zen-toolbar__actions {
+  display: flex;
+  gap: var(--zen-space-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ---------------------------------------------------------------- table */
+
+/* The wrapper scrolls, not the page: a wide table must never make the whole
+   document scroll sideways (ui-spec.md §9). */
+.zen-table-wrap {
+  overflow-x: auto;
+}
+
+.zen-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--zen-surface);
+}
+
+.zen-table th,
+.zen-table td {
+  padding: var(--zen-space-3);
+  border-bottom: 1px solid var(--zen-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.zen-table thead th {
+  border-bottom: 2px solid var(--zen-primary);
+  color: var(--zen-text);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.zen-table tbody tr:hover {
+  background: var(--zen-pale);
+}
+
+.zen-table a {
+  color: var(--zen-secondary);
+  font-weight: 600;
+}
+
+.zen-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------------------------------------------------------------- pagination */
+
+.zen-pagination {
+  display: flex;
+  gap: var(--zen-space-3);
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--zen-space-4);
+}
+
+.zen-pagination p {
+  margin: 0;
+  color: var(--zen-text-muted);
+}
+
+/* ---------------------------------------------------------------- mobile */
+
+@media (max-width: 767px) {
+  /* The table becomes one card per Ticket. Each cell carries its own label from
+     data-label, so a value is never orphaned from the column it belonged to. */
+  .zen-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .zen-table,
+  .zen-table tbody,
+  .zen-table tr,
+  .zen-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .zen-table tr {
+    margin-bottom: var(--zen-space-4);
+    border: 1px solid var(--zen-border);
+    border-radius: var(--zen-radius);
+    overflow: hidden;
+  }
+
+  .zen-table td {
+    display: flex;
+    gap: var(--zen-space-3);
+    justify-content: space-between;
+    border-bottom: 1px solid var(--zen-border);
+  }
+
+  .zen-table td::before {
+    content: attr(data-label);
+    color: var(--zen-text-muted);
+    font-weight: 700;
+    flex: 0 0 45%;
+  }
+
+  .zen-table td:last-child {
+    border-bottom: 0;
+  }
+
+  .zen-pagination {
+    justify-content: center;
+    text-align: center;
+  }
+}
+
+/* ------------------------------------------------------------ attachments
+   One card per file rather than a table row: a filename, a state badge, a
+   removal reason and two actions do not survive being squeezed into columns at
+   390px, and ui-spec.md 9 forbids the page scrolling sideways to save them. */
+
+.zen-attachments {
+  margin: var(--zen-space-4) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--zen-space-3);
+}
+
+.zen-attachment {
+  padding: var(--zen-space-4);
+  border: 1px solid var(--zen-border);
+  border-left: 4px solid var(--zen-primary);
+  border-radius: var(--zen-radius);
+  background: var(--zen-surface);
+}
+
+/* Removed files are dimmer and marked, but the text stays at full contrast:
+   the state is carried by the badge and the sentence, not by the colour. */
+.zen-attachment--removed {
+  border-left-color: var(--zen-text-muted);
+  background: var(--zen-readonly);
+}
+
+.zen-attachment__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--zen-space-3);
+}
+
+.zen-attachment__name {
+  font-weight: 700;
+  /* Long filenames wrap instead of overflowing their card. */
+  overflow-wrap: anywhere;
+}
+
+.zen-attachment__meta {
+  margin: var(--zen-space-2) 0 0;
+  color: var(--zen-text-muted);
+  font-size: 0.9rem;
+}
+
+.zen-attachment__removal {
+  margin: var(--zen-space-2) 0 0;
+  color: var(--zen-text);
+}
+
+.zen-attachment__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--zen-space-3);
+  margin-top: var(--zen-space-3);
+}
+
+@media (max-width: 767px) {
+  /* .zen-button is full width on mobile, so the actions stack rather than
+     leaving two half-buttons fighting for one row. */
+  .zen-attachment__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* ------------------------------------------------------------- form layout
+   ui-spec.md 9 asks for a multi-column form from 768px up, with Summary and
+   Description keeping useful width. Two columns for the short fields, and
+   anything marked --wide spans both, so a long value is never squeezed into
+   half a card to satisfy a grid. Below 768px the grid collapses and every
+   field stacks, which is what the same section asks for. */
+
+@media (min-width: 768px) {
+  .zen-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: var(--zen-space-6);
+  }
+
+  /* Long fields, and everything that is not a field — alerts, action rows,
+     lists — run the full width of the card. */
+  .zen-form-grid > .zen-field--wide,
+  .zen-form-grid > .zen-alert,
+  .zen-form-grid > .zen-status,
+  .zen-form-grid > .zen-shell__nav,
+  .zen-form-grid > ul,
+  .zen-form-grid > p {
+    grid-column: 1 / -1;
+  }
+}

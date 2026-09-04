@@ -1,67 +1,81 @@
-import { useState } from "react";
-import { checkSystem, Category } from "./api.js";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { AppShell, type NavItem } from "./components/index.js";
+import SystemCheck from "./SystemCheck.js";
+import { RequesterProvider, RequesterSelector, RequireRequester, useRequester } from "./requester/index.js";
+import CreateTicket from "./tickets/CreateTicket.js";
+import MyTickets from "./tickets/MyTickets.js";
+import TicketDetail from "./tickets/TicketDetail.js";
 
-// UI states you must handle for Issue 4: idle, loading, success, error.
-type UiState = "idle" | "loading" | "success" | "error";
+// Routes, so that AC-02 — opening a requester-scoped route directly shows the
+// selector — is a real claim about a real URL rather than about which branch of
+// a conditional happened to render.
 
 export default function App() {
-  const [state, setState] = useState<UiState>("idle");
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [error, setError] = useState("");
+  return (
+    <RequesterProvider>
+      <Shell />
+    </RequesterProvider>
+  );
+}
 
-  async function handleCheck() {
-    setState("loading");
-    setError("");
-    try {
-      const status = await checkSystem();
-      setCategories(status.categories);
-      setState("success");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not reach the API.");
-      setState("error");
-    }
+function Shell() {
+  const { requester, clear } = useRequester();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Navigation is hidden until a Requester is chosen: on the selector screen
+  // there is nothing behind those links yet, and offering them would invite the
+  // guard to bounce the user straight back.
+  const navItems: NavItem[] = requester
+    ? [
+        { key: "/create", label: "Create Ticket", onSelect: () => navigate("/create") },
+        { key: "/tickets", label: "My Tickets", onSelect: () => navigate("/tickets") },
+      ]
+    : [];
+
+  function changeRequester() {
+    // BR-11: drop the context first, so requester-scoped screens unmount before
+    // the selector appears rather than briefly showing the old requester's data.
+    clear();
+    navigate("/select-requester", { replace: true });
   }
 
   return (
-    <div className="container py-5" style={{ maxWidth: 640 }}>
-      <h1 className="h3 mb-4">
-        TokTickIT <span className="text-success">IT Service Desk</span>
-      </h1>
-
-      <button className="btn btn-success" onClick={handleCheck} disabled={state === "loading"}>
-        {state === "loading" ? "Loading…" : "Check System"}
-      </button>
-
-      {state === "loading" && (
-        <p className="mt-3 mb-0 text-secondary">Checking the API…</p>
-      )}
-
-      {state === "success" && (
-        <>
-          <p className="mt-3 mb-2">
-            System Status: <span className="text-success fw-semibold">Online</span>
-          </p>
-
-          <h2 className="h6 mt-4">Supported Request Categories:</h2>
-          {categories.length === 0 ? (
-            <p className="text-secondary mb-0">No categories found.</p>
-          ) : (
-            <ul className="list-group">
-              {categories.map((category) => (
-                <li key={category.id} className="list-group-item">
-                  {category.name}
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
-      )}
-
-      {state === "error" && (
-        <p className="mt-3 mb-0">
-          System Status: <span className="text-danger fw-semibold">Offline</span> — {error}
-        </p>
-      )}
-    </div>
+    <AppShell
+      navItems={navItems}
+      activeKey={location.pathname}
+      requesterName={requester?.fullName}
+      onChangeRequester={requester ? changeRequester : undefined}
+    >
+      <Routes>
+        <Route path="/select-requester" element={<RequesterSelector />} />
+        <Route
+          path="/create"
+          element={
+            <RequireRequester>
+              <CreateTicket />
+            </RequireRequester>
+          }
+        />
+        <Route
+          path="/tickets"
+          element={
+            <RequireRequester>
+              <MyTickets />
+            </RequireRequester>
+          }
+        />
+        <Route
+          path="/tickets/:ticketId"
+          element={
+            <RequireRequester>
+              <TicketDetail />
+            </RequireRequester>
+          }
+        />
+        <Route path="/system-check" element={<SystemCheck />} />
+        <Route path="*" element={<Navigate to="/tickets" replace />} />
+      </Routes>
+    </AppShell>
   );
 }

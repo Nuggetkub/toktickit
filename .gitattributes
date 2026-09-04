@@ -1,0 +1,7 @@
+# TypeScript sources are text. Without this, one stray control character in a
+# fixture makes git classify a whole source file as binary and its diff shows
+# nothing at all — which is how an entire test file reached review unreviewable.
+*.ts   text
+*.tsx  text
+*.css  text
+*.md   text

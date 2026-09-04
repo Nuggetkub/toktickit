@@ -1,5 +1,9 @@
 // Prisma schema — datasource and generator are pre-wired.
 // Your DATABASE_URL lives in server/.env (copy it from .env.example).
+//
+// The Lab 2 data design and the reasoning behind it are in
+// docs/lab-02/specification.md §7. Constraints and indexes are not decorative:
+// each one is justified there against the query that needs it.
 
 generator client {
   provider = "prisma-client-js"
@@ -10,10 +14,121 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Declared in severity order so PostgreSQL sorts by severity rather than
+// alphabetically. Sorting a string column would give HIGH, LOW, MEDIUM, URGENT,
+// which is meaningless to a user (BR-25, decision D-08).
+enum RequestedPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// Lab 2 has exactly one status. Lab 3 adds its remaining members without a data
+// migration (BR-03).
+enum TicketStatus {
+  NEW
+}
+
 // An IT request category. `name` is unique so the seed can upsert on it and
 // stay idempotent.
 model Category {
   id        Int      @id @default(autoincrement())
   name      String   @unique
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
+
+  tickets Ticket[]
+}
+
+// The specific service, application or device a ticket concerns.
+model RelatedSystem {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tickets Ticket[]
+}
+
+// The person who owns tickets. In Lab 2 one of these is chosen through the
+// Development Requester selector, which is a testing mechanism and not
+// authentication (BR-05). In Lab 3 an authenticated identity resolves to this
+// same model, so ownership survives unchanged (BR-45).
+model Requester {
+  id        Int      @id @default(autoincrement())
+  fullName  String
+  email     String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tickets           Ticket[]
+  removedAttachments Attachment[] @relation("AttachmentRemovedBy")
+}
+
+model Ticket {
+  id              Int               @id @default(autoincrement())
+  ticketNumber    String            @unique
+  requesterId     Int
+  categoryId      Int
+  relatedSystemId Int
+  summary         String
+  description     String
+  requestedPriority RequestedPriority
+  currentStatus   TicketStatus      @default(NEW)
+  // Nullable because PostgreSQL permits many NULLs under a unique index, so a
+  // ticket created by any future path that has no key is unaffected (BR-19).
+  idempotencyKey  String?           @unique
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  requester     Requester     @relation(fields: [requesterId], references: [id])
+  category      Category      @relation(fields: [categoryId], references: [id])
+  relatedSystem RelatedSystem @relation(fields: [relatedSystemId], references: [id])
+  attachments   Attachment[]
+
+  // Every My Tickets query filters by requester and orders by date descending.
+  // This is the index that query exists for.
+  @@index([requesterId, createdAt(sort: Desc)])
+  @@index([categoryId])
+  @@index([relatedSystemId])
+}
+
+model Attachment {
+  id               Int       @id @default(autoincrement())
+  ticketId         Int
+  // Server-generated. The original filename is display metadata only and never
+  // builds a server path (BR-35).
+  storageKey       String    @unique
+  originalFilename String
+  mimeType         String
+  sizeBytes        Int
+  uploadedAt       DateTime  @default(now())
+
+  // Soft removal. Nullable columns rather than a boolean, so the row records
+  // when, by whom and why — see the justified decision in specification.md §7.
+  // `removedAt IS NULL` is the single indexable definition of "active".
+  removedAt            DateTime?
+  removedByRequesterId Int?
+  removalReason        String?
+
+  ticket    Ticket     @relation(fields: [ticketId], references: [id])
+  removedBy Requester? @relation("AttachmentRemovedBy", fields: [removedByRequesterId], references: [id])
+
+  // The five-active-attachment count (BR-33) is the hottest attachment query.
+  @@index([ticketId, removedAt])
+}
+
+// One row per calendar year, holding the last Ticket Number issued in it.
+//
+// BR-02 specifies a per-year sequence — TKT-2026-00001 starts again at 00001 in
+// 2027 — so the number cannot be derived from the Ticket's own autoincrement id,
+// which is global and would only ever look per-year. The counter is incremented
+// inside the same transaction as the insert, with `ON CONFLICT DO UPDATE` taking
+// a row lock, so two concurrent creates cannot be issued the same number.
+model TicketNumberSequence {
+  year      Int @id
+  lastValue Int @default(0)
 }

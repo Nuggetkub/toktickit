@@ -1,32 +1,32 @@
 import { getPrisma } from "../src/prisma.js";
+import { seedReferenceData } from "../src/seed-data.js";
 
-// The four supported IT request categories, in the order they should appear.
-// Seeding sequentially (not in parallel) keeps autoincrement ids in this order
-// on a fresh database, which is what the categories test asserts.
-const CATEGORY_NAMES = [
-  "Account and Access",
-  "Hardware",
-  "Software",
-  "Network",
-];
+// Thin runner. The data and the upsert logic live in src/seed-data.ts so that
+// tests/lab-02/seed.test.ts can execute them directly and prove the seed is
+// idempotent, rather than relying on someone remembering to run it twice.
 
 async function main() {
   const prisma = getPrisma();
 
-  for (const name of CATEGORY_NAMES) {
-    // upsert on the unique name: re-running the seed updates nothing and
-    // creates nothing, so it never produces duplicates.
-    await prisma.category.upsert({
-      where: { name },
-      update: {},
-      create: { name },
-    });
+  await seedReferenceData(prisma);
+
+  const categories = await prisma.category.findMany({ orderBy: { id: "asc" } });
+  console.log(`Seeded ${categories.length} categories:`);
+  for (const category of categories) {
+    console.log(`  ${category.id}  ${category.name}`);
   }
 
-  const seeded = await prisma.category.findMany({ orderBy: { id: "asc" } });
-  console.log(`Seeded ${seeded.length} categories:`);
-  for (const category of seeded) {
-    console.log(`  ${category.id}  ${category.name}`);
+  const relatedSystems = await prisma.relatedSystem.findMany({ orderBy: { id: "asc" } });
+  console.log(`Seeded ${relatedSystems.length} related systems:`);
+  for (const relatedSystem of relatedSystems) {
+    console.log(`  ${relatedSystem.id}  ${relatedSystem.name}`);
+  }
+
+  const requesters = await prisma.requester.findMany({ orderBy: { id: "asc" } });
+  const active = requesters.filter((requester) => requester.isActive).length;
+  console.log(`Seeded ${requesters.length} requesters (${active} active, ${requesters.length - active} inactive):`);
+  for (const requester of requesters) {
+    console.log(`  ${requester.id}  ${requester.isActive ? "active  " : "inactive"}  ${requester.fullName}`);
   }
 }
 
