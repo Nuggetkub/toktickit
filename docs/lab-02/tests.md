@@ -1,6 +1,6 @@
 # Lab 2 Test Plan and Results
 
-**Status:** Planned before implementation
+**Status:** Complete — all 41 rows ran and passed on `main` at `d9cc8ac` on 2026-09-05
 **Companion document:** [`specification.md`](./specification.md)
 **Status convention:** a row reads `Planned` until that test has actually run and passed
 on `main`. Nothing is marked `Passed` from a feature branch.
@@ -45,47 +45,47 @@ E2E rows below are not claimed runnable until it merges.
 
 | ID | Level | AC | Scenario and expected result | Test file | Status |
 |---|---|---|---|---|---|
-| UNIT-01 | Unit | AC-04 | Ticket Number formats as `TKT-<YYYY>-<NNNNN>` with zero padding, and the sequence restarts per year. | `server/tests/lab-02/ticket-number.test.ts` | Planned |
-| UNIT-02 | Unit | AC-05 | Summary and Description are trimmed before validation; 5/120 and 20/4000 boundaries accept and reject correctly; whitespace alone fails. | `server/tests/lab-02/ticket-validation.test.ts` | Planned |
-| UNIT-03 | Unit | AC-14 | Attachment type is decided from file content, not extension; a `.png` holding a script is rejected. Exactly 5 MB is accepted and one byte more is rejected. | `server/tests/lab-02/attachment-rules.test.ts` | Planned |
-| UNIT-04 | Unit | AC-14 | The active-attachment count ignores rows with `removedAt` set, so removing one frees a slot. | `server/tests/lab-02/attachment-rules.test.ts` | Planned |
-| UNIT-05 | Unit | AC-15 | Removal reason is trimmed and bounded to 5–250 characters. | `server/tests/lab-02/attachment-rules.test.ts` | Planned |
-| UNIT-06 | Unit | AC-09 | Query parsing accepts only the whitelisted sort fields, sort orders and page sizes, requires `page` ≥ 1, and reports each rejection as a field error. | `server/tests/lab-02/ticket-query.test.ts` | Planned |
-| API-01 | API | AC-01 | Categories, related systems and requesters return active rows only, ordered by name and exposing only the contracted fields; a deactivated category disappears; the inactive requester never appears. | `server/tests/lab-02/reference.api.test.ts` | Planned |
-| API-15 | API | AC-01 | With the database unreachable, all three reference endpoints return `503 DEPENDENCY_UNAVAILABLE` in the documented envelope and leak no cause, SQL or stack trace. | `server/tests/lab-02/reference-failure.api.test.ts` | Planned |
-| UNIT-07 | Unit | AC-01 | The seed is idempotent: a second run creates no duplicates, restores a requester deactivated by hand, and seeds no tickets. | `server/tests/lab-02/seed.test.ts` | Planned |
-| API-02 | API | AC-04 | A valid create returns `201` with a `TKT-` number, `NEW`, a server `ticketDate`, and the `requesterId` taken from `X-Dev-Requester-Id` rather than the body. | `server/tests/lab-02/create-ticket.api.test.ts` | Planned |
-| API-03 | API | AC-05 | Each broken field rule returns `400 VALIDATION_FAILED` with that field named in `fieldErrors`, and no ticket is persisted. | `server/tests/lab-02/create-ticket.api.test.ts` | Planned |
-| API-04 | API | AC-06 | Replaying an `Idempotency-Key` with an identical payload returns `200` and the original ticket with no duplicate row; replaying it with a changed payload returns `409 IDEMPOTENCY_KEY_CONFLICT` and creates nothing. | `server/tests/lab-02/create-ticket.api.test.ts` | Planned |
-| API-05 | API | AC-12 | A missing, malformed, or inactive `X-Dev-Requester-Id` returns `401 REQUESTER_CONTEXT_REQUIRED`, and the three causes are indistinguishable to the caller. | `server/tests/lab-02/requester-context.api.test.ts` | Planned |
-| API-16 | API | AC-06 | Two simultaneous creates sharing one `Idempotency-Key` produce exactly one Ticket: one `201`, one `200`, and the same id from both. | `server/tests/lab-02/create-ticket.api.test.ts` | Planned |
-| API-06 | API | AC-08 | The list is scoped to the header's requester: A's tickets are returned for A and are absent for B, with no query parameter involved. | `server/tests/lab-02/my-tickets.api.test.ts` | Planned |
-| API-07 | API | AC-09 | Search, each filter, sorting and paging return the correct subset with correct `page`, `pageSize`, `totalItems` and `totalPages`; a page past the end returns an empty array with `200`. | `server/tests/lab-02/my-tickets.api.test.ts` | Planned |
-| API-08 | API | AC-10 | Sorting by `requestedPriority` ascending returns `LOW`, `MEDIUM`, `HIGH`, `URGENT` in severity order, not alphabetical order. | `server/tests/lab-02/my-tickets.api.test.ts` | Planned |
-| API-09 | API | AC-09 | An unknown `sortBy`, an unknown `sortOrder`, a `pageSize` outside {10, 25, 50}, a `page` below 1, and an unrecognised priority each return `400` rather than being ignored. | `server/tests/lab-02/my-tickets.api.test.ts` | Planned |
-| API-10 | API | AC-12 | An owned ticket returns `200`; a ticket owned by another requester returns `404 TICKET_NOT_FOUND`, identical to the response for a nonexistent id. | `server/tests/lab-02/ticket-detail.api.test.ts` | Planned |
-| API-17 | API | AC-12, AC-15 | Ticket Detail returns full attachment metadata with removed entries present and marked, never the storage key; a non-owner is answered `404` and no filename is disclosed. | `server/tests/lab-02/ticket-detail.api.test.ts` | Planned |
-| API-11 | API | AC-13 | A permitted file under the ceiling returns `201` with active metadata and a stored key that is not derived from the original filename. | `server/tests/lab-02/attachments.api.test.ts` | Planned |
-| API-12 | API | AC-14 | Unsupported type returns `415`; oversize returns `413`; a sixth active file returns `409 ATTACHMENT_LIMIT_REACHED`; upload to another requester's ticket returns `404`. No metadata row is written in any case. | `server/tests/lab-02/attachments.api.test.ts` | Planned |
-| API-13 | API | AC-15 | Soft removal returns `200` with reason, timestamp and remover; metadata still lists the attachment; a later download returns `404`; a second removal returns `409 ATTACHMENT_ALREADY_REMOVED` without overwriting the first reason. | `server/tests/lab-02/attachments.api.test.ts` | Planned |
-| API-14 | API | AC-13 | Downloading an active attachment returns `200`, the recorded MIME type, and a `Content-Disposition` filename that is sanitised. | `server/tests/lab-02/attachments.api.test.ts` | Planned |
-| UI-01 | UI | AC-01 | The selector lists active requesters only, states that it is a testing mechanism and not a login, and renders loading, empty and failure states. | `client/tests/lab-02/RequesterSelector.test.tsx` | Planned |
-| UI-02 | UI | AC-02 | Opening a requester-scoped route with nothing selected renders the selector, no ticket data is shown, the navigation is hidden, a stored requester who is no longer active is dropped, and a returning requester is not bounced while the stored id resolves. | `client/tests/lab-02/RequesterRouteGuard.test.tsx` | Planned |
-| UI-03 | UI | AC-03 | Create Ticket loads categories and related systems from the API and shows the selected requester as a read-only field. | `client/tests/lab-02/CreateTicket.test.tsx` | Planned |
-| UI-04 | UI | AC-05 | Invalid input renders a message beneath each offending field, the submit stays disabled while busy, and entered values survive the failed attempt. | `client/tests/lab-02/CreateTicket.test.tsx` | Planned |
-| UI-05 | UI | AC-04 | A successful create renders the returned Ticket Number and Ticket Date, and offers the next action. | `client/tests/lab-02/CreateTicket.test.tsx` | Planned |
-| UI-06 | UI | AC-07 | An API failure renders a safe message with no raw network text, and every field value is preserved for retry. | `client/tests/lab-02/CreateTicket.test.tsx` | Planned |
-| UI-07 | UI | AC-08 | Changing requester clears filters and paging and reloads the list for the new context. | `client/tests/lab-02/MyTickets.test.tsx` | Planned |
-| UI-08 | UI | AC-09 | Search, filters, sort and pagination controls drive the request and render the returned metadata, including page and total counts. | `client/tests/lab-02/MyTickets.test.tsx` | Planned |
-| UI-09 | UI | AC-11 | Owning no tickets and matching no tickets render different messages and different recovery actions. | `client/tests/lab-02/MyTickets.test.tsx` | Planned |
-| UI-10 | UI | AC-15 | Detail renders every field read-only, shows a removed attachment as retained metadata with a Removed badge, and offers no working download for it. Removal needs a confirmation and a typed reason before anything is sent. | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Planned |
-| UI-11 | UI | AC-14 | A rejected file is named in the error together with its reason, and other selected files are unaffected. A server rejection is reported beside the attachment section, naming the file. | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Planned |
-| UI-12 | UI | AC-07 | The API client converts a thrown `TypeError: Failed to fetch` into a human message before it reaches a component. | `client/tests/lab-02/apiClient.test.ts` | Planned |
-| STYLE-01 | UI style | AC-16 | Zen Green tokens are applied; required fields carry an asterisk; validation messages render beneath their field; read-only and editable fields are visually distinct; button variants and busy/disabled states are correct; `role="status"` and `role="alert"` are used as specified. | `client/tests/lab-02/ZenGreen.styles.test.tsx` | Planned |
-| RESP-01 | Responsive | AC-16 | Create Ticket, My Tickets and Ticket Detail at 1440×900, 834×1112 and 390×844: no page-level horizontal scroll, no clipped label, no control outside the viewport, no attachment name cut off, and a 44 px minimum control height on mobile. Screenshots are written to `artifacts/lab-02/screenshots/` and committed. | `e2e/lab-02/responsive.spec.ts` | Planned |
-| E2E-01 | E2E | AC-04, AC-08 | Select a requester, create a ticket, see its official number, then find that number in My Tickets. | `e2e/lab-02/create-and-find.spec.ts` | Planned |
-| E2E-02 | E2E | AC-02, AC-08, AC-12 | Switch requester and confirm the first requester's tickets disappear from a search; open the first requester's ticket URL directly and confirm it is refused in the same words as a ticket that never existed; open a requester-scoped URL with no requester selected and get the selector. | `e2e/lab-02/ownership.spec.ts` | Planned |
-| E2E-03 | E2E | AC-13, AC-15 | Upload a permitted attachment, download it, soft-remove it with a reason, and confirm the download is then blocked while the metadata remains. | `e2e/lab-02/attachments.spec.ts` | Planned |
+| UNIT-01 | Unit | AC-04 | Ticket Number formats as `TKT-<YYYY>-<NNNNN>` with zero padding, and the sequence restarts per year. | `server/tests/lab-02/ticket-number.test.ts` | Passed |
+| UNIT-02 | Unit | AC-05 | Summary and Description are trimmed before validation; 5/120 and 20/4000 boundaries accept and reject correctly; whitespace alone fails. | `server/tests/lab-02/ticket-validation.test.ts` | Passed |
+| UNIT-03 | Unit | AC-14 | Attachment type is decided from file content, not extension; a `.png` holding a script is rejected. Exactly 5 MB is accepted and one byte more is rejected. | `server/tests/lab-02/attachment-rules.test.ts` | Passed |
+| UNIT-04 | Unit | AC-14 | The active-attachment count ignores rows with `removedAt` set, so removing one frees a slot. | `server/tests/lab-02/attachment-rules.test.ts` | Passed |
+| UNIT-05 | Unit | AC-15 | Removal reason is trimmed and bounded to 5–250 characters. | `server/tests/lab-02/attachment-rules.test.ts` | Passed |
+| UNIT-06 | Unit | AC-09 | Query parsing accepts only the whitelisted sort fields, sort orders and page sizes, requires `page` ≥ 1, and reports each rejection as a field error. | `server/tests/lab-02/ticket-query.test.ts` | Passed |
+| API-01 | API | AC-01 | Categories, related systems and requesters return active rows only, ordered by name and exposing only the contracted fields; a deactivated category disappears; the inactive requester never appears. | `server/tests/lab-02/reference.api.test.ts` | Passed |
+| API-15 | API | AC-01 | With the database unreachable, all three reference endpoints return `503 DEPENDENCY_UNAVAILABLE` in the documented envelope and leak no cause, SQL or stack trace. | `server/tests/lab-02/reference-failure.api.test.ts` | Passed |
+| UNIT-07 | Unit | AC-01 | The seed is idempotent: a second run creates no duplicates, restores a requester deactivated by hand, and seeds no tickets. | `server/tests/lab-02/seed.test.ts` | Passed |
+| API-02 | API | AC-04 | A valid create returns `201` with a `TKT-` number, `NEW`, a server `ticketDate`, and the `requesterId` taken from `X-Dev-Requester-Id` rather than the body. | `server/tests/lab-02/create-ticket.api.test.ts` | Passed |
+| API-03 | API | AC-05 | Each broken field rule returns `400 VALIDATION_FAILED` with that field named in `fieldErrors`, and no ticket is persisted. | `server/tests/lab-02/create-ticket.api.test.ts` | Passed |
+| API-04 | API | AC-06 | Replaying an `Idempotency-Key` with an identical payload returns `200` and the original ticket with no duplicate row; replaying it with a changed payload returns `409 IDEMPOTENCY_KEY_CONFLICT` and creates nothing. | `server/tests/lab-02/create-ticket.api.test.ts` | Passed |
+| API-05 | API | AC-12 | A missing, malformed, or inactive `X-Dev-Requester-Id` returns `401 REQUESTER_CONTEXT_REQUIRED`, and the three causes are indistinguishable to the caller. | `server/tests/lab-02/requester-context.api.test.ts` | Passed |
+| API-16 | API | AC-06 | Two simultaneous creates sharing one `Idempotency-Key` produce exactly one Ticket: one `201`, one `200`, and the same id from both. | `server/tests/lab-02/create-ticket.api.test.ts` | Passed |
+| API-06 | API | AC-08 | The list is scoped to the header's requester: A's tickets are returned for A and are absent for B, with no query parameter involved. | `server/tests/lab-02/my-tickets.api.test.ts` | Passed |
+| API-07 | API | AC-09 | Search, each filter, sorting and paging return the correct subset with correct `page`, `pageSize`, `totalItems` and `totalPages`; a page past the end returns an empty array with `200`. | `server/tests/lab-02/my-tickets.api.test.ts` | Passed |
+| API-08 | API | AC-10 | Sorting by `requestedPriority` ascending returns `LOW`, `MEDIUM`, `HIGH`, `URGENT` in severity order, not alphabetical order. | `server/tests/lab-02/my-tickets.api.test.ts` | Passed |
+| API-09 | API | AC-09 | An unknown `sortBy`, an unknown `sortOrder`, a `pageSize` outside {10, 25, 50}, a `page` below 1, and an unrecognised priority each return `400` rather than being ignored. | `server/tests/lab-02/my-tickets.api.test.ts` | Passed |
+| API-10 | API | AC-12 | An owned ticket returns `200`; a ticket owned by another requester returns `404 TICKET_NOT_FOUND`, identical to the response for a nonexistent id. | `server/tests/lab-02/ticket-detail.api.test.ts` | Passed |
+| API-17 | API | AC-12, AC-15 | Ticket Detail returns full attachment metadata with removed entries present and marked, never the storage key; a non-owner is answered `404` and no filename is disclosed. | `server/tests/lab-02/ticket-detail.api.test.ts` | Passed |
+| API-11 | API | AC-13 | A permitted file under the ceiling returns `201` with active metadata and a stored key that is not derived from the original filename. | `server/tests/lab-02/attachments.api.test.ts` | Passed |
+| API-12 | API | AC-14 | Unsupported type returns `415`; oversize returns `413`; a sixth active file returns `409 ATTACHMENT_LIMIT_REACHED`; upload to another requester's ticket returns `404`. No metadata row is written in any case. | `server/tests/lab-02/attachments.api.test.ts` | Passed |
+| API-13 | API | AC-15 | Soft removal returns `200` with reason, timestamp and remover; metadata still lists the attachment; a later download returns `404`; a second removal returns `409 ATTACHMENT_ALREADY_REMOVED` without overwriting the first reason. | `server/tests/lab-02/attachments.api.test.ts` | Passed |
+| API-14 | API | AC-13 | Downloading an active attachment returns `200`, the recorded MIME type, and a `Content-Disposition` filename that is sanitised. | `server/tests/lab-02/attachments.api.test.ts` | Passed |
+| UI-01 | UI | AC-01 | The selector lists active requesters only, states that it is a testing mechanism and not a login, and renders loading, empty and failure states. | `client/tests/lab-02/RequesterSelector.test.tsx` | Passed |
+| UI-02 | UI | AC-02 | Opening a requester-scoped route with nothing selected renders the selector, no ticket data is shown, the navigation is hidden, a stored requester who is no longer active is dropped, and a returning requester is not bounced while the stored id resolves. | `client/tests/lab-02/RequesterRouteGuard.test.tsx` | Passed |
+| UI-03 | UI | AC-03 | Create Ticket loads categories and related systems from the API and shows the selected requester as a read-only field. | `client/tests/lab-02/CreateTicket.test.tsx` | Passed |
+| UI-04 | UI | AC-05 | Invalid input renders a message beneath each offending field, the submit stays disabled while busy, and entered values survive the failed attempt. | `client/tests/lab-02/CreateTicket.test.tsx` | Passed |
+| UI-05 | UI | AC-04 | A successful create renders the returned Ticket Number and Ticket Date, and offers the next action. | `client/tests/lab-02/CreateTicket.test.tsx` | Passed |
+| UI-06 | UI | AC-07 | An API failure renders a safe message with no raw network text, and every field value is preserved for retry. | `client/tests/lab-02/CreateTicket.test.tsx` | Passed |
+| UI-07 | UI | AC-08 | Changing requester clears filters and paging and reloads the list for the new context. | `client/tests/lab-02/MyTickets.test.tsx` | Passed |
+| UI-08 | UI | AC-09 | Search, filters, sort and pagination controls drive the request and render the returned metadata, including page and total counts. | `client/tests/lab-02/MyTickets.test.tsx` | Passed |
+| UI-09 | UI | AC-11 | Owning no tickets and matching no tickets render different messages and different recovery actions. | `client/tests/lab-02/MyTickets.test.tsx` | Passed |
+| UI-10 | UI | AC-15 | Detail renders every field read-only, shows a removed attachment as retained metadata with a Removed badge, and offers no working download for it. Removal needs a confirmation and a typed reason before anything is sent. | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Passed |
+| UI-11 | UI | AC-14 | A rejected file is named in the error together with its reason, and other selected files are unaffected. A server rejection is reported beside the attachment section, naming the file. | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Passed |
+| UI-12 | UI | AC-07 | The API client converts a thrown `TypeError: Failed to fetch` into a human message before it reaches a component. | `client/tests/lab-02/apiClient.test.ts` | Passed |
+| STYLE-01 | UI style | AC-16 | Zen Green tokens are applied; required fields carry an asterisk; validation messages render beneath their field; read-only and editable fields are visually distinct; button variants and busy/disabled states are correct; `role="status"` and `role="alert"` are used as specified. | `client/tests/lab-02/ZenGreen.styles.test.tsx` | Passed |
+| RESP-01 | Responsive | AC-16 | Create Ticket, My Tickets and Ticket Detail at 1440×900, 834×1112 and 390×844: no page-level horizontal scroll, no clipped label, no control outside the viewport, no attachment name cut off, and a 44 px minimum control height on mobile. Screenshots are written to `artifacts/lab-02/screenshots/` and committed. | `e2e/lab-02/responsive.spec.ts` | Passed |
+| E2E-01 | E2E | AC-04, AC-08 | Select a requester, create a ticket, see its official number, then find that number in My Tickets. | `e2e/lab-02/create-and-find.spec.ts` | Passed |
+| E2E-02 | E2E | AC-02, AC-08, AC-12 | Switch requester and confirm the first requester's tickets disappear from a search; open the first requester's ticket URL directly and confirm it is refused in the same words as a ticket that never existed; open a requester-scoped URL with no requester selected and get the selector. | `e2e/lab-02/ownership.spec.ts` | Passed |
+| E2E-03 | E2E | AC-13, AC-15 | Upload a permitted attachment, download it, soft-remove it with a reason, and confirm the download is then blocked while the metadata remains. | `e2e/lab-02/attachments.spec.ts` | Passed |
 
 ---
 
@@ -181,10 +181,119 @@ HTML report, traces and uploads are regenerated output and are ignored.
 
 ## 6. Final Results
 
-*Implementation is in progress.* This section will carry the real terminal output for the
-unit, API and UI suites captured from `main` after the release merge, together with the
-Playwright run and the responsive screenshots. Test counts and file paths will be filled in
-from that run, not from a feature branch and not from memory.
+**Captured on `main` at `d9cc8ac` — the merge commit of release pull request #42 — on
+2026-09-05.** This branch is cut from that commit and changes only documentation, so the
+tree these commands ran against is the released tree.
+
+All three blocks and all nine screenshots come from **one verification pass**, re-run after
+@Earth2509's review of the pull request carrying this file. His finding was that the E2E
+block held a malformed duplicate line, and he was right: the block had first been written
+through a shell heredoc, which collapsed the backslashes in the Playwright paths, and
+repairing that left an orphan tail behind because one damaged line had already split in two.
+Rather than hand-edit evidence a second time, every block here is now copied out of a
+captured run by script, and the screenshots are the ones that run produced — so the images
+and the assertions that guard them cannot come from different runs.
+
+The numbers below are not the ones from the release pull request. Those were taken on
+`lab2-staging`, and two branches that are each green can still merge into a red default
+branch — which is exactly what happened in my partner's repository between his #31 and his
+#33, where `main` sat failing for a day because nobody re-ran the suite on the merge result.
+So every row above was flipped from `Planned` to `Passed` on the strength of this run and no
+other.
+
+### Unit and API — `cd server && npm test`
+
+```
+ ✓ tests/lab-02/attachments.api.test.ts (13 tests) 610ms
+ ✓ tests/lab-02/my-tickets.api.test.ts (19 tests) 243ms
+ ✓ tests/lab-02/ticket-detail.api.test.ts (6 tests) 193ms
+ ✓ tests/lab-02/create-ticket.api.test.ts (10 tests) 231ms
+ ✓ tests/lab-02/reference.api.test.ts (7 tests) 89ms
+ ✓ tests/lab-02/attachment-rules.test.ts (22 tests) 9ms
+ ✓ tests/lab-02/ticket-validation.test.ts (17 tests) 4ms
+ ✓ tests/lab-02/requester-context.api.test.ts (8 tests) 111ms
+ ✓ tests/lab-02/seed.test.ts (3 tests) 126ms
+ ✓ tests/lab-02/ticket-query.test.ts (11 tests) 4ms
+ ✓ tests/lab-02/reference-failure.api.test.ts (4 tests) 32ms
+ ✓ tests/lab-01/categories.test.ts (2 tests) 54ms
+ ✓ tests/lab-02/ticket-number.test.ts (3 tests) 2ms
+ ✓ tests/lab-01/health.test.ts (1 test) 19ms
+
+ Test Files  14 passed (14)
+      Tests  126 passed (126)
+   Duration  10.66s (transform 351ms, setup 87ms, collect 3.34s, tests 1.73s, environment 2ms, prepare 1.50s)
+```
+
+The `reference-failure` suite writes four `stderr` lines while it runs. That is the point of
+it: it forces the database unreachable and asserts that the failure is logged server-side
+while the client receives a safe `503` envelope with no cause, SQL or stack trace.
+
+### UI component and UI style — `cd client && npm test`
+
+```
+ ✓ tests/lab-02/apiClient.test.ts (3 tests) 4ms
+ ✓ tests/lab-02/RequesterRouteGuard.test.tsx (6 tests) 144ms
+ ✓ tests/lab-02/ZenGreen.styles.test.tsx (24 tests) 242ms
+ ✓ tests/lab-01/App.test.tsx (4 tests) 252ms
+ ✓ tests/lab-02/RequesterSelector.test.tsx (7 tests) 612ms
+ ✓ tests/lab-02/RequesterTicketDetail.test.tsx (13 tests) 1999ms
+ ✓ tests/lab-02/MyTickets.test.tsx (23 tests) 3799ms
+ ✓ tests/lab-02/CreateTicket.test.tsx (17 tests) 15718ms
+
+ Test Files  8 passed (8)
+      Tests  97 passed (97)
+   Duration  32.32s (transform 817ms, setup 17.68s, collect 20.08s, tests 22.77s, environment 84.93s, prepare 3.40s)
+```
+
+### End-to-end and responsive — `npm run e2e`
+
+```
+Running 10 tests using 1 worker
+
+[1/10] e2e\lab-02\attachments.spec.ts:9:1 › an attachment can be uploaded, downloaded, removed with a reason, and then not downloaded
+[2/10] e2e\lab-02\attachments.spec.ts:75:1 › a file the rules refuse is named with its reason and never reaches the Ticket
+[3/10] e2e\lab-02\create-and-find.spec.ts:7:1 › a created Ticket keeps its official number and appears in My Tickets
+[4/10] e2e\lab-02\create-and-find.spec.ts:36:1 › the Ticket opens from the list with the description the list omits
+[5/10] e2e\lab-02\ownership.spec.ts:15:1 › switching Requester removes the first Requester's Tickets, and their URL is refused
+[6/10] e2e\lab-02\ownership.spec.ts:49:1 › a Ticket that never existed is refused in exactly the same words
+[7/10] e2e\lab-02\ownership.spec.ts:61:1 › opening a requester-scoped URL with no Requester selected shows the selector
+[8/10] e2e\lab-02\responsive.spec.ts:24:3 › the three screens stay usable at desktop width
+[9/10] e2e\lab-02\responsive.spec.ts:24:3 › the three screens stay usable at tablet width
+[10/10] e2e\lab-02\responsive.spec.ts:24:3 › the three screens stay usable at mobile width
+  10 passed (35.0s)
+```
+
+### Totals
+
+| Suite | Files | Tests |
+|---|---|---|
+| Unit and API (`server`) | 14 | 126 |
+| UI component and style (`client`) | 8 | 97 |
+| End-to-end and responsive (root) | 4 | 10 |
+| **Total** | **26** | **233** |
+
+### The screenshots in this commit were taken by this run
+
+All nine of
+`artifacts/lab-02/screenshots/{create-ticket,my-tickets,ticket-detail}/{desktop,tablet,mobile}.png`
+were captured by the `main` run above, so they are pictures of the released code rather than
+of a feature branch. **Six of them changed in this commit; the three Create Ticket captures
+are byte-identical to the ones from the issue #27 branch**, because that screen shows a blank
+form with nothing run-specific on it — no ticket number, no timestamp. The six that differ do
+so because they carry a Ticket Number and a Ticket Date from this run.
+
+The assertions that accompany each capture — no page-level horizontal scroll, no clipped
+label, no control outside the viewport, no attachment name cut off, a 44 px minimum control
+height on mobile — passed in the same run that produced the images, so a screenshot cannot
+show a state the suite did not verify.
+
+### How each row was flipped
+
+Not by reading. Every one of the 41 rows names a test file; a script compared each cited
+path against the list of files these three commands actually executed, and all 41 matched
+before any status was changed. The check exists because a `Passed` row citing a file that
+does not exist is a defect I found in my partner's `tests.md` on his PR #30 — the row had
+been "corrected" to a filename that existed only in my repository.
 
 ### Issue #27 feature-branch verification
 
