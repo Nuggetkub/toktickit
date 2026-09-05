@@ -185,6 +185,15 @@ HTML report, traces and uploads are regenerated output and are ignored.
 2026-09-05.** This branch is cut from that commit and changes only documentation, so the
 tree these commands ran against is the released tree.
 
+All three blocks and all nine screenshots come from **one verification pass**, re-run after
+@Earth2509's review of the pull request carrying this file. His finding was that the E2E
+block held a malformed duplicate line, and he was right: the block had first been written
+through a shell heredoc, which collapsed the backslashes in the Playwright paths, and
+repairing that left an orphan tail behind because one damaged line had already split in two.
+Rather than hand-edit evidence a second time, every block here is now copied out of a
+captured run by script, and the screenshots are the ones that run produced — so the images
+and the assertions that guard them cannot come from different runs.
+
 The numbers below are not the ones from the release pull request. Those were taken on
 `lab2-staging`, and two branches that are each green can still merge into a red default
 branch — which is exactly what happened in my partner's repository between his #31 and his
@@ -195,24 +204,24 @@ other.
 ### Unit and API — `cd server && npm test`
 
 ```
- ✓ tests/lab-02/attachments.api.test.ts (13 tests) 568ms
- ✓ tests/lab-02/my-tickets.api.test.ts (19 tests) 233ms
+ ✓ tests/lab-02/attachments.api.test.ts (13 tests) 610ms
+ ✓ tests/lab-02/my-tickets.api.test.ts (19 tests) 243ms
  ✓ tests/lab-02/ticket-detail.api.test.ts (6 tests) 193ms
- ✓ tests/lab-02/create-ticket.api.test.ts (10 tests) 307ms
- ✓ tests/lab-02/reference.api.test.ts (7 tests) 80ms
- ✓ tests/lab-02/attachment-rules.test.ts (22 tests) 11ms
+ ✓ tests/lab-02/create-ticket.api.test.ts (10 tests) 231ms
+ ✓ tests/lab-02/reference.api.test.ts (7 tests) 89ms
+ ✓ tests/lab-02/attachment-rules.test.ts (22 tests) 9ms
  ✓ tests/lab-02/ticket-validation.test.ts (17 tests) 4ms
- ✓ tests/lab-02/requester-context.api.test.ts (8 tests) 82ms
- ✓ tests/lab-02/seed.test.ts (3 tests) 118ms
+ ✓ tests/lab-02/requester-context.api.test.ts (8 tests) 111ms
+ ✓ tests/lab-02/seed.test.ts (3 tests) 126ms
  ✓ tests/lab-02/ticket-query.test.ts (11 tests) 4ms
- ✓ tests/lab-02/reference-failure.api.test.ts (4 tests) 29ms
- ✓ tests/lab-01/categories.test.ts (2 tests) 48ms
+ ✓ tests/lab-02/reference-failure.api.test.ts (4 tests) 32ms
+ ✓ tests/lab-01/categories.test.ts (2 tests) 54ms
  ✓ tests/lab-02/ticket-number.test.ts (3 tests) 2ms
- ✓ tests/lab-01/health.test.ts (1 test) 18ms
+ ✓ tests/lab-01/health.test.ts (1 test) 19ms
 
  Test Files  14 passed (14)
       Tests  126 passed (126)
-   Duration  8.17s
+   Duration  10.66s (transform 351ms, setup 87ms, collect 3.34s, tests 1.73s, environment 2ms, prepare 1.50s)
 ```
 
 The `reference-failure` suite writes four `stderr` lines while it runs. That is the point of
@@ -222,17 +231,18 @@ while the client receives a safe `503` envelope with no cause, SQL or stack trac
 ### UI component and UI style — `cd client && npm test`
 
 ```
- ✓ tests/lab-02/apiClient.test.ts (3 tests) 5ms
- ✓ tests/lab-01/App.test.tsx (4 tests) 289ms
- ✓ tests/lab-02/RequesterRouteGuard.test.tsx (6 tests) 200ms
- ✓ tests/lab-02/ZenGreen.styles.test.tsx (24 tests) 314ms
- ✓ tests/lab-02/RequesterSelector.test.tsx (7 tests) 679ms
- ✓ tests/lab-02/RequesterTicketDetail.test.tsx (13 tests) 1991ms
- ✓ tests/lab-02/MyTickets.test.tsx (23 tests) 3814ms
- ✓ tests/lab-02/CreateTicket.test.tsx (17 tests) 15563ms
+ ✓ tests/lab-02/apiClient.test.ts (3 tests) 4ms
+ ✓ tests/lab-02/RequesterRouteGuard.test.tsx (6 tests) 144ms
+ ✓ tests/lab-02/ZenGreen.styles.test.tsx (24 tests) 242ms
+ ✓ tests/lab-01/App.test.tsx (4 tests) 252ms
+ ✓ tests/lab-02/RequesterSelector.test.tsx (7 tests) 612ms
+ ✓ tests/lab-02/RequesterTicketDetail.test.tsx (13 tests) 1999ms
+ ✓ tests/lab-02/MyTickets.test.tsx (23 tests) 3799ms
+ ✓ tests/lab-02/CreateTicket.test.tsx (17 tests) 15718ms
 
  Test Files  8 passed (8)
       Tests  97 passed (97)
+   Duration  32.32s (transform 817ms, setup 17.68s, collect 20.08s, tests 22.77s, environment 84.93s, prepare 3.40s)
 ```
 
 ### End-to-end and responsive — `npm run e2e`
@@ -250,8 +260,7 @@ Running 10 tests using 1 worker
 [8/10] e2e\lab-02\responsive.spec.ts:24:3 › the three screens stay usable at desktop width
 [9/10] e2e\lab-02\responsive.spec.ts:24:3 › the three screens stay usable at tablet width
 [10/10] e2e\lab-02\responsive.spec.ts:24:3 › the three screens stay usable at mobile width
-esponsive.spec.ts:24:3 › the three screens stay usable at mobile width
-  10 passed (16.3s)
+  10 passed (35.0s)
 ```
 
 ### Totals
