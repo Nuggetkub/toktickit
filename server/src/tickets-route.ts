@@ -209,6 +209,11 @@ async function createWithNumber(
         summary: input.summary,
         description: input.description,
         requestedPriority: input.requestedPriority,
+        // IT Priority starts equal to the Requested Priority and is changed only
+        // by IT Staff or an Administrator afterwards (BR-23). It is set here
+        // rather than defaulted in the database so the copy is a deliberate act
+        // of the code that creates the ticket.
+        itPriority: input.requestedPriority,
         idempotencyKey,
       },
       select: ticketSelect,

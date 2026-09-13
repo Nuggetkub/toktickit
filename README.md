@@ -83,9 +83,47 @@ npx prisma migrate deploy   # use `npx prisma migrate dev` when changing the sch
 npm run prisma:seed
 ```
 
-The seed is idempotent — it upserts on the unique category name, so running it
-repeatedly will not create duplicates. It inserts four categories: Account and
-Access, Hardware, Software, Network.
+The seed is idempotent — it matches on unique natural keys, so running it
+repeatedly creates no duplicates. It inserts the four categories (Account and
+Access, Hardware, Software, Network), seven related systems, the eleven
+development accounts below, and around thirty demo tickets spread across every
+status and priority so the IT Staff queue has realistic volume.
+
+Re-seeding restores a seeded account's name, role and activation state, but
+**never resets a password that has been changed** — it fills one in only where
+the account has none, which is the state the Lab 3 migration leaves a Lab 2
+Requester in.
+
+#### Development accounts
+
+Every seeded account uses the same password:
+
+```text
+TokTickIT-dev-2026
+```
+
+**This is a local fixture, not a secret.** The accounts use the reserved
+`toktickit.local` domain and exist so that a reviewer can sign in as each role on
+a fresh clone. Override it with `SEED_PASSWORD` before seeding if you prefer.
+
+| Account | Role | State |
+|---|---|---|
+| `nadia.rahman@toktickit.local` | Requester | active |
+| `somchai.pattana@toktickit.local` | Requester | active |
+| `marisa.chen@toktickit.local` | Requester | active |
+| `tobias.lindqvist@toktickit.local` | Requester | active |
+| `ananya.wong@toktickit.local` | Requester | active, **must change password at first sign-in** |
+| `priya.anand@toktickit.local` | Requester | inactive |
+| `arthit.chaiyaporn@toktickit.local` | IT Staff | active |
+| `grace.okafor@toktickit.local` | IT Staff | active |
+| `daniel.reyes@toktickit.local` | IT Staff | active |
+| `wichai.boonmee@toktickit.local` | IT Staff | inactive |
+| `pim.srisawat@toktickit.local` | Administrator | active |
+
+The Lab 3 migration renames Lab 2's `Requester` table to `User` in place, so every
+existing ticket and attachment keeps the same owner and the same ids. A migrated
+account has no password until the seed or an Administrator sets one, and an
+account with no password can never sign in.
 
 ### 5. Run the app
 

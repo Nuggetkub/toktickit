@@ -26,7 +26,7 @@ beforeAll(async () => {
   const [category, relatedSystem, inactive] = await Promise.all([
     prisma.category.findFirstOrThrow({ where: { isActive: true } }),
     prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } }),
-    prisma.requester.findFirstOrThrow({ where: { isActive: false } }),
+    prisma.user.findFirstOrThrow({ where: { isActive: false, role: "REQUESTER" } }),
   ]);
   categoryId = category.id;
   relatedSystemId = relatedSystem.id;

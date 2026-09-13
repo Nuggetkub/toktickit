@@ -51,7 +51,7 @@ function list(requesterId: number, query: Record<string, string | number> = {}) 
 
 beforeAll(async () => {
   const [requesters, network, hardware, wifi] = await Promise.all([
-    prisma.requester.findMany({ where: { isActive: true }, orderBy: { id: "asc" }, take: 2 }),
+    prisma.user.findMany({ where: { isActive: true, role: "REQUESTER" }, orderBy: { id: "asc" }, take: 2 }),
     prisma.category.findFirstOrThrow({ where: { name: "Network" } }),
     prisma.category.findFirstOrThrow({ where: { name: "Hardware" } }),
     prisma.relatedSystem.findFirstOrThrow({ where: { name: "Campus Wi-Fi" } }),

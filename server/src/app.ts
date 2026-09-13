@@ -71,8 +71,13 @@ app.get("/api/related-systems", async (_req: Request, res: Response) => {
 
 app.get("/api/requesters", async (_req: Request, res: Response) => {
   try {
-    const requesters = await getPrisma().requester.findMany({
-      where: { isActive: true },
+    // The role filter is load-bearing, not decoration. Lab 2's table held only
+    // Requesters, so "every active row" and "every active Requester" were the
+    // same set; after the Lab 3 rename the table also holds IT Staff and
+    // Administrators, and without this clause an unauthenticated caller would
+    // be handed their names and e-mail addresses.
+    const requesters = await getPrisma().user.findMany({
+      where: { isActive: true, role: "REQUESTER" },
       select: { id: true, fullName: true, email: true },
       orderBy: { fullName: "asc" },
     });
