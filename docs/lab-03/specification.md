@@ -468,7 +468,11 @@ sorting and pagination; one ticket for IT Staff; claim, assign and reassign; IT 
 and status; Public Comments; Internal Notes for permitted roles only; and the
 Administrator user list, create, update and set-initial-password operations. The Lab 2
 error envelope, the single-`400` validation rule and the `404` ownership rule carry over
-unchanged; `403` enters the API for the first time, for role refusals only.
+unchanged. `403` enters the API for the first time, carrying four codes: `FORBIDDEN` for a
+role refusal, `PASSWORD_CHANGE_REQUIRED` while a password change is pending,
+`ACCOUNT_INACTIVE` at sign-in, and `ORIGIN_REJECTED` for an untrusted origin. None of them
+depends on whether a particular resource exists, so none discloses one — an ownership
+refusal is still `404`.
 
 ## 9. Acceptance Criteria
 
@@ -603,7 +607,7 @@ Checked separately from product completion:
 | D-04 | scrypt from Node's built-in `crypto`, with an OWASP-listed parameter set (N = 2^15, r = 8, p = 3). | bcrypt and Argon2 need native modules that must compile on every contributor's machine, including Windows. scrypt is memory-hard, in the standard library, and needs no build step. The self-describing hash format lets the cost rise later without a migration. |
 | D-05 | Passwords need length (12–128) rather than character classes, although the labsheet mockup shows composition rules. | Current NIST guidance (SP 800-63B) finds composition rules produce predictable passwords (`Password1!`) and recommends length instead. The Change Password screen still shows a live checklist, of the rules that actually apply. |
 | D-06 | An inactive account gets a distinct message, but only after its password verifies (BR-07). | Labsheet §8.1 asks for a clear response for inactive accounts without exposing unnecessary information. Revealing deactivation only to someone who already holds the correct password discloses nothing an attacker could use, and the dummy-hash verification in BR-06 keeps timing uniform. |
-| D-07 | `403` enters the API for role refusals; ownership refusals stay `404`. | Lab 2 never returned `403`, because the only refusal was ownership, and a `403` there confirms the resource exists. A role refusal happens before any lookup (BR-18), so a `403` reveals only what the caller's role may do — which the interface shows anyway. |
+| D-07 | `403` enters the API for refusals that do not depend on a resource — `FORBIDDEN`, `PASSWORD_CHANGE_REQUIRED`, `ACCOUNT_INACTIVE` and `ORIGIN_REJECTED`; ownership refusals stay `404`. | Lab 2 never returned `403`, because the only refusal was ownership, and a `403` there confirms the resource exists. These four are decided before any lookup (BR-18) — from the caller's role, their own pending password change, their own account state, or the request's origin — so each reveals only something the caller already knows, while an ownership refusal stays indistinguishable from a missing record. |
 | D-08 | Administrators may perform every IT Staff ticket operation. | Labsheet §4.3 allows this only if the matrix says so, and §4.5 already implies it: the Ticket Owner may be "an active IT Staff or Administrator user", IT Priority may be changed "by IT Staff or Administrator", and Internal Notes are visible to Administrators. An Administrator's landing page is still User Management. |
 | D-09 | `CLOSED` is final; `RESOLVED` is the state that can be reopened. | This gives the Requester a window — the ticket is resolved but not yet closed — to reply that the problem persists. Letting a closed ticket reopen would make Closed mean nothing. A problem that returns after closure is a new ticket. |
 | D-10 | Resolution summaries and cancel/reopen reasons are also posted as Public Comments marked as status changes. | The Requester needs to see why their ticket changed, and the comment thread becomes the ticket's history without a separate audit table, which Lab 3 excludes. |

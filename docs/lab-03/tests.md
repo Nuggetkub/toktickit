@@ -65,6 +65,7 @@ records that replacement.
 | DB-02 | Migration | AC-11 | Two Lab 2 requesters whose emails differ only in case make the migration fail with an explicit message, leaving every table unchanged. | `server/tests/lab-03/migration.test.ts` | Planned |
 | DB-03 | Migration | AC-11 | After the migration, `prisma migrate diff` from the database to `schema.prisma` reports no difference. | `server/tests/lab-03/migration.test.ts` | Planned |
 | DB-04 | Seed | AC-12 | After two seed runs: four active and one inactive Requester, three active and one inactive IT Staff, and an active Administrator each exist once; tickets cover all eight statuses, assigned and unassigned; comments and notes exist; a password changed between the runs still verifies afterwards. | `server/tests/lab-03/seed.test.ts` | Planned |
+| DB-05 | Seed/integration | AC-02, AC-11 | A Requester migrated from Lab 2 starts with no password, is given the documented development initial password by the seed, signs in with it, is refused every other endpoint until a new password is saved, and is not re-provisioned when the seed runs again afterwards — the journey labsheet §5.2 requires to be documented (BR-43, BR-44) and tested. | `server/tests/lab-03/seed.test.ts` | Planned |
 | API-15 | API | AC-13 | The queue returns the correct subset and paging metadata for search, each filter, `owner=me`, `owner=unassigned` and `requesterIndicated=true`; priority and status sort by severity and lifecycle order; a page beyond the last is empty with `200`. | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
 | API-16 | API | AC-13 | Each invalid queue parameter returns `400` naming it; a Requester receives `403`. | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
 | API-17 | API | AC-14 | Claim sets the caller as owner on an unassigned ticket; claiming an assigned ticket returns `409 TICKET_ALREADY_ASSIGNED`; a stale `version` returns `409 TICKET_VERSION_CONFLICT` with the current ticket; two simultaneous claims produce exactly one `200` and one `409`. | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
@@ -81,7 +82,7 @@ records that replacement.
 | API-28 | API | AC-22 | Self-deactivation returns `409 CANNOT_DEACTIVATE_SELF` and own role change `409 CANNOT_CHANGE_OWN_ROLE`; removing the last active Administrator returns `409 LAST_ACTIVE_ADMINISTRATOR`; two Administrators deactivating each other simultaneously leave exactly one active; deactivating IT Staff unassigns their open tickets but not closed ones and reports the count. | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 | API-29 | API | AC-23 | IT Staff and a Requester receive `403` from every User Management endpoint, including for a nonexistent user id. | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 | UI-01 | UI | AC-01, AC-05 | Login shows field validation, the "Signing in…" busy state, and distinct invalid, inactive, throttled and unreachable messages with no raw network text; the password toggle has an accessible name. | `client/tests/lab-03/Login.test.tsx` | Planned |
-| UI-02 | UI | AC-02, AC-06 | Mandatory mode offers only Change Password and Log out; the live checklist ticks as rules are met; a wrong current password shows beneath its field; success lands on the role's page. | `client/tests/lab-03/ChangePassword.test.tsx` | Planned |
+| UI-02 | UI | AC-02, AC-06 | Mandatory mode offers only Change Password and Log out; the live checklist ticks for each of the five BR-11 rules and refuses a whitespace-only password and one equal to the account's email; a wrong current password shows beneath its field; success lands on the role's page. | `client/tests/lab-03/ChangePassword.test.tsx` | Planned |
 | UI-03 | UI | AC-07, AC-09, AC-10 | The shell shows name and role badge and each role's navigation only; a direct unpermitted route shows Forbidden; a `401` mid-session returns to Login with the session-ended notice and cleared data; no selector or Change Requester exists. | `client/tests/lab-03/AppShell.test.tsx` | Planned |
 | UI-04 | UI | AC-13 | Queue controls produce the right request and reset to page 1; badges, Unassigned and the resolved marker render; loading, empty, no-results and failure are distinct; a stale response is discarded; a row opens detail. | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Planned |
 | UI-05 | UI | AC-14, AC-15, AC-16 | Ticket information is read-only and the Work panel editable; Claim, owner and priority save independently; the status control lists only allowed next statuses; dialogs require summary or reason; a `409` shows Reload and keeps input; a terminal ticket disables the Work panel. | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Planned |
@@ -94,7 +95,7 @@ records that replacement.
 | E2E-02 | E2E | AC-13, AC-14, AC-15, AC-16, AC-17, AC-18, AC-19 | A Requester creates a ticket; IT Staff find it in the queue, claim it, raise IT Priority, move it to In Progress, post a comment and a note; the Requester sees the comment but not the note and indicates resolved; IT Staff see the marker, resolve with a summary, and close. | `e2e/lab-03/staff-ticket-flow.spec.ts` | Planned |
 | E2E-03 | E2E | AC-20, AC-21, AC-22, AC-23 | An Administrator searches, filters by role, creates an IT Staff user; that user must change the password at first sign-in; the Administrator deactivates them and their sign-in is then refused; own deactivation is prevented; IT Staff are shown Forbidden on Users. | `e2e/lab-03/user-administration.spec.ts` | Planned |
 | E2E-04 | E2E | AC-10 | The Lab 2 journeys — create and find, attachments, ownership — pass after signing in, with no selector anywhere. | `e2e/lab-03/requester-regression.spec.ts` | Planned |
-| RESP-01 | Responsive | AC-24 | Login, Change Password, the shell, the queue, staff Ticket Detail and User Management at 1440×900, 834×1112 and 390×844: no page-level horizontal scroll, no clipped label, no control outside the viewport, 44 px mobile targets; screenshots written to `artifacts/lab-03/screenshots/`. | `e2e/lab-03/responsive.spec.ts` | Planned |
+| RESP-01 | Responsive | AC-24 | Login, Change Password, the shell, My Tickets, Requester Ticket Detail, the queue, staff Ticket Detail and User Management at 1440×900, 834×1112 and 390×844: no page-level horizontal scroll, no clipped label, no control outside the viewport, 44 px mobile targets; screenshots written to `artifacts/lab-03/screenshots/`. The two Requester screens are included because Lab 3 changes them — a status filter and column, Public Comments, and the Problem Appears Resolved action. | `e2e/lab-03/responsive.spec.ts` | Planned |
 
 ---
 
@@ -106,7 +107,7 @@ table and the AC column above were checked against each other by script.
 | AC | Planned tests |
 |---|---|
 | AC-01 Valid sign-in returns the identity and role | UNIT-01, API-01, UI-01, E2E-01 |
-| AC-02 Pending password change blocks the application | API-04, UI-02, E2E-01 |
+| AC-02 Pending password change blocks the application | API-04, DB-05, UI-02, E2E-01 |
 | AC-03 A forged `requesterId` changes nothing | API-10 |
 | AC-04 Requesters are refused Internal Notes | API-08, API-23, UI-07 |
 | AC-05 Invalid, inactive and throttled sign-in | UNIT-05, API-02, API-03, UI-01, E2E-01 |
@@ -115,7 +116,7 @@ table and the AC column above were checked against each other by script.
 | AC-08 Administrative changes and expiry end sessions | API-07, API-27 |
 | AC-09 Role navigation, Forbidden, `403` before lookup, Origin check | API-09, API-11, API-12, UI-03 |
 | AC-10 Lab 2 Requester journeys under sign-in | API-12, API-13, API-14, UI-03, UI-09, E2E-04 |
-| AC-11 Migration preserves Lab 2 data | DB-01, DB-02, DB-03 |
+| AC-11 Migration preserves Lab 2 data | DB-01, DB-02, DB-03, DB-05 |
 | AC-12 Seed is idempotent and complete | DB-04 |
 | AC-13 Queue search, filter, sort and paging | UNIT-04, API-15, API-16, UI-04, E2E-02 |
 | AC-14 Ownership rules and concurrent claims | API-17, API-18, UI-05, E2E-02 |

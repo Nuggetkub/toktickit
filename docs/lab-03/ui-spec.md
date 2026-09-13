@@ -114,8 +114,13 @@ each item ticking as it is met and read out through `aria-describedby`:
 
 - At least 12 characters
 - No more than 128 characters
+- Not only spaces
 - Different from your current password
+- Different from your email address
 - Matches the confirmation
+
+The list is exactly the five rules BR-11 states, so the screen can never show a password as
+acceptable that the server will then reject.
 
 | State | Presentation |
 |---|---|
@@ -364,4 +369,5 @@ artifacts/lab-03/screenshots/authentication/{login,change-password,shell}-{deskt
 artifacts/lab-03/screenshots/staff-queue/{desktop,tablet,mobile}.png
 artifacts/lab-03/screenshots/staff-ticket-detail/{desktop,tablet,mobile}.png
 artifacts/lab-03/screenshots/user-management/{desktop,tablet,mobile}.png
+artifacts/lab-03/screenshots/requester/{my-tickets,ticket-detail}-{desktop,tablet,mobile}.png
 ```
