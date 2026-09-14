@@ -107,6 +107,34 @@ describe("POST /api/auth/login", () => {
     }
   });
 
+  it("spends the same work on an unknown email as on a wrong password", async () => {
+    // BR-06 is a claim about *time*, not about the response body, and the body
+    // assertions above pass whether or not the dummy hash is used. Without this
+    // test, deleting the dummy-hash line would break the defence silently: an
+    // unknown email would return before any key derivation, and the difference
+    // is measurable from outside.
+    const sample = async (email: string) => {
+      const timings: number[] = [];
+      for (let run = 0; run < 3; run += 1) {
+        resetThrottle();
+        const started = process.hrtime.bigint();
+        await post("/api/auth/login").send({ email, password: "not the right password" });
+        timings.push(Number(process.hrtime.bigint() - started) / 1e6);
+      }
+      return timings.sort((a, b) => a - b)[1]; // median, to blunt scheduler noise
+    };
+
+    const unknownAccount = await sample(`nobody${DOMAIN}`);
+    const wrongPassword = await sample(ACTIVE);
+
+    // scrypt at the contracted cost dominates both paths, so the ratio is near
+    // 1. A missing dummy hash drops the unknown-email path by an order of
+    // magnitude, which this bound catches while tolerating ordinary jitter.
+    const ratio = unknownAccount / wrongPassword;
+    expect(ratio).toBeGreaterThan(0.5);
+    expect(ratio).toBeLessThan(2);
+  }, 30_000);
+
   it("names a deactivated account only once its password is correct", async () => {
     const correct = await post("/api/auth/login").send({ email: INACTIVE, password: PASSWORD });
     expect(correct.status).toBe(403);
