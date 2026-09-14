@@ -450,7 +450,7 @@ A second function, `seedDemoTickets`, is run by `prisma db seed` and the E2E pre
 
 | Accounts | Active | Inactive |
 |---|---|---|
-| Requester | Nadia Rahman, Somchai Pattana, Marisa Chen, Tobias Lindqvist (the four migrated from Lab 2), and Ananya Wong, who must change her password at first sign-in | Priya Anand (migrated from Lab 2) |
+| Requester | Nadia Rahman, Somchai Pattana, Marisa Chen and Tobias Lindqvist (the four migrated from Lab 2), plus Ananya Wong | Priya Anand (migrated from Lab 2) |
 | IT Staff | Arthit Chaiyaporn, Grace Okafor, Daniel Reyes | Wichai Boonmee |
 | Administrator | Pim Srisawat | — |
 

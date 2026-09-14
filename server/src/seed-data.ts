@@ -43,8 +43,6 @@ export type SeedUser = {
   email: string;
   role: "REQUESTER" | "IT_STAFF" | "ADMINISTRATOR";
   isActive: boolean;
-  /** True only for the account that demonstrates the first-login change (Part 5). */
-  mustChangePassword: boolean;
 };
 
 /**
@@ -56,20 +54,26 @@ export type SeedUser = {
  * only fills in what the migration left empty (BR-43, BR-44).
  */
 export const USERS: readonly SeedUser[] = [
-  { fullName: "Nadia Rahman", email: "nadia.rahman@toktickit.local", role: "REQUESTER", isActive: true, mustChangePassword: false },
-  { fullName: "Somchai Pattana", email: "somchai.pattana@toktickit.local", role: "REQUESTER", isActive: true, mustChangePassword: false },
-  { fullName: "Marisa Chen", email: "marisa.chen@toktickit.local", role: "REQUESTER", isActive: true, mustChangePassword: false },
-  { fullName: "Tobias Lindqvist", email: "tobias.lindqvist@toktickit.local", role: "REQUESTER", isActive: true, mustChangePassword: false },
-  { fullName: "Priya Anand (retired account)", email: "priya.anand@toktickit.local", role: "REQUESTER", isActive: false, mustChangePassword: false },
-  // Signs in with the development password and is then required to change it,
-  // which is what Part 5 has to demonstrate.
-  { fullName: "Ananya Wong", email: "ananya.wong@toktickit.local", role: "REQUESTER", isActive: true, mustChangePassword: true },
-  { fullName: "Arthit Chaiyaporn", email: "arthit.chaiyaporn@toktickit.local", role: "IT_STAFF", isActive: true, mustChangePassword: false },
-  { fullName: "Grace Okafor", email: "grace.okafor@toktickit.local", role: "IT_STAFF", isActive: true, mustChangePassword: false },
-  { fullName: "Daniel Reyes", email: "daniel.reyes@toktickit.local", role: "IT_STAFF", isActive: true, mustChangePassword: false },
-  { fullName: "Wichai Boonmee (on leave)", email: "wichai.boonmee@toktickit.local", role: "IT_STAFF", isActive: false, mustChangePassword: false },
-  { fullName: "Pim Srisawat", email: "pim.srisawat@toktickit.local", role: "ADMINISTRATOR", isActive: true, mustChangePassword: false },
+  { fullName: "Nadia Rahman", email: "nadia.rahman@toktickit.local", role: "REQUESTER", isActive: true },
+  { fullName: "Somchai Pattana", email: "somchai.pattana@toktickit.local", role: "REQUESTER", isActive: true },
+  { fullName: "Marisa Chen", email: "marisa.chen@toktickit.local", role: "REQUESTER", isActive: true },
+  { fullName: "Tobias Lindqvist", email: "tobias.lindqvist@toktickit.local", role: "REQUESTER", isActive: true },
+  { fullName: "Priya Anand (retired account)", email: "priya.anand@toktickit.local", role: "REQUESTER", isActive: false },
+  { fullName: "Ananya Wong", email: "ananya.wong@toktickit.local", role: "REQUESTER", isActive: true },
+  { fullName: "Arthit Chaiyaporn", email: "arthit.chaiyaporn@toktickit.local", role: "IT_STAFF", isActive: true },
+  { fullName: "Grace Okafor", email: "grace.okafor@toktickit.local", role: "IT_STAFF", isActive: true },
+  { fullName: "Daniel Reyes", email: "daniel.reyes@toktickit.local", role: "IT_STAFF", isActive: true },
+  { fullName: "Wichai Boonmee (on leave)", email: "wichai.boonmee@toktickit.local", role: "IT_STAFF", isActive: false },
+  { fullName: "Pim Srisawat", email: "pim.srisawat@toktickit.local", role: "ADMINISTRATOR", isActive: true },
 ] as const;
+
+/**
+ * No account carries its own "must change" flag, because BR-12 leaves no choice:
+ * **setting an initial password always marks the account as requiring a change.**
+ * The seed is one of the two things permitted to set an initial password, so
+ * every account it provisions starts in mandatory-change mode — including the
+ * Lab 2 Requesters it finds already migrated, which is what DB-05 requires.
+ */
 
 /**
  * The Requester subset, kept as its own export because the Lab 2 suites assert
@@ -115,7 +119,9 @@ export async function seedReferenceData(prisma: PrismaClient): Promise<void> {
     });
 
     if (!existing) {
-      await prisma.user.create({ data: { ...user, passwordHash } });
+      // Requiring the change is not optional: this account is being given an
+      // initial password, and BR-12 says that always leaves the gate on.
+      await prisma.user.create({ data: { ...user, passwordHash, mustChangePassword: true } });
       continue;
     }
 
@@ -125,6 +131,11 @@ export async function seedReferenceData(prisma: PrismaClient): Promise<void> {
     // which is exactly the state the migration leaves a Lab 2 Requester in
     // (BR-43) — so re-seeding never undoes a password somebody has changed
     // (BR-44).
+    //
+    // Filling that hash *is* issuing an initial password, so the account stays in
+    // mandatory-change mode (BR-12). This is the migrated Lab 2 Requester's path
+    // into the system: it receives the documented development password and is
+    // still refused everything else until it saves a new one (DB-05).
     await prisma.user.update({
       where: { id: existing.id },
       data: {
@@ -132,7 +143,7 @@ export async function seedReferenceData(prisma: PrismaClient): Promise<void> {
         role: user.role,
         isActive: user.isActive,
         ...(existing.passwordHash === null
-          ? { passwordHash, mustChangePassword: user.mustChangePassword }
+          ? { passwordHash, mustChangePassword: true }
           : {}),
       },
     });

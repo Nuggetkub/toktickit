@@ -53,11 +53,10 @@ describe("the Lab 3 seed", () => {
       await expect(verifyPassword(DEVELOPMENT_PASSWORD, user.passwordHash!)).resolves.toBe(true);
     }
 
-    // Exactly one account demonstrates the mandatory first-login change (Part 5).
-    const mustChange = users.filter((user) => user.mustChangePassword);
-    expect(mustChange.map((user) => user.email)).toEqual(
-      USERS.filter((user) => user.mustChangePassword).map((user) => user.email),
-    );
+    // Every one of them is left requiring a change, because the seed issued the
+    // password (BR-12). There is no seeded account that can reach the
+    // application without choosing its own password first.
+    expect(users.filter((user) => !user.mustChangePassword)).toEqual([]);
   });
 
   it("creates nothing on a second run and never resets a changed password", async () => {
@@ -110,12 +109,21 @@ describe("the Lab 3 seed", () => {
     // A seeded fixture whose hash the migration left empty is filled in, which
     // is how the four Lab 2 Requesters receive their initial password.
     const fixture = USERS.find((user) => user.role === "REQUESTER" && user.isActive)!;
-    await prisma.user.update({ where: { email: fixture.email }, data: { passwordHash: null } });
+    // Exactly the state the migration leaves behind: no password, and the gate
+    // on. `mustChangePassword: false` is set here deliberately, so that if the
+    // seed ever cleared the gate again this assertion would catch it.
+    await prisma.user.update({
+      where: { email: fixture.email },
+      data: { passwordHash: null, mustChangePassword: false },
+    });
     await seedReferenceData(prisma);
 
     const provisioned = await prisma.user.findUniqueOrThrow({ where: { email: fixture.email } });
     expect(provisioned.passwordHash).not.toBeNull();
     await expect(verifyPassword(DEVELOPMENT_PASSWORD, provisioned.passwordHash!)).resolves.toBe(true);
+    // DB-05: receiving the development password does not admit the account to
+    // the application — it must still choose its own password first (BR-12).
+    expect(provisioned.mustChangePassword).toBe(true);
   });
 });
 

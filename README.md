@@ -106,13 +106,18 @@ TokTickIT-dev-2026
 `toktickit.local` domain and exist so that a reviewer can sign in as each role on
 a fresh clone. Override it with `SEED_PASSWORD` before seeding if you prefer.
 
+**Every one of these accounts must choose a new password at its first sign-in.**
+The value above is an *initial* password, and issuing one always leaves the
+account in mandatory-change mode, so no seeded account can reach the application
+without setting its own password first.
+
 | Account | Role | State |
 |---|---|---|
 | `nadia.rahman@toktickit.local` | Requester | active |
 | `somchai.pattana@toktickit.local` | Requester | active |
 | `marisa.chen@toktickit.local` | Requester | active |
 | `tobias.lindqvist@toktickit.local` | Requester | active |
-| `ananya.wong@toktickit.local` | Requester | active, **must change password at first sign-in** |
+| `ananya.wong@toktickit.local` | Requester | active |
 | `priya.anand@toktickit.local` | Requester | inactive |
 | `arthit.chaiyaporn@toktickit.local` | IT Staff | active |
 | `grace.okafor@toktickit.local` | IT Staff | active |
