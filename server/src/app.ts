@@ -1,7 +1,9 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import { getPrisma } from "./prisma.js";
-import { CLIENT_ORIGIN, SERVICE_NAME } from "./config.js";
+import { CLIENT_ORIGINS, SERVICE_NAME } from "./config.js";
+import { changePassword, login, logout, me } from "./auth-routes.js";
+import { asyncRoute, requireAuthenticatedUser, requireTrustedOrigin } from "./auth-middleware.js";
 import { sendDependencyUnavailable, sendError } from "./errors.js";
 import { createTicket, getTicket, listTickets } from "./tickets-route.js";
 import multer from "multer";
@@ -17,9 +19,12 @@ import {
 // Supertest can import `app` without opening a port. Do not merge these files.
 export const app = express();
 
-// Least privilege: only the configured client origin may call this API, rather
-// than the wildcard that cors() sends by default.
-app.use(cors({ origin: CLIENT_ORIGIN }));
+// Least privilege: only the configured client origins may call this API, rather
+// than the wildcard that cors() sends by default. `credentials` is what lets the
+// browser send the session cookie at all — and a wildcard origin is rejected by
+// the browser as soon as credentials are involved, so the explicit list is not
+// optional (decision D-02).
+app.use(cors({ origin: CLIENT_ORIGINS, credentials: true }));
 app.use(express.json());
 
 // ---------------------------------------------------------------------------
@@ -30,6 +35,29 @@ app.use(express.json());
 app.get("/api/health", (_req: Request, res: Response) => {
   res.status(200).json({ status: "ok", service: SERVICE_NAME });
 });
+
+// ---------------------------------------------------------------------------
+// Issue 46 — authentication (api-spec.md §2)
+//
+// These four are the only endpoints a signed-in user may reach while a password
+// change is pending (BR-02), which is why none of them carries
+// requirePasswordChangeComplete: an account with an initial password has to be
+// able to see who it is, fix the password, or leave.
+//
+// The Origin check guards the state-changing three (BR-16). It is mounted here
+// rather than globally because the Lab 2 routes still take their identity from
+// the development header; issue #47 moves them onto the session and applies the
+// same guard to them.
+// ---------------------------------------------------------------------------
+app.post("/api/auth/login", requireTrustedOrigin, asyncRoute(login));
+app.get("/api/auth/me", requireAuthenticatedUser, asyncRoute(me));
+app.post(
+  "/api/auth/change-password",
+  requireTrustedOrigin,
+  requireAuthenticatedUser,
+  asyncRoute(changePassword),
+);
+app.post("/api/auth/logout", requireTrustedOrigin, asyncRoute(logout));
 
 // ---------------------------------------------------------------------------
 // Issue 19 — Lab 2 reference data (api-spec.md §2)

@@ -5,6 +5,17 @@ import type { Response } from "express";
 // `code` is the stable identifier tests assert on; `message` is safe to display.
 export type ErrorCode =
   | "VALIDATION_FAILED"
+  // Lab 3 authentication and authorization (api-spec.md §9). `403` enters the
+  // API here for the first time, for refusals that do not depend on a resource
+  // existing — so none of them discloses one (decision D-07).
+  | "UNAUTHENTICATED"
+  | "INVALID_CREDENTIALS"
+  | "ACCOUNT_INACTIVE"
+  | "LOGIN_THROTTLED"
+  | "PASSWORD_CHANGE_REQUIRED"
+  | "ORIGIN_REJECTED"
+  | "FORBIDDEN"
+  // Retired in Lab 3: identity now comes from the session, not this header.
   | "REQUESTER_CONTEXT_REQUIRED"
   | "IDEMPOTENCY_KEY_REQUIRED"
   | "IDEMPOTENCY_KEY_CONFLICT"
