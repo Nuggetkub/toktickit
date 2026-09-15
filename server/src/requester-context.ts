@@ -34,8 +34,11 @@ export async function resolveRequester(req: Request): Promise<RequesterContextRe
   const id = Number(trimmed);
   if (!Number.isSafeInteger(id) || id < 1) return { failure: "MALFORMED" };
 
-  const requester = await getPrisma().requester.findFirst({
-    where: { id, isActive: true },
+  // Active *and* a Requester: after the Lab 3 rename this table also holds IT
+  // Staff and Administrators, and the development header must not be able to
+  // borrow one of their identities for a requester-scoped route.
+  const requester = await getPrisma().user.findFirst({
+    where: { id, isActive: true, role: "REQUESTER" },
     select: { id: true, fullName: true },
   });
 

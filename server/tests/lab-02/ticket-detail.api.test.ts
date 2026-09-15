@@ -41,7 +41,7 @@ async function newDetailTicket(summary: string): Promise<number> {
 
 beforeAll(async () => {
   const [requesters, category, relatedSystem] = await Promise.all([
-    prisma.requester.findMany({ where: { isActive: true }, orderBy: { id: "asc" }, take: 2 }),
+    prisma.user.findMany({ where: { isActive: true, role: "REQUESTER" }, orderBy: { id: "asc" }, take: 2 }),
     prisma.category.findFirstOrThrow({ where: { isActive: true } }),
     prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } }),
   ]);

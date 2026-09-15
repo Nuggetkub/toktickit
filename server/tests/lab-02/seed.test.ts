@@ -17,24 +17,24 @@ describe("reference data seed", () => {
     const before = {
       categories: await prisma.category.count(),
       relatedSystems: await prisma.relatedSystem.count(),
-      requesters: await prisma.requester.count(),
+      requesters: await prisma.user.count(),
     };
 
     await seedReferenceData(prisma);
 
     expect(await prisma.category.count()).toBe(before.categories);
     expect(await prisma.relatedSystem.count()).toBe(before.relatedSystems);
-    expect(await prisma.requester.count()).toBe(before.requesters);
+    expect(await prisma.user.count()).toBe(before.requesters);
   });
 
   it("restores a requester that was deactivated by hand", async () => {
     const prisma = getPrisma();
     const target = REQUESTERS.find((requester) => requester.isActive)!;
 
-    await prisma.requester.update({ where: { email: target.email }, data: { isActive: false } });
+    await prisma.user.update({ where: { email: target.email }, data: { isActive: false } });
     await seedReferenceData(prisma);
 
-    const restored = await prisma.requester.findUniqueOrThrow({ where: { email: target.email } });
+    const restored = await prisma.user.findUniqueOrThrow({ where: { email: target.email } });
     expect(restored.isActive).toBe(true);
   });
 

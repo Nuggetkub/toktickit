@@ -12,7 +12,7 @@ vi.mock("../../src/prisma.js", () => ({
   getPrisma: () => ({
     category: { findMany: unreachable },
     relatedSystem: { findMany: unreachable },
-    requester: { findMany: unreachable },
+    user: { findMany: unreachable },
   }),
 }));
 

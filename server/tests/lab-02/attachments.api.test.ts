@@ -56,7 +56,7 @@ async function activeCount(ticketId: number, requesterId: number): Promise<numbe
 }
 
 beforeAll(async () => {
-  const requesters = await prisma.requester.findMany({ where: { isActive: true }, orderBy: { id: "asc" }, take: 2 });
+  const requesters = await prisma.user.findMany({ where: { isActive: true, role: "REQUESTER" }, orderBy: { id: "asc" }, take: 2 });
   ownerId = requesters[0].id;
   otherId = requesters[1].id;
 }, 60000);
