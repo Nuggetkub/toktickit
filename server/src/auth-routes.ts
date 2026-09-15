@@ -109,6 +109,17 @@ export async function changePassword(req: Request, res: Response): Promise<void>
   const input = (req.body ?? {}) as Record<string, unknown>;
   const currentPassword = typeof input.currentPassword === "string" ? input.currentPassword : "";
 
+  // Read the window before validating anything, exactly as sign-in does.
+  // Recording failures without checking them counts attempts that nothing ever
+  // enforces, which would leave a stolen session free to guess the current
+  // password indefinitely — the very thing BR-09 extends this rule to cover.
+  const throttle = throttleState(user.email);
+  if (throttle.throttled) {
+    res.setHeader("Retry-After", String(throttle.retryAfterSeconds));
+    sendError(res, 429, "LOGIN_THROTTLED", "Too many attempts. Try again later.");
+    return;
+  }
+
   const check = validateNewPassword({
     newPassword: input.newPassword,
     confirmPassword: input.confirmPassword,

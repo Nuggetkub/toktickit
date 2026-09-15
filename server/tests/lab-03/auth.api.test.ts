@@ -239,6 +239,34 @@ describe("POST /api/auth/change-password", () => {
     expect((await request(app).get("/api/auth/me").set("Cookie", cookie)).status).toBe(200);
   });
 
+  it("refuses a sixth attempt, even with the correct current password", async () => {
+    const cookie = await signIn(ACTIVE);
+    const replacement = "a private password for the throttle test";
+
+    // Five wrong current passwords from inside a valid session.
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const failure = await post("/api/auth/change-password")
+        .set("Cookie", cookie)
+        .send({ currentPassword: "wrong", newPassword: replacement, confirmPassword: replacement });
+      expect(failure.status).toBe(400);
+    }
+
+    // The sixth is refused although everything about it is correct. Counting
+    // failures without enforcing them would let a stolen session guess the
+    // current password at leisure (BR-09).
+    const throttled = await post("/api/auth/change-password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: PASSWORD, newPassword: replacement, confirmPassword: replacement });
+
+    expect(throttled.status).toBe(429);
+    expect(throttled.body.error.code).toBe("LOGIN_THROTTLED");
+    expect(Number(throttled.headers["retry-after"])).toBeGreaterThan(0);
+
+    // And the password really was left alone, so the refusal is not cosmetic.
+    resetThrottle();
+    expect((await post("/api/auth/login").send({ email: ACTIVE, password: PASSWORD })).status).toBe(200);
+  }, 30_000);
+
   it("applies every password rule to the new password", async () => {
     const cookie = await signIn(ACTIVE);
 
