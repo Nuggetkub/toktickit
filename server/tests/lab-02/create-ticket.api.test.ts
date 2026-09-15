@@ -3,7 +3,7 @@ import request from "supertest";
 import { randomUUID } from "node:crypto";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
-import { REQUESTER_HEADER } from "../../src/requester-context.js";
+import { sessionCookieFor, TEST_ORIGIN } from "../support/session.js";
 
 // API-02, API-03, API-04 — AC-04, AC-05, AC-06.
 //
@@ -19,6 +19,12 @@ let otherRequesterId = 0;
 let categoryId = 0;
 let relatedSystemId = 0;
 
+// Issue #47 retired the X-Dev-Requester-Id header: identity is the session's
+// (BR-03). Only how the caller is identified has changed — every assertion below
+// is the Lab 2 assertion it always was.
+let cookie = "";
+let otherCookie = "";
+
 function body(overrides: Record<string, unknown> = {}) {
   return {
     categoryId,
@@ -32,10 +38,11 @@ function body(overrides: Record<string, unknown> = {}) {
 
 // `key` is typed as plain string rather than inferred from randomUUID(), whose
 // template-literal type would reject the deliberately malformed key below.
-function post(overrides: Record<string, unknown> = {}, key: string = randomUUID(), asRequester?: number) {
+function post(overrides: Record<string, unknown> = {}, key: string = randomUUID(), asCookie?: string) {
   return request(app)
     .post("/api/tickets")
-    .set(REQUESTER_HEADER, String(asRequester ?? requesterId))
+    .set("Cookie", asCookie ?? cookie)
+    .set("Origin", TEST_ORIGIN)
     .set("Idempotency-Key", key)
     .send(body(overrides));
 }
@@ -50,10 +57,13 @@ beforeAll(async () => {
   otherRequesterId = active[1].id;
   categoryId = category.id;
   relatedSystemId = relatedSystem.id;
-});
+
+  cookie = await sessionCookieFor(requesterId);
+  otherCookie = await sessionCookieFor(otherRequesterId);
+}, 30000);
 
 describe("POST /api/tickets — success", () => {
-  it("saves one ticket owned by the header's requester, with a server-assigned number", async () => {
+  it("saves one ticket owned by the session's requester, with a server-assigned number", async () => {
     const before = await prisma.ticket.count();
     const res = await post();
 
@@ -118,7 +128,8 @@ describe("POST /api/tickets — validation", () => {
   it("requires an Idempotency-Key header containing a UUID", async () => {
     const missing = await request(app)
       .post("/api/tickets")
-      .set(REQUESTER_HEADER, String(requesterId))
+      .set("Cookie", cookie)
+      .set("Origin", TEST_ORIGIN)
       .send(body());
     expect(missing.status).toBe(400);
     expect(missing.body.error.code).toBe("IDEMPOTENCY_KEY_REQUIRED");
@@ -158,7 +169,7 @@ describe("POST /api/tickets — idempotency", () => {
     const key = randomUUID();
     await post({}, key);
 
-    const conflict = await post({}, key, otherRequesterId);
+    const conflict = await post({}, key, otherCookie);
 
     expect(conflict.status).toBe(409);
     expect(conflict.body.error.code).toBe("IDEMPOTENCY_KEY_CONFLICT");

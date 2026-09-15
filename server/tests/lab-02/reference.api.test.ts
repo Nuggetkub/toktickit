@@ -1,10 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import request from "supertest";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
-import { CATEGORY_NAMES, RELATED_SYSTEM_NAMES, REQUESTERS } from "../../src/seed-data.js";
+import { CATEGORY_NAMES, RELATED_SYSTEM_NAMES } from "../../src/seed-data.js";
+import { sessionCookieFor } from "../support/session.js";
 
-// API-01 — the three reference endpoints (specification.md AC-01).
+// API-01 — the reference endpoints (specification.md AC-01).
 //
 // These run against the real migrated and seeded database, like the Lab 1
 // suite, because what is being asserted is that the *query* excludes inactive
@@ -12,17 +13,38 @@ import { CATEGORY_NAMES, RELATED_SYSTEM_NAMES, REQUESTERS } from "../../src/seed
 // was told to return.
 //
 //   npx prisma migrate dev  &&  npm run prisma:seed
+//
+// Changed by issue #47, and only in how the caller is identified: both endpoints
+// now require a session of any role (Lab 3 api-spec.md §3), so each call carries
+// one. Every assertion about their content is the Lab 2 assertion, unchanged.
+//
+// The `GET /api/requesters` block that used to live here is gone with the
+// endpoint it tested — Lab 3 has a sign-in screen instead of a Requester
+// selector. That the path now answers 404, and that no privileged address leaks
+// through the surfaces that remain, is asserted in
+// `tests/lab-03/authorization.api.test.ts`.
 
-const activeRequesters = REQUESTERS.filter((requester) => requester.isActive);
-const inactiveRequesters = REQUESTERS.filter((requester) => !requester.isActive);
+let cookie = "";
 
 function sorted(values: readonly string[]): string[] {
   return [...values].sort((a, b) => a.localeCompare(b));
 }
 
+function get(path: string) {
+  return request(app).get(path).set("Cookie", cookie);
+}
+
+beforeAll(async () => {
+  const requester = await getPrisma().user.findFirstOrThrow({
+    where: { isActive: true, role: "REQUESTER" },
+    orderBy: { id: "asc" },
+  });
+  cookie = await sessionCookieFor(requester.id);
+}, 30000);
+
 describe("GET /api/categories", () => {
   it("returns active categories ordered by name, exposing only id and name", async () => {
-    const res = await request(app).get("/api/categories");
+    const res = await get("/api/categories");
 
     expect(res.status).toBe(200);
     expect(res.body.map((category: { name: string }) => category.name)).toEqual(sorted(CATEGORY_NAMES));
@@ -38,7 +60,7 @@ describe("GET /api/categories", () => {
     try {
       await prisma.category.update({ where: { id: target.id }, data: { isActive: false } });
 
-      const res = await request(app).get("/api/categories");
+      const res = await get("/api/categories");
       const names = res.body.map((category: { name: string }) => category.name);
 
       expect(names).not.toContain("Hardware");
@@ -52,7 +74,7 @@ describe("GET /api/categories", () => {
 
 describe("GET /api/related-systems", () => {
   it("returns all seeded related systems ordered by name", async () => {
-    const res = await request(app).get("/api/related-systems");
+    const res = await get("/api/related-systems");
 
     expect(res.status).toBe(200);
     // The labsheet requires at least six.
@@ -70,45 +92,13 @@ describe("GET /api/related-systems", () => {
     try {
       await prisma.relatedSystem.update({ where: { id: target.id }, data: { isActive: false } });
 
-      const res = await request(app).get("/api/related-systems");
+      const res = await get("/api/related-systems");
       const names = res.body.map((system: { name: string }) => system.name);
 
       expect(names).not.toContain("VPN");
       expect(names).toHaveLength(RELATED_SYSTEM_NAMES.length - 1);
     } finally {
       await prisma.relatedSystem.update({ where: { id: target.id }, data: { isActive: true } });
-    }
-  });
-});
-
-describe("GET /api/requesters", () => {
-  it("returns only active Development Requesters, ordered by name", async () => {
-    const res = await request(app).get("/api/requesters");
-
-    expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(activeRequesters.length);
-    expect(res.body.map((requester: { fullName: string }) => requester.fullName)).toEqual(
-      sorted(activeRequesters.map((requester) => requester.fullName)),
-    );
-  });
-
-  it("never exposes the inactive requester to the selector", async () => {
-    // BR-06. This is the rule the seeded inactive row exists to prove.
-    expect(inactiveRequesters.length).toBeGreaterThan(0);
-
-    const res = await request(app).get("/api/requesters");
-    const emails = res.body.map((requester: { email: string }) => requester.email);
-
-    for (const requester of inactiveRequesters) {
-      expect(emails).not.toContain(requester.email);
-    }
-  });
-
-  it("exposes only id, fullName and email — no timestamps or isActive", async () => {
-    const res = await request(app).get("/api/requesters");
-
-    for (const requester of res.body) {
-      expect(Object.keys(requester).sort()).toEqual(["email", "fullName", "id"]);
     }
   });
 });

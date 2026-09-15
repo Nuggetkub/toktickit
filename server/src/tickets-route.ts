@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { getPrisma } from "./prisma.js";
 import { sendDependencyUnavailable, sendError } from "./errors.js";
-import { resolveRequester } from "./requester-context.js";
+import { currentUser } from "./auth-middleware.js";
 import { attachmentSelect, type AttachmentView } from "./attachment-view.js";
 import {
   DEFAULT_PAGE_SIZE,
@@ -70,20 +70,11 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 export async function createTicket(req: Request, res: Response): Promise<void> {
-  const context = await resolveRequester(req).catch(() => null);
-  if (context === null) {
-    sendDependencyUnavailable(res, "POST /api/tickets (requester lookup)", new Error("requester lookup failed"));
-    return;
-  }
-  if (!context.requester) {
-    sendError(
-      res,
-      401,
-      "REQUESTER_CONTEXT_REQUIRED",
-      "Select a Development Requester before creating a Ticket.",
-    );
-    return;
-  }
+  // Identity is the session's, never the client's (BR-03). Nothing in the body,
+  // the query string or a header can change who owns what this route creates.
+  // The route is mounted behind requireRole("REQUESTER"), so any other role was
+  // refused with 403 before reaching here.
+  const requester = currentUser(res);
 
   const idempotencyKey = req.header("idempotency-key")?.trim() ?? "";
   if (!UUID.test(idempotencyKey)) {
@@ -103,7 +94,7 @@ export async function createTicket(req: Request, res: Response): Promise<void> {
   }
 
   const input = validation.value;
-  const requesterId = context.requester.id;
+  const requesterId = requester.id;
   const prisma = getPrisma();
 
   try {
@@ -272,15 +263,9 @@ function orderBy(query: TicketListQuery): Prisma.TicketOrderByWithRelationInput[
 }
 
 export async function listTickets(req: Request, res: Response): Promise<void> {
-  const context = await resolveRequester(req).catch(() => null);
-  if (context === null) {
-    sendDependencyUnavailable(res, "GET /api/tickets (requester lookup)", new Error("lookup failed"));
-    return;
-  }
-  if (!context.requester) {
-    sendError(res, 401, "REQUESTER_CONTEXT_REQUIRED", "Select a Development Requester to see your Tickets.");
-    return;
-  }
+  // My Tickets is a Requester screen: IT Staff use the queue instead, and the
+  // route is mounted behind requireRole("REQUESTER") to say so (api-spec.md §4).
+  const requester = currentUser(res);
 
   const validation = validateTicketListQuery(req.query as Record<string, unknown>);
   if (!validation.value) {
@@ -294,7 +279,7 @@ export async function listTickets(req: Request, res: Response): Promise<void> {
   // whole of the ownership guarantee for the list: it is a database predicate,
   // not something the caller can influence.
   const where: Prisma.TicketWhereInput = {
-    requesterId: context.requester.id,
+    requesterId: requester.id,
     ...(query.categoryId ? { categoryId: query.categoryId } : {}),
     ...(query.relatedSystemId ? { relatedSystemId: query.relatedSystemId } : {}),
     ...(query.requestedPriority ? { requestedPriority: query.requestedPriority } : {}),
@@ -334,15 +319,7 @@ export async function listTickets(req: Request, res: Response): Promise<void> {
 }
 
 export async function getTicket(req: Request, res: Response): Promise<void> {
-  const context = await resolveRequester(req).catch(() => null);
-  if (context === null) {
-    sendDependencyUnavailable(res, "GET /api/tickets/:id (requester lookup)", new Error("lookup failed"));
-    return;
-  }
-  if (!context.requester) {
-    sendError(res, 401, "REQUESTER_CONTEXT_REQUIRED", "Select a Development Requester to open a Ticket.");
-    return;
-  }
+  const user = currentUser(res);
 
   const ticketId = Number(req.params.ticketId);
   if (!Number.isSafeInteger(ticketId) || ticketId < 1) {
@@ -353,9 +330,14 @@ export async function getTicket(req: Request, res: Response): Promise<void> {
 
   try {
     // Ownership is part of the query, so another requester's ticket is not
-    // fetched and then refused — it is never read at all (BR-10).
+    // fetched and then refused — it is never read at all (BR-10, BR-19).
+    //
+    // IT Staff and Administrators may read any ticket: that is the one cell of
+    // the authorization matrix where this endpoint widens rather than narrows,
+    // and it is what lets the queue open a ticket it does not own. A Requester's
+    // predicate is unchanged from Lab 2.
     const ticket = await getPrisma().ticket.findFirst({
-      where: { id: ticketId, requesterId: context.requester.id },
+      where: user.role === "REQUESTER" ? { id: ticketId, requesterId: user.id } : { id: ticketId },
       select: ticketSelect,
     });
 

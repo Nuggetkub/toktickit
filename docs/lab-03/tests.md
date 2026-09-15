@@ -181,5 +181,22 @@ the commit, the commands and their complete output copied from the run by script
   an identity — moves to UI-03 and E2E-01. `server/tests/lab-02/requester-context.api.test.ts`
   tested the retired header and is replaced by API-09 and API-10. Each removal happens in the
   pull request that retires the feature, and names its replacement.
+- **Suites changed by issue #47, and why** (Definition of Done, Part 1 item 4). The four Lab 2
+  API suites — `create-ticket`, `my-tickets`, `ticket-detail` and `attachments` — keep every
+  Lab 2 assertion and change only in how the caller is identified: a session cookie from
+  `server/tests/support/session.ts` in place of `X-Dev-Requester-Id`, plus an `Origin` header
+  on state-changing calls (BR-16). Three assertions of the retired code
+  `REQUESTER_CONTEXT_REQUIRED` now assert `401 UNAUTHENTICATED`, which api-spec.md §9 puts in
+  its place. `server/tests/lab-01/categories.test.ts` signs in for the same reason: reference
+  data is no longer public. The `GET /api/requesters` block of
+  `server/tests/lab-02/reference.api.test.ts`, and the whole of
+  `server/tests/lab-03/requester-directory.api.test.ts`, go with the endpoint they tested and
+  are replaced by API-12 — which asserts that the path now answers `404` and that no
+  privileged address leaks through the surfaces that remain.
+- **The Lab 2 suites mint their sessions directly** rather than posting to
+  `/api/auth/login`. A scrypt verification at N = 2^15 per call would add seconds to every
+  file, and repeated sign-ins for one email would trip the login throttle (BR-09) and fail
+  those suites for a reason unrelated to anything they assert. Sign-in itself is covered by
+  API-01 to API-07, and the guards those cookies pass through by API-09.
 - **Session expiry** is tested by moving the stored expiry into the past, not by waiting
   eight hours.
