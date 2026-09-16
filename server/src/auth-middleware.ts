@@ -1,4 +1,5 @@
 import type { NextFunction, Request, RequestHandler, Response } from "express";
+import type { Role } from "@prisma/client";
 import { CLIENT_ORIGINS } from "./config.js";
 import { sendError } from "./errors.js";
 import { resolveSession, type SessionUser } from "./session.js";
@@ -84,6 +85,33 @@ export const requirePasswordChangeComplete: RequestHandler = (_req, res, next) =
   }
   next();
 };
+
+/**
+ * Step 4 — the roles this endpoint permits (BR-18, the authorization matrix).
+ *
+ * Runs *before* any resource is looked up, which is the whole point: a role
+ * check performed after the lookup would answer `403` for a ticket that exists
+ * and `404` for one that does not, and the difference would tell an unprivileged
+ * caller which ids are real. Deciding from the role alone reveals only something
+ * the caller already knows about themselves (decision D-07).
+ */
+export function requireRole(...roles: Role[]): RequestHandler {
+  return (_req, res, next) => {
+    const user = res.locals.user as SessionUser | undefined;
+    // Fail closed. A route that is mounted without requireAuthenticatedUser has
+    // no caller to judge, and must not be treated as permitted by default.
+    if (!user) {
+      sendError(res, 401, "UNAUTHENTICATED", "Sign in to continue.");
+      return;
+    }
+
+    if (!roles.includes(user.role)) {
+      sendError(res, 403, "FORBIDDEN", "Your role does not have access to this operation.");
+      return;
+    }
+    next();
+  };
+}
 
 /** Wraps an async handler so a rejected promise reaches Express's error handler. */
 export function asyncRoute(handler: (req: Request, res: Response) => Promise<unknown>): RequestHandler {

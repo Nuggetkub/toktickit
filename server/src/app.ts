@@ -3,7 +3,13 @@ import cors from "cors";
 import { getPrisma } from "./prisma.js";
 import { CLIENT_ORIGINS, SERVICE_NAME } from "./config.js";
 import { changePassword, login, logout, me } from "./auth-routes.js";
-import { asyncRoute, requireAuthenticatedUser, requireTrustedOrigin } from "./auth-middleware.js";
+import {
+  asyncRoute,
+  requireAuthenticatedUser,
+  requirePasswordChangeComplete,
+  requireRole,
+  requireTrustedOrigin,
+} from "./auth-middleware.js";
 import { sendDependencyUnavailable, sendError } from "./errors.js";
 import { createTicket, getTicket, listTickets } from "./tickets-route.js";
 import multer from "multer";
@@ -28,6 +34,17 @@ app.use(cors({ origin: CLIENT_ORIGINS, credentials: true }));
 app.use(express.json());
 
 // ---------------------------------------------------------------------------
+// Issue 47 — step 1 of the authorization order (api-spec.md §1, BR-16, D-03).
+//
+// Issue 46 mounted this on the three auth mutations alone, because the Lab 2
+// routes still took their identity from a forgeable development header and so
+// had no session worth protecting. Now that every route below runs on the
+// session, the check belongs where the contract puts it: first, and everywhere.
+// It ignores GET, so capturing read evidence with curl still needs no Origin.
+// ---------------------------------------------------------------------------
+app.use(requireTrustedOrigin);
+
+// ---------------------------------------------------------------------------
 // Issue 2 — API health check
 // Make the test in tests/lab-01/health.test.ts pass.
 // It must return HTTP 200 with JSON: { status: "ok", service: "TokTickIT API" }
@@ -43,35 +60,42 @@ app.get("/api/health", (_req: Request, res: Response) => {
 // change is pending (BR-02), which is why none of them carries
 // requirePasswordChangeComplete: an account with an initial password has to be
 // able to see who it is, fix the password, or leave.
-//
-// The Origin check guards the state-changing three (BR-16). It is mounted here
-// rather than globally because the Lab 2 routes still take their identity from
-// the development header; issue #47 moves them onto the session and applies the
-// same guard to them.
 // ---------------------------------------------------------------------------
-app.post("/api/auth/login", requireTrustedOrigin, asyncRoute(login));
+app.post("/api/auth/login", asyncRoute(login));
 app.get("/api/auth/me", requireAuthenticatedUser, asyncRoute(me));
-app.post(
-  "/api/auth/change-password",
-  requireTrustedOrigin,
-  requireAuthenticatedUser,
-  asyncRoute(changePassword),
-);
-app.post("/api/auth/logout", requireTrustedOrigin, asyncRoute(logout));
+app.post("/api/auth/change-password", requireAuthenticatedUser, asyncRoute(changePassword));
+app.post("/api/auth/logout", asyncRoute(logout));
 
 // ---------------------------------------------------------------------------
-// Issue 19 — Lab 2 reference data (api-spec.md §2)
+// Issue 47 — steps 2 and 3, for every endpoint below (api-spec.md §1).
 //
-// These three are not requester-scoped and take no identity header: the
-// selector has to be able to load before a Requester has been chosen at all.
+// Spread into each route rather than mounted once with app.use(), so the guards
+// are visible at the route they protect. A route added later then has to state
+// its own protection instead of inheriting it from where it happened to be
+// typed — and the four auth routes above cannot silently acquire the password
+// gate that BR-02 says they must not have.
+// ---------------------------------------------------------------------------
+const signedIn = [requireAuthenticatedUser, requirePasswordChangeComplete];
+
+// ---------------------------------------------------------------------------
+// Issue 19 — Lab 2 reference data (api-spec.md §3)
 //
-// All three return active rows only and are ordered by name, so the dropdowns
-// that consume them read alphabetically rather than in insertion order. An
-// empty array is a valid answer — the interface treats it as an empty state,
-// not as an error.
+// Both return active rows only, ordered by name, so the dropdowns that consume
+// them read alphabetically rather than in insertion order. An empty array is a
+// valid answer — the interface treats it as an empty state, not as an error.
+//
+// Lab 2 left these open to anyone because the Requester selector had to load
+// before a Requester had been chosen. Lab 3 has a sign-in screen instead, so
+// they now require a session of any role: an unauthenticated caller has no
+// screen left to fill.
+//
+// `GET /api/requesters` is gone. It is deliberately not replaced by a route
+// answering 403 — the endpoint itself is what Lab 3 retires, because nothing
+// selects a Requester from a list any more. An unregistered path answers 404,
+// which is exactly what api-spec.md §3 specifies for it.
 // ---------------------------------------------------------------------------
 
-app.get("/api/categories", async (_req: Request, res: Response) => {
+app.get("/api/categories", ...signedIn, async (_req: Request, res: Response) => {
   try {
     const categories = await getPrisma().category.findMany({
       where: { isActive: true },
@@ -84,7 +108,7 @@ app.get("/api/categories", async (_req: Request, res: Response) => {
   }
 });
 
-app.get("/api/related-systems", async (_req: Request, res: Response) => {
+app.get("/api/related-systems", ...signedIn, async (_req: Request, res: Response) => {
   try {
     const relatedSystems = await getPrisma().relatedSystem.findMany({
       where: { isActive: true },
@@ -97,36 +121,17 @@ app.get("/api/related-systems", async (_req: Request, res: Response) => {
   }
 });
 
-app.get("/api/requesters", async (_req: Request, res: Response) => {
-  try {
-    // The role filter is load-bearing, not decoration. Lab 2's table held only
-    // Requesters, so "every active row" and "every active Requester" were the
-    // same set; after the Lab 3 rename the table also holds IT Staff and
-    // Administrators, and without this clause an unauthenticated caller would
-    // be handed their names and e-mail addresses.
-    const requesters = await getPrisma().user.findMany({
-      where: { isActive: true, role: "REQUESTER" },
-      select: { id: true, fullName: true, email: true },
-      orderBy: { fullName: "asc" },
-    });
-    res.status(200).json(requesters);
-  } catch (err) {
-    sendDependencyUnavailable(res, "GET /api/requesters", err);
-  }
-});
-
 // ---------------------------------------------------------------------------
-// Issue 21 — Create Ticket (api-spec.md §3)
+// Issues 21, 23 and 47 — Requester tickets (api-spec.md §4)
 //
-// Requester-scoped: identity arrives in the X-Dev-Requester-Id header, never in
-// the body, so this route describes a Ticket and nothing else (decision D-01).
+// Identity is the session's, so these routes describe a Ticket and nothing else
+// (BR-03). Creating and listing are Requester operations — IT Staff have the
+// queue instead — while Ticket Detail is readable by every role and is narrowed
+// to the caller's own ticket inside the handler when that caller is a Requester.
 // ---------------------------------------------------------------------------
-app.post("/api/tickets", createTicket);
-
-// Issue 23 — My Tickets. Both are requester-scoped: the list is filtered by the
-// header identity and the detail is fetched by (id, requesterId) together.
-app.get("/api/tickets", listTickets);
-app.get("/api/tickets/:ticketId", getTicket);
+app.post("/api/tickets", ...signedIn, requireRole("REQUESTER"), createTicket);
+app.get("/api/tickets", ...signedIn, requireRole("REQUESTER"), listTickets);
+app.get("/api/tickets/:ticketId", ...signedIn, getTicket);
 
 // ---------------------------------------------------------------------------
 // Issue 25 — Attachments (api-spec.md §4)
@@ -137,10 +142,24 @@ app.get("/api/tickets/:ticketId", getTicket);
 // ---------------------------------------------------------------------------
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_BYTES } });
 
-app.post("/api/tickets/:ticketId/attachments", upload.single("file"), uploadAttachment);
-app.get("/api/tickets/:ticketId/attachments", listAttachments);
-app.get("/api/tickets/:ticketId/attachments/:attachmentId/download", downloadAttachment);
-app.patch("/api/tickets/:ticketId/attachments/:attachmentId", removeAttachment);
+// The guards precede multer deliberately: an unauthenticated caller, or one
+// whose role may not upload at all, is refused before a single byte of their
+// body is buffered into memory.
+app.post(
+  "/api/tickets/:ticketId/attachments",
+  ...signedIn,
+  requireRole("REQUESTER"),
+  upload.single("file"),
+  uploadAttachment,
+);
+app.get("/api/tickets/:ticketId/attachments", ...signedIn, listAttachments);
+app.get("/api/tickets/:ticketId/attachments/:attachmentId/download", ...signedIn, downloadAttachment);
+app.patch(
+  "/api/tickets/:ticketId/attachments/:attachmentId",
+  ...signedIn,
+  requireRole("REQUESTER"),
+  removeAttachment,
+);
 
 // Multer rejects an oversized body before the route runs, so its error needs
 // translating into the documented envelope rather than reaching Express's

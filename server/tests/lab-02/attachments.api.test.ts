@@ -3,7 +3,7 @@ import request from "supertest";
 import { randomUUID } from "node:crypto";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
-import { REQUESTER_HEADER } from "../../src/requester-context.js";
+import { sessionCookieFor, TEST_ORIGIN } from "../support/session.js";
 import { MAX_ACTIVE, MAX_BYTES } from "../../src/attachment-rules.js";
 
 // API-11 to API-14 — AC-13, AC-14, AC-15.
@@ -22,13 +22,17 @@ const EXECUTABLE = Buffer.concat([Buffer.from([0x4d, 0x5a, 0x90, 0x00]), Buffer.
 
 let ownerId = 0;
 let otherId = 0;
+// Identity is the session's since issue #47; the assertions are unchanged.
+let ownerCookie = "";
+let otherCookie = "";
 
-async function newTicket(requesterId: number, summary: string): Promise<number> {
+async function newTicket(cookie: string, summary: string): Promise<number> {
   const category = await prisma.category.findFirstOrThrow({ where: { isActive: true } });
   const relatedSystem = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } });
   const res = await request(app)
     .post("/api/tickets")
-    .set(REQUESTER_HEADER, String(requesterId))
+    .set("Cookie", cookie)
+    .set("Origin", TEST_ORIGIN)
     .set("Idempotency-Key", randomUUID())
     .send({
       categoryId: category.id,
@@ -41,17 +45,18 @@ async function newTicket(requesterId: number, summary: string): Promise<number> 
   return res.body.id as number;
 }
 
-function upload(ticketId: number, requesterId: number, bytes: Buffer, filename: string, declaredType: string) {
+function upload(ticketId: number, cookie: string, bytes: Buffer, filename: string, declaredType: string) {
   return request(app)
     .post(`/api/tickets/${ticketId}/attachments`)
-    .set(REQUESTER_HEADER, String(requesterId))
+    .set("Cookie", cookie)
+    .set("Origin", TEST_ORIGIN)
     .attach("file", bytes, { filename, contentType: declaredType });
 }
 
-async function activeCount(ticketId: number, requesterId: number): Promise<number> {
+async function activeCount(ticketId: number, cookie: string): Promise<number> {
   const res = await request(app)
     .get(`/api/tickets/${ticketId}/attachments`)
-    .set(REQUESTER_HEADER, String(requesterId));
+    .set("Cookie", cookie);
   return (res.body as { removedAt: string | null }[]).filter((a) => a.removedAt === null).length;
 }
 
@@ -59,12 +64,14 @@ beforeAll(async () => {
   const requesters = await prisma.user.findMany({ where: { isActive: true, role: "REQUESTER" }, orderBy: { id: "asc" }, take: 2 });
   ownerId = requesters[0].id;
   otherId = requesters[1].id;
+  ownerCookie = await sessionCookieFor(ownerId);
+  otherCookie = await sessionCookieFor(otherId);
 }, 60000);
 
 describe("upload", () => {
   it("stores a permitted file and never returns its storage key", async () => {
-    const ticketId = await newTicket(ownerId, "Upload happy path");
-    const res = await upload(ticketId, ownerId, PNG, "evidence.png", "image/png");
+    const ticketId = await newTicket(ownerCookie, "Upload happy path");
+    const res = await upload(ticketId, ownerCookie, PNG, "evidence.png", "image/png");
 
     expect(res.status).toBe(201);
     expect(res.body.mimeType).toBe("image/png");
@@ -80,10 +87,10 @@ describe("upload", () => {
   it("refuses a file whose content is not permitted, however it is declared", async () => {
     // The defect this exact test exists for: trusting the client's declared
     // Content-Type would accept this.
-    const ticketId = await newTicket(ownerId, "Type sniffing");
+    const ticketId = await newTicket(ownerCookie, "Type sniffing");
     const before = await prisma.attachment.count({ where: { ticketId } });
 
-    const lying = await upload(ticketId, ownerId, EXECUTABLE, "totally-safe.png", "image/png");
+    const lying = await upload(ticketId, ownerCookie, EXECUTABLE, "totally-safe.png", "image/png");
 
     expect(lying.status).toBe(415);
     expect(lying.body.error.code).toBe("ATTACHMENT_TYPE_NOT_ALLOWED");
@@ -91,16 +98,16 @@ describe("upload", () => {
   });
 
   it("refuses an oversized file before it becomes a row", async () => {
-    const ticketId = await newTicket(ownerId, "Oversize");
-    const res = await upload(ticketId, ownerId, Buffer.alloc(MAX_BYTES + 1024, 1), "big.png", "image/png");
+    const ticketId = await newTicket(ownerCookie, "Oversize");
+    const res = await upload(ticketId, ownerCookie, Buffer.alloc(MAX_BYTES + 1024, 1), "big.png", "image/png");
 
     expect(res.status).toBe(413);
     expect(await prisma.attachment.count({ where: { ticketId } })).toBe(0);
   });
 
   it("refuses an upload to another requester's ticket as not found", async () => {
-    const ticketId = await newTicket(ownerId, "Cross-owner upload");
-    const res = await upload(ticketId, otherId, PNG, "evidence.png", "image/png");
+    const ticketId = await newTicket(ownerCookie, "Cross-owner upload");
+    const res = await upload(ticketId, otherCookie, PNG, "evidence.png", "image/png");
 
     expect(res.status).toBe(404);
     expect(res.body.error.code).toBe("TICKET_NOT_FOUND");
@@ -110,12 +117,12 @@ describe("upload", () => {
 
 describe("the five-active limit", () => {
   it("refuses the sixth attachment", async () => {
-    const ticketId = await newTicket(ownerId, "Sequential limit");
+    const ticketId = await newTicket(ownerCookie, "Sequential limit");
     for (let index = 0; index < MAX_ACTIVE; index += 1) {
-      expect((await upload(ticketId, ownerId, PNG, `shot-${index}.png`, "image/png")).status).toBe(201);
+      expect((await upload(ticketId, ownerCookie, PNG, `shot-${index}.png`, "image/png")).status).toBe(201);
     }
 
-    const sixth = await upload(ticketId, ownerId, PNG, "sixth.png", "image/png");
+    const sixth = await upload(ticketId, ownerCookie, PNG, "sixth.png", "image/png");
     expect(sixth.status).toBe(409);
     expect(sixth.body.error.code).toBe("ATTACHMENT_LIMIT_REACHED");
   });
@@ -124,10 +131,10 @@ describe("the five-active limit", () => {
     // Counting and inserting without a lock is a check-then-write: six parallel
     // uploads each read a count below the limit and each proceed. A multi-file
     // picker uploading in parallel is the ordinary case, not an exotic one.
-    const ticketId = await newTicket(ownerId, "Concurrent limit");
+    const ticketId = await newTicket(ownerCookie, "Concurrent limit");
 
     const results = await Promise.all(
-      Array.from({ length: 6 }, (_, index) => upload(ticketId, ownerId, PNG, `race-${index}.png`, "image/png")),
+      Array.from({ length: 6 }, (_, index) => upload(ticketId, ownerCookie, PNG, `race-${index}.png`, "image/png")),
     );
 
     const created = results.filter((res) => res.status === 201).length;
@@ -135,39 +142,39 @@ describe("the five-active limit", () => {
 
     expect(created).toBe(MAX_ACTIVE);
     expect(refused).toBe(1);
-    expect(await activeCount(ticketId, ownerId)).toBe(MAX_ACTIVE);
+    expect(await activeCount(ticketId, ownerCookie)).toBe(MAX_ACTIVE);
   }, 60000);
 
   it("frees a slot when an attachment is removed", async () => {
     // BR-33 counts active rows only. A limit that never releases would strand
     // any Ticket that has ever held five.
-    const ticketId = await newTicket(ownerId, "Slot reuse");
+    const ticketId = await newTicket(ownerCookie, "Slot reuse");
     const uploaded = [];
     for (let index = 0; index < MAX_ACTIVE; index += 1) {
-      uploaded.push(await upload(ticketId, ownerId, PNG, `slot-${index}.png`, "image/png"));
+      uploaded.push(await upload(ticketId, ownerCookie, PNG, `slot-${index}.png`, "image/png"));
     }
 
-    expect((await upload(ticketId, ownerId, PNG, "before.png", "image/png")).status).toBe(409);
+    expect((await upload(ticketId, ownerCookie, PNG, "before.png", "image/png")).status).toBe(409);
 
     const removal = await request(app)
       .patch(`/api/tickets/${ticketId}/attachments/${uploaded[0].body.id}`)
-      .set(REQUESTER_HEADER, String(ownerId))
+      .set("Cookie", ownerCookie).set("Origin", TEST_ORIGIN)
       .send({ removalReason: "Uploaded the wrong screenshot." });
     expect(removal.status).toBe(200);
 
-    expect((await upload(ticketId, ownerId, PNG, "after.png", "image/png")).status).toBe(201);
-    expect(await activeCount(ticketId, ownerId)).toBe(MAX_ACTIVE);
+    expect((await upload(ticketId, ownerCookie, PNG, "after.png", "image/png")).status).toBe(201);
+    expect(await activeCount(ticketId, ownerCookie)).toBe(MAX_ACTIVE);
   }, 60000);
 });
 
 describe("metadata and download", () => {
   it("downloads an active attachment with its detected type and a safe filename", async () => {
-    const ticketId = await newTicket(ownerId, "Download");
-    const created = await upload(ticketId, ownerId, PNG, "evidence.png", "image/png");
+    const ticketId = await newTicket(ownerCookie, "Download");
+    const created = await upload(ticketId, ownerCookie, PNG, "evidence.png", "image/png");
 
     const res = await request(app)
       .get(`/api/tickets/${ticketId}/attachments/${created.body.id}/download`)
-      .set(REQUESTER_HEADER, String(ownerId));
+      .set("Cookie", ownerCookie).set("Origin", TEST_ORIGIN);
 
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toContain("image/png");
@@ -176,12 +183,12 @@ describe("metadata and download", () => {
   });
 
   it("refuses another requester's attachment as not found", async () => {
-    const ticketId = await newTicket(ownerId, "Cross-owner download");
-    const created = await upload(ticketId, ownerId, PNG, "evidence.png", "image/png");
+    const ticketId = await newTicket(ownerCookie, "Cross-owner download");
+    const created = await upload(ticketId, ownerCookie, PNG, "evidence.png", "image/png");
 
     const res = await request(app)
       .get(`/api/tickets/${ticketId}/attachments/${created.body.id}/download`)
-      .set(REQUESTER_HEADER, String(otherId));
+      .set("Cookie", otherCookie).set("Origin", TEST_ORIGIN);
 
     expect(res.status).toBe(404);
   });
@@ -189,12 +196,12 @@ describe("metadata and download", () => {
 
 describe("soft removal", () => {
   it("records who removed it and why, keeps the metadata, and blocks the download", async () => {
-    const ticketId = await newTicket(ownerId, "Soft removal");
-    const created = await upload(ticketId, ownerId, PNG, "evidence.png", "image/png");
+    const ticketId = await newTicket(ownerCookie, "Soft removal");
+    const created = await upload(ticketId, ownerCookie, PNG, "evidence.png", "image/png");
 
     const removal = await request(app)
       .patch(`/api/tickets/${ticketId}/attachments/${created.body.id}`)
-      .set(REQUESTER_HEADER, String(ownerId))
+      .set("Cookie", ownerCookie).set("Origin", TEST_ORIGIN)
       .send({ removalReason: "  It shows another person's account.  " });
 
     expect(removal.status).toBe(200);
@@ -205,28 +212,28 @@ describe("soft removal", () => {
     // BR-39: still listed as metadata, no longer downloadable.
     const metadata = await request(app)
       .get(`/api/tickets/${ticketId}/attachments`)
-      .set(REQUESTER_HEADER, String(ownerId));
+      .set("Cookie", ownerCookie).set("Origin", TEST_ORIGIN);
     expect(metadata.body).toHaveLength(1);
     expect(metadata.body[0].removalReason).toBe("It shows another person's account.");
 
     const download = await request(app)
       .get(`/api/tickets/${ticketId}/attachments/${created.body.id}/download`)
-      .set(REQUESTER_HEADER, String(ownerId));
+      .set("Cookie", ownerCookie).set("Origin", TEST_ORIGIN);
     expect(download.status).toBe(404);
   });
 
   it("refuses a second removal without overwriting the first reason", async () => {
-    const ticketId = await newTicket(ownerId, "Double removal");
-    const created = await upload(ticketId, ownerId, PNG, "evidence.png", "image/png");
+    const ticketId = await newTicket(ownerCookie, "Double removal");
+    const created = await upload(ticketId, ownerCookie, PNG, "evidence.png", "image/png");
 
     await request(app)
       .patch(`/api/tickets/${ticketId}/attachments/${created.body.id}`)
-      .set(REQUESTER_HEADER, String(ownerId))
+      .set("Cookie", ownerCookie).set("Origin", TEST_ORIGIN)
       .send({ removalReason: "The original reason." });
 
     const second = await request(app)
       .patch(`/api/tickets/${ticketId}/attachments/${created.body.id}`)
-      .set(REQUESTER_HEADER, String(ownerId))
+      .set("Cookie", ownerCookie).set("Origin", TEST_ORIGIN)
       .send({ removalReason: "A different reason entirely." });
 
     expect(second.status).toBe(409);
@@ -237,12 +244,12 @@ describe("soft removal", () => {
   });
 
   it("requires a reason of the documented length", async () => {
-    const ticketId = await newTicket(ownerId, "Removal reason");
-    const created = await upload(ticketId, ownerId, PNG, "evidence.png", "image/png");
+    const ticketId = await newTicket(ownerCookie, "Removal reason");
+    const created = await upload(ticketId, ownerCookie, PNG, "evidence.png", "image/png");
 
     const res = await request(app)
       .patch(`/api/tickets/${ticketId}/attachments/${created.body.id}`)
-      .set(REQUESTER_HEADER, String(ownerId))
+      .set("Cookie", ownerCookie).set("Origin", TEST_ORIGIN)
       .send({ removalReason: "no" });
 
     expect(res.status).toBe(400);
@@ -253,12 +260,12 @@ describe("soft removal", () => {
   });
 
   it("refuses to remove another requester's attachment", async () => {
-    const ticketId = await newTicket(ownerId, "Cross-owner removal");
-    const created = await upload(ticketId, ownerId, PNG, "evidence.png", "image/png");
+    const ticketId = await newTicket(ownerCookie, "Cross-owner removal");
+    const created = await upload(ticketId, ownerCookie, PNG, "evidence.png", "image/png");
 
     const res = await request(app)
       .patch(`/api/tickets/${ticketId}/attachments/${created.body.id}`)
-      .set(REQUESTER_HEADER, String(otherId))
+      .set("Cookie", otherCookie).set("Origin", TEST_ORIGIN)
       .send({ removalReason: "Not mine to remove." });
 
     expect(res.status).toBe(404);

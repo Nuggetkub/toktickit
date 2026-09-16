@@ -15,8 +15,10 @@ export type ErrorCode =
   | "PASSWORD_CHANGE_REQUIRED"
   | "ORIGIN_REJECTED"
   | "FORBIDDEN"
-  // Retired in Lab 3: identity now comes from the session, not this header.
-  | "REQUESTER_CONTEXT_REQUIRED"
+  // REQUESTER_CONTEXT_REQUIRED (Lab 2) is gone, not merely unused: issue #47
+  // retired the X-Dev-Requester-Id header it described, and `401 UNAUTHENTICATED`
+  // took its place (api-spec.md §9). Leaving the variant in the union would let a
+  // later route emit a code the contract no longer documents.
   | "IDEMPOTENCY_KEY_REQUIRED"
   | "IDEMPOTENCY_KEY_CONFLICT"
   | "TICKET_NOT_FOUND"

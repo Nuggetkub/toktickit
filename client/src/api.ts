@@ -10,12 +10,15 @@ export interface SystemStatus {
   categories: Category[];
 }
 
-// A Development Requester as the selector sees one. The API deliberately
-// exposes no more than this: no isActive, no timestamps (api-spec.md §2).
-export interface Requester {
+export type Role = "REQUESTER" | "IT_STAFF" | "ADMINISTRATOR";
+
+/** The signed-in user, exactly as `/api/auth/me` returns them (api-spec.md §2). */
+export interface AuthUser {
   id: number;
   fullName: string;
   email: string;
+  role: Role;
+  mustChangePassword: boolean;
 }
 
 // Shown to the user whenever the API cannot be reached at all. A rejected fetch
@@ -23,12 +26,41 @@ export interface Requester {
 // jargon; the acceptance criterion asks for a useful message instead.
 export const UNREACHABLE_MESSAGE = "Unable to connect to TokTickIT API";
 
+/**
+ * Called whenever any request answers `401` — issue #48.
+ *
+ * It lives here rather than in each screen because ui-spec.md §2 requires *every*
+ * `401` outside sign-in to end the session and clear what is on screen. A screen
+ * added later cannot forget a rule it never has to remember, whereas a `catch`
+ * copied into each component is one omission away from showing a signed-out user
+ * the previous user's data.
+ */
+let unauthorizedHandler: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  unauthorizedHandler = handler;
+}
+
+/** Sign-in answers 401 for bad credentials; that is not a lost session. */
+let suppressUnauthorized = false;
+
+function noteUnauthorized(response: Response): void {
+  if (response.status === 401 && !suppressUnauthorized) unauthorizedHandler?.();
+}
+
+// Every request carries the session cookie. The API is a different origin, so
+// without `credentials` the browser sends nothing and every call is a 401
+// (decision D-02).
+const CREDENTIALS: RequestCredentials = "include";
+
 // Wraps fetch so a network-level failure becomes a readable message rather than
 // the browser's raw TypeError. HTTP responses pass straight through — those are
 // handled by the status checks below.
 async function request(url: string): Promise<Response> {
   try {
-    return await fetch(url);
+    const response = await fetch(url, { credentials: CREDENTIALS });
+    noteUnauthorized(response);
+    return response;
   } catch {
     throw new Error(UNREACHABLE_MESSAGE);
   }
@@ -49,17 +81,6 @@ export async function checkSystem(): Promise<SystemStatus> {
 
   const categories = (await response.json()) as Category[];
   return { online: true, categories };
-}
-
-// Issue 20 — the active Development Requesters offered by the selector.
-// Inactive requesters are excluded by the API, not filtered here (BR-06): the
-// client is not the thing that decides who may be selected.
-export async function fetchRequesters(): Promise<Requester[]> {
-  const response = await request(`${API_URL}/api/requesters`);
-  if (!response.ok) {
-    throw new Error("Could not load Development Requesters.");
-  }
-  return (await response.json()) as Requester[];
 }
 
 // ---------------------------------------------------------------------------
@@ -107,6 +128,8 @@ export class ApiError extends Error {
     readonly code?: string,
     readonly fieldErrors?: Record<string, string>,
     readonly status?: number,
+    /** Seconds from `Retry-After`, so a throttled sign-in can say how long. */
+    readonly retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = "ApiError";
@@ -131,17 +154,22 @@ async function toApiError(response: Response): Promise<ApiError> {
   } catch {
     // A non-JSON error body is itself a failure worth reporting safely.
   }
+
+  const retryAfter = Number(response.headers?.get?.("Retry-After") ?? "");
   return new ApiError(
     envelope?.error?.message ?? "The request could not be completed.",
     envelope?.error?.code,
     envelope?.error?.fieldErrors,
     response.status,
+    Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
   );
 }
 
 async function send(path: string, init?: RequestInit): Promise<Response> {
   try {
-    return await fetch(`${API_URL}${path}`, init);
+    const response = await fetch(`${API_URL}${path}`, { credentials: CREDENTIALS, ...init });
+    noteUnauthorized(response);
+    return response;
   } catch {
     // The browser's raw TypeError never reaches a component (BR-43).
     throw new ApiError(UNREACHABLE_MESSAGE);
@@ -154,6 +182,71 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+// ---------------------------------------------------------------------------
+// Issue 48 — authentication (api-spec.md §2)
+//
+// The session lives in an HttpOnly cookie, so there is deliberately no token
+// here to store, read or accidentally log. "Who am I" is a question for the
+// server on every start-up, never a value cached in the client.
+// ---------------------------------------------------------------------------
+
+/** `POST /api/auth/login`. A `401` here is a wrong password, not a lost session. */
+export async function signIn(email: string, password: string): Promise<AuthUser> {
+  suppressUnauthorized = true;
+  try {
+    const body = await requestJson<{ user: AuthUser }>("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    return body.user;
+  } finally {
+    suppressUnauthorized = false;
+  }
+}
+
+/**
+ * `GET /api/auth/me`. Answers `null` rather than throwing when nobody is signed
+ * in: at start-up that is an ordinary answer, not a failure.
+ */
+export async function fetchCurrentUser(): Promise<AuthUser | null> {
+  suppressUnauthorized = true;
+  try {
+    const response = await send("/api/auth/me");
+    if (response.status === 401) return null;
+    if (!response.ok) throw await toApiError(response);
+    return ((await response.json()) as { user: AuthUser }).user;
+  } finally {
+    suppressUnauthorized = false;
+  }
+}
+
+export interface PasswordChange {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+/** `POST /api/auth/change-password` — returns the user with the gate cleared. */
+export async function changePassword(input: PasswordChange): Promise<AuthUser> {
+  const body = await requestJson<{ user: AuthUser }>("/api/auth/change-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return body.user;
+}
+
+/** `POST /api/auth/logout` — always succeeds, so signing out is safe to retry. */
+export async function signOut(): Promise<void> {
+  suppressUnauthorized = true;
+  try {
+    await send("/api/auth/logout", { method: "POST" });
+  } finally {
+    suppressUnauthorized = false;
+  }
+}
+
 export async function fetchCategories(): Promise<Category[]> {
   return requestJson<Category[]>("/api/categories");
 }
@@ -163,20 +256,16 @@ export async function fetchRelatedSystems(): Promise<RelatedSystem[]> {
 }
 
 /**
- * The Requester travels in a header, never in the body (decision D-01), and the
- * idempotency key in another — both are transport metadata rather than part of
- * the ticket being described.
+ * The idempotency key travels in a header because it is transport metadata
+ * rather than part of the ticket being described (decision D-01). The requester
+ * is no longer sent at all: issue #47 made ownership the session's business, so
+ * there is nothing here a client could forge.
  */
-export async function createTicket(
-  ticket: NewTicket,
-  requesterId: number,
-  idempotencyKey: string,
-): Promise<CreatedTicket> {
+export async function createTicket(ticket: NewTicket, idempotencyKey: string): Promise<CreatedTicket> {
   return requestJson<CreatedTicket>("/api/tickets", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Dev-Requester-Id": String(requesterId),
       "Idempotency-Key": idempotencyKey,
     },
     body: JSON.stringify(ticket),
@@ -223,10 +312,7 @@ export interface TicketListParams {
  * rather than ignoring them (BR-27), so an empty filter must be absent from the
  * query string rather than present and blank.
  */
-export async function fetchTickets(
-  params: TicketListParams,
-  requesterId: number,
-): Promise<TicketListResponse> {
+export async function fetchTickets(params: TicketListParams): Promise<TicketListResponse> {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === "" || value === null) continue;
@@ -234,9 +320,7 @@ export async function fetchTickets(
   }
 
   const suffix = query.toString();
-  return requestJson<TicketListResponse>(`/api/tickets${suffix ? `?${suffix}` : ""}`, {
-    headers: { "X-Dev-Requester-Id": String(requesterId) },
-  });
+  return requestJson<TicketListResponse>(`/api/tickets${suffix ? `?${suffix}` : ""}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -264,16 +348,12 @@ export interface TicketDetail extends CreatedTicket {
   attachments: Attachment[];
 }
 
-export async function fetchTicket(ticketId: number, requesterId: number): Promise<TicketDetail> {
-  return requestJson<TicketDetail>(`/api/tickets/${ticketId}`, {
-    headers: { "X-Dev-Requester-Id": String(requesterId) },
-  });
+export async function fetchTicket(ticketId: number): Promise<TicketDetail> {
+  return requestJson<TicketDetail>(`/api/tickets/${ticketId}`);
 }
 
-export async function fetchAttachments(ticketId: number, requesterId: number): Promise<Attachment[]> {
-  return requestJson<Attachment[]>(`/api/tickets/${ticketId}/attachments`, {
-    headers: { "X-Dev-Requester-Id": String(requesterId) },
-  });
+export async function fetchAttachments(ticketId: number): Promise<Attachment[]> {
+  return requestJson<Attachment[]>(`/api/tickets/${ticketId}/attachments`);
 }
 
 /**
@@ -284,17 +364,12 @@ export async function fetchAttachments(ticketId: number, requesterId: number): P
  * server cannot parse, which then looks like a validation bug rather than a
  * transport one.
  */
-export async function uploadAttachment(
-  ticketId: number,
-  file: File,
-  requesterId: number,
-): Promise<Attachment> {
+export async function uploadAttachment(ticketId: number, file: File): Promise<Attachment> {
   const body = new FormData();
   body.append("file", file);
 
   return requestJson<Attachment>(`/api/tickets/${ticketId}/attachments`, {
     method: "POST",
-    headers: { "X-Dev-Requester-Id": String(requesterId) },
     body,
   });
 }
@@ -303,14 +378,10 @@ export async function removeAttachment(
   ticketId: number,
   attachmentId: number,
   removalReason: string,
-  requesterId: number,
 ): Promise<Attachment> {
   return requestJson<Attachment>(`/api/tickets/${ticketId}/attachments/${attachmentId}`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Dev-Requester-Id": String(requesterId),
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ removalReason }),
   });
 }
@@ -318,19 +389,13 @@ export async function removeAttachment(
 /**
  * Downloads through fetch rather than a plain link.
  *
- * The endpoint is requester-scoped and identity travels in `X-Dev-Requester-Id`
- * (D-01), and a browser navigation cannot carry a custom header — an `<a href>`
- * would arrive without context and be answered `401`. So the bytes are fetched
- * with the header and handed to the caller to save.
+ * The bytes are fetched and handed to the caller to save. A plain `<a href>`
+ * would work now that identity travels in a cookie, but fetching keeps the
+ * failure path in one place: a refusal arrives as the documented error envelope
+ * and can be shown beside the attachment, rather than as a browser error page.
  */
-export async function downloadAttachment(
-  ticketId: number,
-  attachmentId: number,
-  requesterId: number,
-): Promise<Blob> {
-  const response = await send(`/api/tickets/${ticketId}/attachments/${attachmentId}/download`, {
-    headers: { "X-Dev-Requester-Id": String(requesterId) },
-  });
+export async function downloadAttachment(ticketId: number, attachmentId: number): Promise<Blob> {
+  const response = await send(`/api/tickets/${ticketId}/attachments/${attachmentId}/download`);
   if (!response.ok) throw await toApiError(response);
   return response.blob();
 }

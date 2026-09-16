@@ -20,7 +20,7 @@ import {
   ReadOnlyField,
   StatusMessage,
 } from "../components/index.js";
-import { useRequester } from "../requester/index.js";
+import { useAuth } from "../auth/index.js";
 import {
   MAX_FILES,
   PERMITTED_TYPE_LABEL,
@@ -61,7 +61,7 @@ function newIdempotencyKey(): string {
 }
 
 export default function CreateTicket() {
-  const { requester } = useRequester();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [values, setValues] = useState<FormValues>(EMPTY);
@@ -136,7 +136,7 @@ export default function CreateTicket() {
 
     const errors = validate();
     setFieldErrors(errors);
-    if (Object.keys(errors).length > 0 || !requester) {
+    if (Object.keys(errors).length > 0) {
       focusFirstInvalid(errors);
       return;
     }
@@ -152,7 +152,6 @@ export default function CreateTicket() {
           description: values.description.trim(),
           requestedPriority: values.requestedPriority as RequestedPriority,
         },
-        requester.id,
         idempotencyKey,
       );
       setCreated(ticket);
@@ -283,7 +282,9 @@ export default function CreateTicket() {
             screen is not a surprise once they are filled in (ui-spec.md §6). */}
         <ReadOnlyField label="Ticket Number" value="Assigned after saving" />
         <ReadOnlyField label="Ticket Date" value="Assigned after saving" />
-        <ReadOnlyField label="Requester" value={requester?.fullName ?? "No Requester selected"} wide />
+        {/* The signed-in user owns whatever this form creates (BR-03); it is
+            shown rather than chosen, because there is no longer a choice. */}
+        <ReadOnlyField label="Requester" value={user?.fullName ?? ""} wide />
 
         <Field id="categoryId" label="Category" required error={fieldErrors.categoryId}>
           {(control) => (
