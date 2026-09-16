@@ -649,3 +649,68 @@ body {
     grid-column: 1 / -1;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Issue 48 — sign-in surfaces (ui-spec.md sections 2, 3 and 4)
+   --------------------------------------------------------------------------- */
+
+/* Login and the mandatory Change Password sit on their own, centred, with no
+   navigation behind them: there is nothing else the visitor may reach yet. */
+.zen-auth {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 0;
+}
+
+.zen-auth .zen-card {
+  width: 100%;
+  max-width: 420px;
+}
+
+.zen-password {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.zen-password input {
+  flex: 1 1 auto;
+}
+
+.zen-shell__user {
+  font-weight: 600;
+}
+
+/* The live password checklist. The tick and the wording carry the state; the
+   colour only reinforces it, so the list still reads correctly in monochrome. */
+.zen-checklist {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  font-size: 0.9rem;
+  color: var(--zen-text-muted);
+}
+
+.zen-checklist li {
+  padding: 0.15rem 0;
+}
+
+.zen-checklist__item--met {
+  color: var(--zen-primary);
+}
+
+/* Role badges: Requester neutral, IT Staff pale, Administrator outlined. */
+.zen-badge--role-requester {
+  border: 1px solid var(--zen-border);
+  color: var(--zen-text);
+}
+
+.zen-badge--role-staff {
+  background: var(--zen-pale);
+  color: var(--zen-secondary);
+}
+
+.zen-badge--role-admin {
+  border: 1px solid var(--zen-primary);
+  color: var(--zen-primary);
+}

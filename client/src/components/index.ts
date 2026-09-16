@@ -6,4 +6,5 @@ export { Card } from "./Card.js";
 export { EmptyState } from "./EmptyState.js";
 export { ErrorAlert } from "./ErrorAlert.js";
 export { Field, ReadOnlyField, type FieldControlProps } from "./Field.js";
+export { RoleBadge } from "./RoleBadge.js";
 export { StatusMessage } from "./StatusMessage.js";

@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
+import type { Role } from "../api.js";
 import { Button } from "./Button.js";
+import { RoleBadge } from "./RoleBadge.js";
 
 export type NavItem = {
   key: string;
@@ -12,25 +14,33 @@ type AppShellProps = {
   navItems?: NavItem[];
   /** `key` of the active nav item. */
   activeKey?: string;
-  /** Selected Development Requester, shown once a testing context exists. */
-  requesterName?: string;
-  onChangeRequester?: () => void;
+  /** The signed-in user, shown on the right with their role (ui-spec.md §2). */
+  userName?: string;
+  userRole?: Role;
+  onChangePassword?: () => void;
+  onLogout?: () => void;
   children: ReactNode;
 };
 
 /**
- * The frame every Lab 2 screen sits in: TokTickIT identity, primary navigation,
- * the selected Development Requester, and Change Requester (ui-spec.md §4).
+ * The frame every screen sits in: TokTickIT identity, the role's navigation, and
+ * the signed-in user with a role badge, Change password and Log out
+ * (ui-spec.md §2).
  *
- * It is presentational and prop-driven. Routing and the requester context land
- * in Issue #20, and this component is deliberately ready for both rather than
- * reaching for state it does not own yet.
+ * It stays presentational and prop-driven — it reads no context and makes no
+ * authorization decision. Which items reach `navItems` is the router's business
+ * (`App.tsx`), and what a role may actually *do* is the server's (issue #47).
+ *
+ * Every prop is optional so the shell still renders as a bare frame, which is
+ * what the Lab 1 system-check screen uses it for.
  */
 export function AppShell({
   navItems = [],
   activeKey,
-  requesterName,
-  onChangeRequester,
+  userName,
+  userRole,
+  onChangePassword,
+  onLogout,
   children,
 }: AppShellProps) {
   return (
@@ -61,13 +71,18 @@ export function AppShell({
             </nav>
           )}
 
-          {requesterName && (
+          {userName && (
             <div className="zen-shell__context">
-              <span>Development Requester</span>
-              <span className="zen-shell__requester">{requesterName}</span>
-              {onChangeRequester && (
-                <Button variant="secondary" onClick={onChangeRequester}>
-                  Change Requester
+              <span className="zen-shell__user">{userName}</span>
+              {userRole && <RoleBadge role={userRole} />}
+              {onChangePassword && (
+                <Button variant="tertiary" onClick={onChangePassword}>
+                  Change password
+                </Button>
+              )}
+              {onLogout && (
+                <Button variant="secondary" onClick={onLogout}>
+                  Log out
                 </Button>
               )}
             </div>

@@ -3,14 +3,23 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import App from "../../src/App.js";
-import { REQUESTER_STORAGE_KEY } from "../../src/requester/index.js";
 
 // UI-10, UI-11 — AC-12, AC-14, AC-15.
+//
+// UPDATED IN LAB 3 (Issue #48), and only in how the caller is identified: the
+// suite signs in through `/api/auth/me` rather than seeding a requester id, and
+// the two assertions about the `X-Dev-Requester-Id` header now assert the
+// session cookie instead (BR-03). Everything about the read-only record, the
+// 404, attachment states, uploading and removal is the Lab 2 assertion,
+// unchanged.
 
-const REQUESTERS = [
-  { id: 1, fullName: "Nadia Rahman", email: "nadia.rahman@toktickit.local" },
-  { id: 2, fullName: "Somchai Pattana", email: "somchai.pattana@toktickit.local" },
-];
+const USER = {
+  id: 1,
+  fullName: "Nadia Rahman",
+  email: "nadia.rahman@toktickit.local",
+  role: "REQUESTER",
+  mustChangePassword: false,
+};
 
 const ACTIVE_FILE = {
   id: 7,
@@ -62,34 +71,39 @@ type Handler = (init: RequestInit | undefined) => { status: number; body: unknow
 /**
  * Routes by method and path so a test can answer one call differently without
  * restating the others. Every request is recorded, which is what lets the
- * ownership test assert on the header actually sent rather than on the props of
- * a component.
+ * ownership test assert on what was actually sent rather than on the props of a
+ * component.
  */
 function mockApi(handlers: Record<string, Handler> = {}) {
-  const calls: { method: string; path: string; headers: Record<string, string>; body: unknown }[] = [];
+  const calls: { method: string; path: string; init: RequestInit | undefined; body: unknown }[] = [];
 
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
     const url = new URL(String(input), "http://localhost");
     const method = (init?.method ?? "GET").toUpperCase();
-    const headers = (init?.headers ?? {}) as Record<string, string>;
-    calls.push({ method, path: url.pathname, headers, body: init?.body });
+    calls.push({ method, path: url.pathname, init, body: init?.body });
+
+    if (url.pathname === "/api/auth/me") {
+      return { ok: true, status: 200, json: async () => ({ user: USER }), headers: new Headers() };
+    }
 
     const handler = handlers[`${method} ${url.pathname}`];
     if (handler) {
       const answer = handler(init);
       if (answer instanceof Blob) {
-        return { ok: true, status: 200, blob: async () => answer };
+        return { ok: true, status: 200, blob: async () => answer, headers: new Headers() };
       }
       return {
         ok: answer.status < 400,
         status: answer.status,
         json: async () => answer.body,
         blob: async () => new Blob([]),
+        headers: new Headers(),
       };
     }
 
-    if (url.pathname === "/api/requesters") return { ok: true, status: 200, json: async () => REQUESTERS };
-    if (url.pathname === "/api/tickets/42") return { ok: true, status: 200, json: async () => detail() };
+    if (url.pathname === "/api/tickets/42") {
+      return { ok: true, status: 200, json: async () => detail(), headers: new Headers() };
+    }
     throw new Error(`Unexpected request: ${method} ${url.pathname}`);
   });
 
@@ -97,8 +111,7 @@ function mockApi(handlers: Record<string, Handler> = {}) {
   return { fetchMock, calls };
 }
 
-async function renderDetail(ticketId = "42", requesterId = "1") {
-  window.localStorage.setItem(REQUESTER_STORAGE_KEY, requesterId);
+async function renderDetail(ticketId = "42") {
   render(
     <MemoryRouter initialEntries={[`/tickets/${ticketId}`]}>
       <App />
@@ -111,7 +124,7 @@ function png(name: string, bytes = 1024): File {
 }
 
 /** The card a heading belongs to, so an assertion cannot match the app shell —
- *  which also displays the requester's name. */
+ *  which also displays the signed-in user's name. */
 function cardFor(heading: RegExp | string): HTMLElement {
   return screen.getByRole("heading", { name: heading }).closest("section") as HTMLElement;
 }
@@ -127,8 +140,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
-  window.localStorage.clear();
 });
 
 describe("Ticket Detail — the read-only record", () => {
@@ -137,8 +150,8 @@ describe("Ticket Detail — the read-only record", () => {
     await renderDetail();
 
     await screen.findByRole("heading", { name: "Ticket TKT-2026-00042" });
-    // Scoped to the ticket card: the shell shows the requester's name too, and
-    // an assertion that cannot tell them apart proves nothing about the screen.
+    // Scoped to the ticket card: the shell shows the user's name too, and an
+    // assertion that cannot tell them apart proves nothing about the screen.
     const card = within(cardFor(/^Ticket TKT-/));
 
     for (const [label, value] of [
@@ -163,13 +176,16 @@ describe("Ticket Detail — the read-only record", () => {
     expect(document.querySelectorAll(".zen-field--readonly").length).toBeGreaterThanOrEqual(9);
   });
 
-  it("asks for the ticket as the selected requester and shows nothing before the answer", async () => {
+  it("asks for the ticket as the signed-in user and shows nothing before the answer", async () => {
     const { calls } = mockApi({ "GET /api/tickets/42": () => ({ status: 200, body: detail() }) });
-    await renderDetail("42", "2");
+    await renderDetail();
 
     await screen.findByRole("heading", { name: "Ticket TKT-2026-00042" });
     const detailCall = calls.find((call) => call.path === "/api/tickets/42");
-    expect(detailCall?.headers["X-Dev-Requester-Id"]).toBe("2");
+    // The retired header must be absent, not merely ignored, and the cookie is
+    // what identifies the caller instead (BR-03).
+    expect((detailCall?.init?.headers as Record<string, string> | undefined)?.["X-Dev-Requester-Id"]).toBeUndefined();
+    expect(detailCall?.init).toMatchObject({ credentials: "include" });
   });
 });
 
@@ -185,7 +201,7 @@ describe("Ticket Detail — a ticket that is not yours", () => {
     expect(alert).toHaveTextContent(/could not be found/i);
 
     // No field of the ticket reaches the screen, and nothing on it says who does
-    // own the ticket — the two failures stay indistinguishable (D-04).
+    // own the ticket — the two failures stay indistinguishable (BR-19).
     expect(screen.queryByText("TKT-2026-00042")).toBeNull();
     expect(screen.queryByText("Somchai Pattana")).toBeNull();
     expect(screen.queryByRole("list", { name: "Attachments" })).toBeNull();
@@ -239,7 +255,7 @@ describe("Ticket Detail — attachment states", () => {
     expect(within(removed).queryByRole("button", { name: /Remove/ })).toBeNull();
   });
 
-  it("downloads an active attachment with the requester header, since a link cannot carry one", async () => {
+  it("downloads an active attachment through fetch, carrying the session", async () => {
     const { calls } = mockApi({
       "GET /api/tickets/42": () => ({ status: 200, body: detail([ACTIVE_FILE]) }),
       "GET /api/tickets/42/attachments/7/download": () => new Blob([new Uint8Array([1, 2, 3])]),
@@ -251,7 +267,7 @@ describe("Ticket Detail — attachment states", () => {
 
     await waitFor(() => expect(objectUrl.create).toHaveBeenCalled());
     const download = calls.find((call) => call.path.endsWith("/download"));
-    expect(download?.headers["X-Dev-Requester-Id"]).toBe("1");
+    expect(download?.init).toMatchObject({ credentials: "include" });
     // The object URL is released once the save is triggered; a detail screen
     // visited repeatedly would otherwise hold every file it downloaded.
     expect(objectUrl.revoke).toHaveBeenCalledWith("blob:stub");
