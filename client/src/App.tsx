@@ -1,7 +1,8 @@
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { AppShell, Card, StatusMessage, type NavItem } from "./components/index.js";
+import { AppShell, StatusMessage, type NavItem } from "./components/index.js";
 import SystemCheck from "./SystemCheck.js";
 import { AuthProvider, ChangePassword, Login, RequireAuth, landingPath, useAuth } from "./auth/index.js";
+import StaffTicketQueue from "./staff/StaffTicketQueue.js";
 import CreateTicket from "./tickets/CreateTicket.js";
 import MyTickets from "./tickets/MyTickets.js";
 import TicketDetail from "./tickets/TicketDetail.js";
@@ -19,11 +20,16 @@ export default function App() {
 
 /** The navigation each role is offered (ui-spec.md §2). */
 function navigationFor(role: string, navigate: (path: string) => void): NavItem[] {
-  if (role !== "REQUESTER") return [];
-  return [
-    { key: "/tickets", label: "My Tickets", onSelect: () => navigate("/tickets") },
-    { key: "/create", label: "Create Ticket", onSelect: () => navigate("/create") },
-  ];
+  if (role === "REQUESTER") {
+    return [
+      { key: "/tickets", label: "My Tickets", onSelect: () => navigate("/tickets") },
+      { key: "/create", label: "Create Ticket", onSelect: () => navigate("/create") },
+    ];
+  }
+
+  // IT Staff and Administrators share the queue (decision D-08). Users is added
+  // for Administrators by the issue that builds User Management.
+  return [{ key: "/queue", label: "Ticket Queue", onSelect: () => navigate("/queue") }];
 }
 
 function Shell() {
@@ -68,17 +74,22 @@ function Shell() {
         <Route
           path="/tickets/:ticketId"
           element={
-            <RequireAuth roles={["REQUESTER"]}>
+            // Open to every role: issue #47 already lets IT Staff and
+            // Administrators read any ticket, and the queue links here. The
+            // screen hides the attachment controls for anyone who is not the
+            // Requester, matching the server rather than offering a button that
+            // would be refused.
+            <RequireAuth>
               <TicketDetail />
             </RequireAuth>
           }
         />
 
         <Route
-          path="/workspace"
+          path="/queue"
           element={
-            <RequireAuth>
-              <Workspace />
+            <RequireAuth roles={["IT_STAFF", "ADMINISTRATOR"]}>
+              <StaffTicketQueue />
             </RequireAuth>
           }
         />
@@ -122,23 +133,5 @@ function Landing() {
   return <Navigate to={user ? landingPath(user.role) : "/login"} replace />;
 }
 
-/**
- * The IT Staff and Administrator start page, until their screens exist.
- *
- * Their real landing pages — the Ticket Queue and User Management — arrive with
- * the issues that build them. Sending them to a Requester screen instead would
- * be worse than saying so: the server already answers `403` there, so the screen
- * would fill with refusals and look broken rather than unbuilt.
- */
-function Workspace() {
-  const { user } = useAuth();
-  return (
-    <Card title="Your workspace" as="h1">
-      <p>
-        You are signed in as {user?.fullName}. The screens for your role are not part of this
-        release yet — the IT Staff Ticket Queue and User Management arrive with the issues that
-        build them.
-      </p>
-    </Card>
-  );
-}
+// The `Workspace` placeholder that stood here is gone: issue #50 gives IT Staff
+// and Administrators the real Ticket Queue to land on.

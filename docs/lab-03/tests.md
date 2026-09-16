@@ -208,6 +208,17 @@ the commit, the commands and their complete output copied from the run by script
   `client/tests/lab-02/apiClient.test.ts` exercised `fetchRequesters`, which is gone with its
   endpoint; it now runs the identical translation path through `fetchCategories`, and gains a
   case proving the session cookie is sent at all.
+- **Suites changed by issue #50, and why** (Definition of Done, Part 1 item 4).
+  `client/tests/lab-03/AppShell.test.tsx` asserted that IT Staff were offered no navigation at
+  all and landed on a placeholder card. That was true only while their screens did not exist;
+  they now land on the Ticket Queue and the navigation offers it. The claim the test was
+  really making — that the **Requester** screens are not offered to them — is unchanged and
+  still asserted, alongside the Forbidden state for a Requester-only route.
+  `client/tests/lab-02/RequesterTicketDetail.test.tsx` gains two cases rather than losing any:
+  the queue links IT Staff to Ticket Detail, so the suite now proves that a member of staff who
+  does not own the ticket may read it and download an active attachment but is offered no
+  upload or removal control, and that the owning Requester still gets both. Its `mockApi`
+  gained an optional user argument so a suite can render as someone other than the owner.
 - **The Lab 2 suites mint their sessions directly** rather than posting to
   `/api/auth/login`. A scrypt verification at N = 2^15 per call would add seconds to every
   file, and repeated sign-ins for one email would trip the login throttle (BR-09) and fail

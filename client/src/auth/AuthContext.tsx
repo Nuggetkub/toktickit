@@ -110,7 +110,12 @@ export function useAuth(): AuthContextValue {
   return value;
 }
 
-/** Where each role starts (ui-spec.md §2). */
+/**
+ * Where each role starts (ui-spec.md §2).
+ *
+ * An Administrator lands on the Ticket Queue until User Management exists; the
+ * issue that builds it moves them to Users.
+ */
 export function landingPath(role: AuthUser["role"]): string {
-  return role === "REQUESTER" ? "/tickets" : "/workspace";
+  return role === "REQUESTER" ? "/tickets" : "/queue";
 }
