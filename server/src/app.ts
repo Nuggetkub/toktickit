@@ -12,6 +12,7 @@ import {
 } from "./auth-middleware.js";
 import { sendDependencyUnavailable, sendError } from "./errors.js";
 import { createTicket, getTicket, listTickets } from "./tickets-route.js";
+import { listAssignees, listStaffQueue } from "./staff-queue-route.js";
 import multer from "multer";
 import { MAX_BYTES } from "./attachment-rules.js";
 import {
@@ -160,6 +161,20 @@ app.patch(
   requireRole("REQUESTER"),
   removeAttachment,
 );
+
+// ---------------------------------------------------------------------------
+// Issue 49 — the IT Staff Ticket Queue (api-spec.md §5)
+//
+// Registered here, above the error-handling middleware. Express only runs an
+// error handler when something calls next(err), so a route below it would still
+// work — but it reads as unreachable to the next person, which is a trap worth
+// not laying. (I raised the same thing on my peer's queue; he moved it.)
+//
+// requireRole runs before the handler, so a Requester is refused without the
+// query ever being parsed or a ticket ever being read (BR-18).
+// ---------------------------------------------------------------------------
+app.get("/api/staff/tickets", ...signedIn, requireRole("IT_STAFF", "ADMINISTRATOR"), asyncRoute(listStaffQueue));
+app.get("/api/staff/assignees", ...signedIn, requireRole("IT_STAFF", "ADMINISTRATOR"), asyncRoute(listAssignees));
 
 // Multer rejects an oversized body before the route runs, so its error needs
 // translating into the documented envelope rather than reaching Express's
