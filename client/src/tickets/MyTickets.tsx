@@ -11,7 +11,7 @@ import {
   type TicketListResponse,
 } from "../api.js";
 import { Badge, Button, Card, EmptyState, ErrorAlert, Field, StatusMessage } from "../components/index.js";
-import { useRequester } from "../requester/index.js";
+import { useAuth } from "../auth/index.js";
 
 type SortChoice =
   | "ticketDate:desc"
@@ -52,7 +52,7 @@ const PRIORITY_TONE: Record<RequestedPriority, "neutral" | "warning" | "danger">
 };
 
 export default function MyTickets() {
-  const { requester } = useRequester();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [filters, setFilters] = useState<Filters>(DEFAULTS);
@@ -93,7 +93,7 @@ export default function MyTickets() {
   ];
 
   useEffect(() => {
-    if (!requester) return;
+    if (!user) return;
     let active = true;
     setState("loading");
 
@@ -108,7 +108,6 @@ export default function MyTickets() {
         page,
         pageSize: PAGE_SIZE,
       },
-      requester.id,
     )
       .then((response) => {
         // Guards against a slow response from an abandoned query overwriting a
@@ -125,7 +124,7 @@ export default function MyTickets() {
       active = false;
     };
   }, [
-    requester,
+    user,
     debouncedSearch,
     filters.categoryId,
     filters.relatedSystemId,

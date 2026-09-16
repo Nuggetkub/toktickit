@@ -3,14 +3,30 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import App from "../../src/App.js";
-import { REQUESTER_STORAGE_KEY } from "../../src/requester/index.js";
 
 // UI-07, UI-08, UI-09 — AC-08, AC-09, AC-11.
+//
+// UPDATED IN LAB 3 (Issue #48), and only in how the caller is identified: the
+// suite signs in through `/api/auth/me` instead of seeding a requester id into
+// localStorage, and the assertions about the `X-Dev-Requester-Id` header are
+// replaced by ones about the session cookie (BR-03). Every assertion about
+// searching, filtering, sorting, paging and the states in between is the Lab 2
+// assertion, unchanged.
+//
+// Two describes were removed rather than converted, because they tested the
+// Development Requester selector itself — switching requester mid-session and
+// returning to the selector. Lab 3 has no selector to return to; changing who
+// you are now means signing out and signing in, which `AppShell.test.tsx`
+// covers. tests.md §7 records the removal.
 
-const REQUESTERS = [
-  { id: 1, fullName: "Nadia Rahman", email: "nadia.rahman@toktickit.local" },
-  { id: 2, fullName: "Somchai Pattana", email: "somchai.pattana@toktickit.local" },
-];
+const USER = {
+  id: 1,
+  fullName: "Nadia Rahman",
+  email: "nadia.rahman@toktickit.local",
+  role: "REQUESTER",
+  mustChangePassword: false,
+};
+
 const CATEGORIES = [{ id: 2, name: "Network" }, { id: 3, name: "Hardware" }];
 const RELATED_SYSTEMS = [{ id: 5, name: "Campus Wi-Fi" }];
 
@@ -46,31 +62,31 @@ function deferred<T>() {
  * a test return a pending promise so the states between request and response are
  * reachable rather than only their endpoints.
  */
-function mockApi(
-  listFor: (url: URL, headers: Record<string, string>) => unknown = () => page([ticket(1, "Campus Wi-Fi drops nightly")]),
-) {
+function mockApi(listFor: (url: URL) => unknown = () => page([ticket(1, "Campus Wi-Fi drops nightly")])) {
   const listUrls: URL[] = [];
+  const listInits: (RequestInit | undefined)[] = [];
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
     const url = new URL(String(input), "http://localhost");
+    const json = (body: unknown) => ({ ok: true, status: 200, json: async () => body, headers: new Headers() });
+
+    if (url.pathname === "/api/auth/me") return json({ user: USER });
 
     if (url.pathname === "/api/tickets") {
       listUrls.push(url);
-      const headers = (init?.headers ?? {}) as Record<string, string>;
-      const body = await listFor(url, headers);
+      listInits.push(init);
+      const body = await listFor(url);
       if (body instanceof Error) throw body;
-      return { ok: true, status: 200, json: async () => body, headers: init?.headers };
+      return json(body);
     }
-    if (url.pathname === "/api/requesters") return { ok: true, status: 200, json: async () => REQUESTERS };
-    if (url.pathname === "/api/categories") return { ok: true, status: 200, json: async () => CATEGORIES };
-    if (url.pathname === "/api/related-systems") return { ok: true, status: 200, json: async () => RELATED_SYSTEMS };
+    if (url.pathname === "/api/categories") return json(CATEGORIES);
+    if (url.pathname === "/api/related-systems") return json(RELATED_SYSTEMS);
     throw new Error(`Unexpected request: ${url.pathname}`);
   });
   vi.stubGlobal("fetch", fetchMock);
-  return { fetchMock, listUrls };
+  return { fetchMock, listUrls, listInits };
 }
 
-async function renderList(requesterId = "1") {
-  window.localStorage.setItem(REQUESTER_STORAGE_KEY, requesterId);
+async function renderList() {
   render(
     <MemoryRouter initialEntries={["/tickets"]}>
       <App />
@@ -86,8 +102,8 @@ async function renderList(requesterId = "1") {
 }
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
-  window.localStorage.clear();
 });
 
 describe("My Tickets — the list", () => {
@@ -108,12 +124,15 @@ describe("My Tickets — the list", () => {
     expect(within(table).getByText("Campus Wi-Fi drops nightly")).toBeInTheDocument();
   });
 
-  it("sends the requester in the header, never in the query string", async () => {
-    const { listUrls } = mockApi();
+  it("identifies the requester by session, never in the query string", async () => {
+    const { listUrls, listInits } = mockApi();
     await renderList();
     await screen.findByRole("table");
 
     expect(listUrls[0].searchParams.has("requesterId")).toBe(false);
+    // Ownership is the session's business now (BR-03). The cookie is what makes
+    // that work, and its absence would turn every one of these into a 401.
+    expect(listInits[0]).toMatchObject({ credentials: "include" });
   });
 
   it("links Ticket Number and Summary to the ticket", async () => {
@@ -327,73 +346,6 @@ describe("My Tickets — paging moves through the list", () => {
   });
 });
 
-describe("My Tickets — changing requester reloads under the new identity", () => {
-  // The fixture depends on the requester header, so "A's tickets disappear and
-  // B's appear" is actually observable. A shared fixture would prove only that
-  // the header changed, which is not what AC-08 claims.
-  function perRequester(url: URL, headers: Record<string, string>) {
-    const who = headers["X-Dev-Requester-Id"];
-    if (who === "2") return page([ticket(20, "Somchai's own ticket")]);
-    const requested = Number(url.searchParams.get("page") ?? "1");
-    return {
-      items: [ticket(requested * 10, `Nadia page ${requested} ticket`)],
-      page: requested,
-      pageSize: 10,
-      totalItems: 20,
-      totalPages: 2,
-    };
-  }
-
-  it("replaces the first requester's tickets with the second requester's", async () => {
-    const { fetchMock } = mockApi(perRequester);
-    await renderList("1");
-
-    expect(await screen.findByText("Nadia page 1 ticket")).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: "Change Requester" }));
-    await screen.findByRole("heading", { name: "Development Requester Selection" });
-    await userEvent.selectOptions(await screen.findByLabelText(/Development Requester/), "2");
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-
-    expect(await screen.findByText("Somchai's own ticket")).toBeInTheDocument();
-    // AC-08: the previous requester's ticket must be gone, not merely re-fetched.
-    expect(screen.queryByText("Nadia page 1 ticket")).not.toBeInTheDocument();
-
-    const listCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes("/api/tickets"));
-    const lastHeaders = (listCalls.at(-1)![1] as RequestInit).headers as Record<string, string>;
-    expect(lastHeaders["X-Dev-Requester-Id"]).toBe("2");
-  });
-
-  it("starts the new requester on page 1 with the filters cleared", async () => {
-    // BR-11: changing Requester clears requester-scoped state. Carrying a filter
-    // or a page number across would show the new requester a view shaped by
-    // somebody else's session.
-    const { listUrls } = mockApi(perRequester);
-    await renderList("1");
-    await screen.findByRole("table");
-
-    await userEvent.selectOptions(screen.getByLabelText("Category"), "3");
-    await waitFor(() => expect(listUrls.at(-1)!.searchParams.get("categoryId")).toBe("3"));
-    await userEvent.click(screen.getByRole("button", { name: "Next" }));
-    await waitFor(() => expect(listUrls.at(-1)!.searchParams.get("page")).toBe("2"));
-
-    await userEvent.click(screen.getByRole("button", { name: "Change Requester" }));
-    await screen.findByRole("heading", { name: "Development Requester Selection" });
-    await userEvent.selectOptions(await screen.findByLabelText(/Development Requester/), "2");
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-
-    expect(await screen.findByText("Somchai's own ticket")).toBeInTheDocument();
-
-    const afterSwitch = listUrls.at(-1)!;
-    expect(afterSwitch.searchParams.get("page")).toBe("1");
-    expect(afterSwitch.searchParams.has("categoryId")).toBe(false);
-
-    // And the controls agree with the request that was sent.
-    expect(screen.getByLabelText("Category")).toHaveValue("");
-    expect(screen.getByRole("button", { name: "Clear filters" })).toBeDisabled();
-  });
-});
-
 describe("My Tickets — pagination", () => {
   it("announces the result count, not only the page number", async () => {
     const rows = Array.from({ length: 10 }, (_, index) => ticket(index + 1, `Ticket ${index + 1}`));
@@ -413,30 +365,5 @@ describe("My Tickets — pagination", () => {
 
     expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
-  });
-});
-
-describe("My Tickets — requester context", () => {
-  it("requests the list for whichever requester is selected", async () => {
-    const { fetchMock } = mockApi();
-    await renderList("2");
-    await screen.findByRole("table");
-
-    const listCall = fetchMock.mock.calls.find(([url]) => String(url).includes("/api/tickets"))!;
-    const headers = (listCall[1] as RequestInit).headers as Record<string, string>;
-    expect(headers["X-Dev-Requester-Id"]).toBe("2");
-  });
-
-  it("returns to the selector when the requester is changed", async () => {
-    mockApi();
-    await renderList();
-    await screen.findByRole("table");
-
-    await userEvent.click(screen.getByRole("button", { name: "Change Requester" }));
-
-    expect(
-      await screen.findByRole("heading", { name: "Development Requester Selection" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 });

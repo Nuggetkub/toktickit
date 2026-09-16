@@ -19,7 +19,7 @@ import {
   ReadOnlyField,
   StatusMessage,
 } from "../components/index.js";
-import { useRequester } from "../requester/index.js";
+import { useAuth } from "../auth/index.js";
 import {
   MAX_FILES,
   PERMITTED_TYPE_LABEL,
@@ -64,7 +64,7 @@ function moment(value: string): string {
 
 export default function TicketDetail() {
   const { ticketId = "" } = useParams();
-  const { requester } = useRequester();
+  const { user } = useAuth();
 
   const [ticket, setTicket] = useState<TicketDetailResponse | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "notFound" | "failed">("loading");
@@ -81,11 +81,11 @@ export default function TicketDetail() {
   const [removalBusy, setRemovalBusy] = useState(false);
 
   useEffect(() => {
-    if (!requester) return;
+    if (!user) return;
     let active = true;
     setState("loading");
 
-    fetchTicket(Number(ticketId), requester.id)
+    fetchTicket(Number(ticketId))
       .then((loaded) => {
         if (!active) return;
         setTicket(loaded);
@@ -103,7 +103,7 @@ export default function TicketDetail() {
     return () => {
       active = false;
     };
-  }, [requester, ticketId, reloadToken]);
+  }, [user, ticketId, reloadToken]);
 
   const activeCount = attachments.filter((file) => file.removedAt === null).length;
   const atLimit = activeCount >= MAX_FILES;
@@ -112,7 +112,7 @@ export default function TicketDetail() {
     // The picker keeps its value, so choosing the same file twice after a failure
     // would otherwise be silent. Clearing it makes every choice a fresh event.
     input.value = "";
-    if (!chosen || !requester || !ticket) return;
+    if (!chosen || !ticket) return;
 
     setNotice("");
 
@@ -126,7 +126,7 @@ export default function TicketDetail() {
     setAttachmentError("");
     setUploadingName(chosen.name);
     try {
-      const stored = await uploadAttachment(ticket.id, chosen, requester.id);
+      const stored = await uploadAttachment(ticket.id, chosen);
       setAttachments((current) => [...current, stored]);
       setNotice(`${stored.originalFilename} was uploaded.`);
     } catch (error) {
@@ -138,11 +138,11 @@ export default function TicketDetail() {
   }
 
   async function download(attachment: Attachment) {
-    if (!requester || !ticket) return;
+    if (!ticket) return;
     setAttachmentError("");
     setNotice("");
     try {
-      const blob = await downloadAttachment(ticket.id, attachment.id, requester.id);
+      const blob = await downloadAttachment(ticket.id, attachment.id);
       saveBlob(blob, attachment.originalFilename);
       setNotice(`${attachment.originalFilename} was downloaded.`);
     } catch (error) {
@@ -160,7 +160,7 @@ export default function TicketDetail() {
   }
 
   async function confirmRemoval(attachment: Attachment) {
-    if (!requester || !ticket) return;
+    if (!ticket) return;
 
     const trimmed = reason.trim();
     if (trimmed.length < REASON_MIN || trimmed.length > REASON_MAX) {
@@ -170,7 +170,7 @@ export default function TicketDetail() {
 
     setRemovalBusy(true);
     try {
-      const removed = await removeAttachment(ticket.id, attachment.id, trimmed, requester.id);
+      const removed = await removeAttachment(ticket.id, attachment.id, trimmed);
       // Replaced rather than dropped: the row stays on screen carrying its
       // removal reason and date, which is the whole point of a soft removal.
       setAttachments((current) => current.map((file) => (file.id === removed.id ? removed : file)));
@@ -203,8 +203,8 @@ export default function TicketDetail() {
     return (
       <Card title="Ticket not found" as="h1">
         <ErrorAlert>
-          That Ticket could not be found. It may not exist, or it may belong to a different
-          Development Requester.
+          That Ticket could not be found. It may not exist, or it may belong to someone else —
+          the two answers are deliberately identical (BR-19).
         </ErrorAlert>
         <Link className="zen-button zen-button--secondary" to="/tickets">
           Back to My Tickets
