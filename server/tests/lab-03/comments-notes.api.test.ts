@@ -359,8 +359,18 @@ describe("the eligibility check and the write are one atomic step (Earth2509, PR
     );
 
     await new Promise((resolve) => setTimeout(resolve, 150));
-    const pending = fire();
-    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    // `.then()` is what dispatches a supertest request. Holding the Test object
+    // alone sends nothing, so the request would begin only after this helper had
+    // released the lock and committed the status change — it would then read a
+    // Ticket that was already CLOSED and be refused for entirely the wrong
+    // reason, passing whether or not the route locks anything.
+    //
+    // That is not hypothetical: the first version of this helper did exactly
+    // that, and removing FOR UPDATE from the route left all 36 tests green. The
+    // break-the-code run is the only reason it was caught.
+    const pending = fire().then((res) => res);
+    await new Promise((resolve) => setTimeout(resolve, 250));
 
     release();
     await locker;
