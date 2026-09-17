@@ -431,6 +431,89 @@ describe("API-16 — the assignee list", () => {
   });
 });
 
+// Added after Earth2509's review of PR #64.
+//
+// The client suites mock `fetch` and these suites drive the API, so the two
+// halves of one contract were tested independently and could drift without
+// either side failing: a renamed parameter would quietly stop filtering, and a
+// renamed field would render as an empty column. His specific findings turned
+// out to describe his own repository's queue, but the risk he was looking for is
+// real here, so this closes it.
+//
+// Nothing below re-tests filtering — the suites above do that. These assert only
+// that the names the queue screen actually sends and reads are the names this
+// API accepts and returns.
+describe("the client's contract — what the queue screen sends and renders", () => {
+  /** Exactly the sortBy values client/src/staff/StaffTicketQueue.tsx can emit. */
+  const CLIENT_SORT_FIELDS = ["ticketDate", "updatedAt", "itPriority", "currentStatus", "ticketNumber"] as const;
+
+  it("accepts the request the screen makes on first load", async () => {
+    const res = await request(app)
+      .get("/api/staff/tickets")
+      .set("Cookie", staff)
+      .query({ sortBy: "ticketDate", sortOrder: "desc", page: 1, pageSize: 10 });
+
+    expect(res.status).toBe(200);
+  });
+
+  it.each(CLIENT_SORT_FIELDS)("accepts sortBy=%s, which the Sort control offers", async (field) => {
+    const res = await request(app)
+      .get("/api/staff/tickets")
+      .set("Cookie", staff)
+      .query({ sortBy: field, categoryId });
+
+    expect(res.status).toBe(200);
+  });
+
+  it.each([
+    ["search", "wifi"],
+    ["currentStatus", "OPEN"],
+    ["itPriority", "URGENT"],
+    ["categoryId", "1"],
+    ["owner", "me"],
+    ["owner", "unassigned"],
+    ["requesterIndicated", "true"],
+  ])("accepts %s=%s, which a toolbar control sends", async (name, value) => {
+    const res = await request(app)
+      .get("/api/staff/tickets")
+      .set("Cookie", staff)
+      .query(name === "categoryId" ? { categoryId } : { [name]: value, categoryId });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("returns every field the queue row renders, under the name it renders", async () => {
+    const res = await queue(staff, { currentStatus: "OPEN" });
+    const row = res.body.items[0];
+
+    // A rename here is invisible to the client suites, which mock the response:
+    // the column would simply render empty against a live server.
+    expect(row.requester.fullName).toBe("Nadia Rahman");
+    expect(row.owner.fullName).toBe("Grace Okafor");
+    expect(row.category.name).toBeTruthy();
+
+    for (const key of [
+      "ticketNumber",
+      "summary",
+      "ticketDate",
+      "requestedPriority",
+      "itPriority",
+      "currentStatus",
+      "requesterResolvedAt",
+      "updatedAt",
+    ]) {
+      expect(row, `queue row is missing ${key}`).toHaveProperty(key);
+    }
+  });
+
+  it("returns assignee names under the name the Owner filter lists them by", async () => {
+    const res = await request(app).get("/api/staff/assignees").set("Cookie", staff);
+    const me = res.body.find((user: { id: number }) => user.id === staffId);
+
+    expect(me.fullName).toBe("Grace Okafor");
+  });
+});
+
 /** The Origin guard applies to mutations only; the queue is a read (BR-16). */
 describe("API-16 — reads need no Origin", () => {
   it("answers a queue request that carries no Origin header", async () => {
