@@ -28,6 +28,16 @@ export type ErrorCode =
   | "ATTACHMENT_TOO_LARGE"
   | "ATTACHMENT_TYPE_NOT_ALLOWED"
   | "REFERENCE_NOT_FOUND"
+  // Lab 3 ticket workflow (api-spec.md §6). Each names one refusal precisely,
+  // because the client acts differently on each: a stale version means reload
+  // and reapply, an already-assigned ticket means someone else took it first, a
+  // terminal ticket means nothing more can change at all. One shared code would
+  // leave the interface guessing which of those happened.
+  | "TICKET_VERSION_CONFLICT"
+  | "TICKET_ALREADY_ASSIGNED"
+  | "INVALID_STATUS_TRANSITION"
+  | "OWNER_REQUIRED"
+  | "TICKET_TERMINAL"
   | "INTERNAL_ERROR"
   | "DEPENDENCY_UNAVAILABLE";
 
