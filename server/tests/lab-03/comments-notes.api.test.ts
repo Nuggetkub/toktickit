@@ -445,6 +445,13 @@ describe("API-24 — the Requester's resolution indication", () => {
 
     expect([a.status, b.status]).toEqual([200, 200]);
     expect(a.body.requesterResolvedAt).toBe(b.body.requesterResolvedAt);
+
+    // Honest about its limits: both handlers re-read the ticket after writing,
+    // so these two responses agree whether or not the write was guarded — this
+    // case cannot, on its own, tell a protected race from an unprotected one.
+    // The test above ("keeps the first time when repeated") is the one that can,
+    // now that the conditional WHERE is the only guard: break it and the second
+    // request overwrites the timestamp and that test goes red.
   });
 
   it("is the Requester's own signal: IT Staff get 403, another Requester 404", async () => {

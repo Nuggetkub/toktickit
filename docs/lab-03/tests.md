@@ -241,6 +241,17 @@ the commit, the commands and their complete output copied from the run by script
   all. The two codes mean different things to the screen, so the row has been corrected to
   match the rule. Where a test plan and a business rule disagree, the rule is the contract and
   the plan is the mistake.
+- **The concurrent resolution-indication test cannot prove the race it looks like it
+  proves** (issue #52). Both handlers re-read the ticket after writing, so the two
+  responses carry the same timestamp whether or not the write was guarded. It is kept as a
+  smoke test — two simultaneous requests must still both answer `200` — and it says so in
+  the file. The guard is proven instead by the sequential repeat, which works only because
+  the conditional `WHERE` is now the **single** expression of BR-32: an outer
+  `if (requesterResolvedAt === null)` used to sit around it, caught every case the tests
+  could reach, and thereby made the real guard deletable with the suite still green. The
+  break-the-code run for #52 is what exposed that, and the fix was to remove the duplicate
+  rule rather than to write a cleverer test. A guard no test can fail is indistinguishable
+  from no guard at all.
 - **The Lab 2 suites mint their sessions directly** rather than posting to
   `/api/auth/login`. A scrypt verification at N = 2^15 per call would add seconds to every
   file, and repeated sign-ins for one email would trip the login throttle (BR-09) and fail

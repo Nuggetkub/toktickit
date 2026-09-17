@@ -234,16 +234,21 @@ export async function indicateResolved(req: Request, res: Response): Promise<voi
       return;
     }
 
-    // Repeating it keeps the first time and changes nothing (BR-32). Written as
-    // a conditional update rather than read-then-write so two taps in the same
-    // instant cannot both set it: `requesterResolvedAt: null` in the WHERE means
-    // the second one matches no row.
-    if (ticket.requesterResolvedAt === null) {
-      await prisma.ticket.updateMany({
-        where: { id, requesterResolvedAt: null },
-        data: { requesterResolvedAt: new Date() },
-      });
-    }
+    // Repeating it keeps the first time and changes nothing (BR-32). The WHERE
+    // is the whole of that rule: a second request matches no row, so there is
+    // nothing to overwrite, and two arriving in the same instant cannot both
+    // win either.
+    //
+    // There was an `if (ticket.requesterResolvedAt === null)` wrapped around
+    // this. It was removed deliberately. It expressed the same rule a second
+    // time, and because it caught every sequential repeat on its own, the WHERE
+    // below could be deleted entirely without a single test failing — the
+    // break-the-code run for #52 proved exactly that. One guard that is tested
+    // beats two guards where the outer one hides the inner one.
+    await prisma.ticket.updateMany({
+      where: { id, requesterResolvedAt: null },
+      data: { requesterResolvedAt: new Date() },
+    });
 
     const detail = await prisma.ticket.findUniqueOrThrow({ where: { id }, select: ticketDetailSelect });
     const attachments = await prisma.attachment.findMany({
