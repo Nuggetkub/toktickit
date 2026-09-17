@@ -38,6 +38,17 @@ export type ErrorCode =
   | "INVALID_STATUS_TRANSITION"
   | "OWNER_REQUIRED"
   | "TICKET_TERMINAL"
+  // Lab 3 Administrator user management (api-spec.md §8). Each refusal is named
+  // separately because the Administrator's next move differs for each: a
+  // duplicate email means pick another address, self-deactivation means ask
+  // someone else to do it, and the last-Administrator refusal means promote
+  // somebody before demoting yourself. A shared CONFLICT would make the screen
+  // guess which of the three happened.
+  | "USER_NOT_FOUND"
+  | "EMAIL_ALREADY_EXISTS"
+  | "CANNOT_DEACTIVATE_SELF"
+  | "CANNOT_CHANGE_OWN_ROLE"
+  | "LAST_ACTIVE_ADMINISTRATOR"
   | "INTERNAL_ERROR"
   | "DEPENDENCY_UNAVAILABLE";
 
