@@ -104,6 +104,14 @@ function mockApi(handlers: Record<string, Handler> = {}, asUser: unknown = USER)
     if (url.pathname === "/api/tickets/42") {
       return { ok: true, status: 200, json: async () => detail(), headers: new Headers() };
     }
+
+    // Lab 3 issue #53 put a Public Comments panel on this screen, so it asks one
+    // more question than it did in Lab 2. Answered here rather than excluded:
+    // refusing it would fail the attachment assertions for a reason that has
+    // nothing to do with attachments. Every Lab 2 assertion below is unchanged.
+    if (url.pathname === "/api/tickets/42/comments") {
+      return { ok: true, status: 200, json: async () => [], headers: new Headers() };
+    }
     throw new Error(`Unexpected request: ${method} ${url.pathname}`);
   });
 
@@ -161,7 +169,11 @@ describe("Ticket Detail — the read-only record", () => {
       ["Related System", "Campus Wi-Fi"],
       ["Ticket Summary", "Cannot connect to Campus Wi-Fi in Building 4"],
       ["Requested Priority", "HIGH"],
-      ["Current Status", "NEW"],
+      // Lab 3 issue #53: the status is now rendered by `StatusBadge`, which
+      // carries it in words (ui-spec.md §1). The field is still read-only and
+      // still shows the ticket's status — only the wording the reader sees has
+      // changed, from the enum value to the label.
+      ["Current Status", "New"],
       ["Description", "My laptop reports an authentication failure on the campus network."],
     ] as const) {
       expect(card.getByText(label)).toBeInTheDocument();

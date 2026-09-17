@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-
 import { AppShell, StatusMessage, type NavItem } from "./components/index.js";
 import SystemCheck from "./SystemCheck.js";
 import { AuthProvider, ChangePassword, Login, RequireAuth, landingPath, useAuth } from "./auth/index.js";
+import StaffTicketDetail from "./staff/StaffTicketDetail.js";
 import StaffTicketQueue from "./staff/StaffTicketQueue.js";
 import CreateTicket from "./tickets/CreateTicket.js";
 import MyTickets from "./tickets/MyTickets.js";
@@ -90,6 +91,18 @@ function Shell() {
           element={
             <RequireAuth roles={["IT_STAFF", "ADMINISTRATOR"]}>
               <StaffTicketQueue />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/queue/:ticketId"
+          element={
+            // The operational screen is its own route rather than a mode of
+            // /tickets/:id: the two show the same ticket to different readers,
+            // and a Requester must never reach a screen carrying Internal Notes
+            // — not even one that would render them empty.
+            <RequireAuth roles={["IT_STAFF", "ADMINISTRATOR"]}>
+              <StaffTicketDetail />
             </RequireAuth>
           }
         />
