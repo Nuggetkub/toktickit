@@ -14,6 +14,13 @@ import { sendDependencyUnavailable, sendError } from "./errors.js";
 import { createTicket, getTicket, listTickets } from "./tickets-route.js";
 import { listAssignees, listStaffQueue } from "./staff-queue-route.js";
 import { changeTicketStatus, claimTicket, setItPriority, setTicketOwner } from "./ticket-workflow-route.js";
+import {
+  createComment,
+  createInternalNote,
+  indicateResolved,
+  listComments,
+  listInternalNotes,
+} from "./discussion-route.js";
 import multer from "multer";
 import { MAX_BYTES } from "./attachment-rules.js";
 import {
@@ -192,6 +199,38 @@ app.post("/api/tickets/:ticketId/claim", ...staffOnly, asyncRoute(claimTicket));
 app.patch("/api/tickets/:ticketId/owner", ...staffOnly, asyncRoute(setTicketOwner));
 app.patch("/api/tickets/:ticketId/it-priority", ...staffOnly, asyncRoute(setItPriority));
 app.post("/api/tickets/:ticketId/status", ...staffOnly, asyncRoute(changeTicketStatus));
+
+// ---------------------------------------------------------------------------
+// Issue 52 — Comments, Internal Notes and the resolution indication (§7)
+//
+// Comments are open to every role and narrowed inside the handler to the
+// caller's own ticket when that caller is a Requester — the same predicate
+// Ticket Detail uses, not a second copy of the rule that would eventually
+// disagree with it.
+//
+// Internal Notes carry requireRole, so a Requester is refused at step 4, before
+// the ticket is looked up. That is the whole of BR-35: no note content is read,
+// and the refusal is identical whether or not the ticket exists.
+//
+// The indication is the mirror image: Requester only, because it is the
+// Requester's own signal. IT Staff receive 403, another Requester 404.
+//
+// There is no PUT, PATCH or DELETE for comments or notes. They are not
+// registered rather than answered with 405, so an edit attempt meets the 404
+// BR-37 specifies.
+// ---------------------------------------------------------------------------
+app.get("/api/tickets/:ticketId/comments", ...signedIn, asyncRoute(listComments));
+app.post("/api/tickets/:ticketId/comments", ...signedIn, asyncRoute(createComment));
+
+app.get("/api/tickets/:ticketId/internal-notes", ...staffOnly, asyncRoute(listInternalNotes));
+app.post("/api/tickets/:ticketId/internal-notes", ...staffOnly, asyncRoute(createInternalNote));
+
+app.post(
+  "/api/tickets/:ticketId/resolution-indication",
+  ...signedIn,
+  requireRole("REQUESTER"),
+  asyncRoute(indicateResolved),
+);
 
 // Multer rejects an oversized body before the route runs, so its error needs
 // translating into the documented envelope rather than reaching Express's
