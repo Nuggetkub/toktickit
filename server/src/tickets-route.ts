@@ -39,6 +39,43 @@ const ticketSelect = {
 type TicketRow = Prisma.TicketGetPayload<{ select: typeof ticketSelect }>;
 
 /**
+ * Ticket Detail (api-spec.md §4): the Lab 2 shape plus the workflow fields.
+ *
+ * Exported because every workflow success returns this same detail with
+ * `version` incremented (api-spec.md §6). One definition, used by both routes —
+ * a second copy in the workflow module is exactly the kind of duplicate that
+ * eventually disagrees.
+ *
+ * The create response deliberately keeps the narrower Lab 2 shape: a new ticket
+ * has no owner, no resolution and version 1, so adding those fields there would
+ * only add noise to the one response that cannot carry news.
+ */
+export const ticketDetailSelect = {
+  ...ticketSelect,
+  itPriority: true,
+  version: true,
+  resolutionSummary: true,
+  requesterResolvedAt: true,
+  owner: { select: { id: true, fullName: true, role: true } },
+} satisfies Prisma.TicketSelect;
+
+type TicketDetailRow = Prisma.TicketGetPayload<{ select: typeof ticketDetailSelect }>;
+
+export function serializeTicketDetail(ticket: TicketDetailRow, attachments: AttachmentView[] = []) {
+  return {
+    ...serialize(ticket, attachments),
+    itPriority: ticket.itPriority,
+    // Null is the answer, not an omission: Ticket Detail shows "Not yet
+    // assigned", and the client must be able to tell that from a field that
+    // failed to load.
+    owner: ticket.owner,
+    resolutionSummary: ticket.resolutionSummary,
+    requesterResolvedAt: ticket.requesterResolvedAt,
+    version: ticket.version,
+  };
+}
+
+/**
  * `attachments` defaults to empty because a Ticket has none at the moment it is
  * created — the create response in api-spec.md §3 shows exactly that. Ticket
  * Detail passes the real rows, removed ones included (BR-39).
@@ -338,7 +375,7 @@ export async function getTicket(req: Request, res: Response): Promise<void> {
     // predicate is unchanged from Lab 2.
     const ticket = await getPrisma().ticket.findFirst({
       where: user.role === "REQUESTER" ? { id: ticketId, requesterId: user.id } : { id: ticketId },
-      select: ticketSelect,
+      select: ticketDetailSelect,
     });
 
     if (!ticket) {
@@ -355,7 +392,7 @@ export async function getTicket(req: Request, res: Response): Promise<void> {
       select: attachmentSelect,
     });
 
-    res.status(200).json(serialize(ticket, attachments));
+    res.status(200).json(serializeTicketDetail(ticket, attachments));
   } catch (error) {
     sendDependencyUnavailable(res, "GET /api/tickets/:id", error);
   }

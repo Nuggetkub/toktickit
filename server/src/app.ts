@@ -13,6 +13,7 @@ import {
 import { sendDependencyUnavailable, sendError } from "./errors.js";
 import { createTicket, getTicket, listTickets } from "./tickets-route.js";
 import { listAssignees, listStaffQueue } from "./staff-queue-route.js";
+import { changeTicketStatus, claimTicket, setItPriority, setTicketOwner } from "./ticket-workflow-route.js";
 import multer from "multer";
 import { MAX_BYTES } from "./attachment-rules.js";
 import {
@@ -175,6 +176,22 @@ app.patch(
 // ---------------------------------------------------------------------------
 app.get("/api/staff/tickets", ...signedIn, requireRole("IT_STAFF", "ADMINISTRATOR"), asyncRoute(listStaffQueue));
 app.get("/api/staff/assignees", ...signedIn, requireRole("IT_STAFF", "ADMINISTRATOR"), asyncRoute(listAssignees));
+
+// ---------------------------------------------------------------------------
+// Issue 51 — the ticket workflow (api-spec.md §6)
+//
+// IT Staff and Administrators only (D-08 lets an Administrator do every IT Staff
+// ticket operation), and requireRole runs before the handler, so a Requester is
+// refused without the ticket ever being read.
+//
+// These are mutations, so the global Origin check already applies (BR-16).
+// ---------------------------------------------------------------------------
+const staffOnly = [...signedIn, requireRole("IT_STAFF", "ADMINISTRATOR")] as const;
+
+app.post("/api/tickets/:ticketId/claim", ...staffOnly, asyncRoute(claimTicket));
+app.patch("/api/tickets/:ticketId/owner", ...staffOnly, asyncRoute(setTicketOwner));
+app.patch("/api/tickets/:ticketId/it-priority", ...staffOnly, asyncRoute(setItPriority));
+app.post("/api/tickets/:ticketId/status", ...staffOnly, asyncRoute(changeTicketStatus));
 
 // Multer rejects an oversized body before the route runs, so its error needs
 // translating into the documented envelope rather than reaching Express's
