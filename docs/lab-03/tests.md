@@ -252,6 +252,23 @@ the commit, the commands and their complete output copied from the run by script
   break-the-code run for #52 is what exposed that, and the fix was to remove the duplicate
   rule rather than to write a cleverer test. A guard no test can fail is indistinguishable
   from no guard at all.
+- **The eligibility check and the write are one atomic step, after a review finding on
+  PR #66.** Earth2509 found that `POST /comments`, `POST /internal-notes` and the resolution
+  indication each read the Ticket, decided, and wrote afterwards with nothing holding the row:
+  a concurrent transition to `CLOSED` lands in that gap, and the write reaches a frozen Ticket
+  while the endpoint still answers `201`. The indication was worse — its conditional write
+  keyed only on `{ id, requesterResolvedAt: null }`, with no status in the predicate and the
+  result count ignored, so an indication could be stored on a status BR-32 forbids and still
+  return `200`. All three now take the Ticket's row lock inside their transaction, the way
+  `uploadAttachment` already did; api-spec.md §1's order (404, then 400, then 409) is
+  unchanged, because the lock alters *when* the status is read, not which answer wins.
+- **A `Promise.all` cannot see that class of defect, so the tests force the interleaving.**
+  Two requests fired together almost never land in the one window that matters, and a test
+  that usually passes for the wrong reason is worse than no test. The three concurrency cases
+  instead take the row lock in the test's own interactive transaction, fire the request so it
+  blocks inside the route, change the status, commit, and only then let the request proceed —
+  which makes the refusal deterministic. This is the same reasoning as the forced timestamp
+  collision used for BR-37: construct the race, never wait for it.
 - **The Lab 2 suites mint their sessions directly** rather than posting to
   `/api/auth/login`. A scrypt verification at N = 2^15 per call would add seconds to every
   file, and repeated sign-ins for one email would trip the login throttle (BR-09) and fail

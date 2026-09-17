@@ -329,6 +329,81 @@ describe("API-23 — Internal Notes stay internal", () => {
   });
 });
 
+describe("the eligibility check and the write are one atomic step (Earth2509, PR #66)", () => {
+  // These force the interleaving rather than hoping for it. A plain Promise.all
+  // proves nothing here: the two requests almost never land in the one window
+  // that matters. So the test takes the Ticket's row lock itself, holds it while
+  // the request blocks inside its own transaction, changes the status, commits,
+  // and only then lets the request proceed.
+  //
+  // Without the row lock in the route, the request reads the old status before
+  // this transaction commits and writes afterwards — which is exactly the
+  // defect, and exactly what these tests fail on.
+  async function whileClosing(
+    ticketId: number,
+    toStatus: "CLOSED" | "RESOLVED",
+    fire: () => request.Test,
+  ) {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    const locker = prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT "id" FROM "Ticket" WHERE "id" = ${ticketId} FOR UPDATE`;
+        await tx.ticket.update({ where: { id: ticketId }, data: { currentStatus: toStatus as never } });
+        await held;
+      },
+      { timeout: 20_000 },
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const pending = fire();
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    release();
+    await locker;
+    return pending;
+  }
+
+  it("refuses a comment on a Ticket that closed while the request was in flight", async () => {
+    const ticket = await newTicket({ status: "OPEN" });
+    const res = await whileClosing(ticket.id, "CLOSED", () =>
+      post(`/api/tickets/${ticket.id}/comments`, owner, { content: "Posted just as it closed." }),
+    );
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe("TICKET_TERMINAL");
+    expect(await prisma.publicComment.count({ where: { ticketId: ticket.id } })).toBe(0);
+  });
+
+  it("refuses an internal note on a Ticket that closed while the request was in flight", async () => {
+    const ticket = await newTicket({ status: "OPEN" });
+    const res = await whileClosing(ticket.id, "CLOSED", () =>
+      post(`/api/tickets/${ticket.id}/internal-notes`, staff, { content: "Noting just as it closed." }),
+    );
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe("TICKET_TERMINAL");
+    expect(await prisma.internalNote.count({ where: { ticketId: ticket.id } })).toBe(0);
+  });
+
+  it("refuses the indication on a Ticket that reached RESOLVED while the request was in flight", async () => {
+    const ticket = await newTicket({ status: "IN_PROGRESS" });
+    const res = await whileClosing(ticket.id, "RESOLVED", () =>
+      post(`/api/tickets/${ticket.id}/resolution-indication`, owner, {}),
+    );
+
+    // BR-32 forbids the indication on RESOLVED, and the endpoint must say so
+    // rather than answering 200 with the indication quietly written.
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe("INDICATION_NOT_ALLOWED");
+    const stored = await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
+    expect(stored.requesterResolvedAt).toBeNull();
+  });
+});
+
 describe("API-21 — BR-27 freezes attachments too", () => {
   // The same byte pattern the Lab 2 attachments suite uses. Content decides the
   // type (BR-31), and input validity is answered before state, so a real PNG
