@@ -324,6 +324,75 @@ export async function fetchTickets(params: TicketListParams): Promise<TicketList
 }
 
 // ---------------------------------------------------------------------------
+// Issue 50 — the IT Staff Ticket Queue (api-spec.md §5)
+// ---------------------------------------------------------------------------
+
+export interface UserSummary {
+  id: number;
+  fullName: string;
+  role: Role;
+}
+
+export interface StaffQueueRow {
+  id: number;
+  ticketNumber: string;
+  ticketDate: string;
+  summary: string;
+  category: { id: number; name: string };
+  requester: UserSummary;
+  requestedPriority: RequestedPriority;
+  itPriority: RequestedPriority;
+  currentStatus: string;
+  /** Null is the answer, not an omission: the queue shows "Unassigned". */
+  owner: UserSummary | null;
+  requesterResolvedAt: string | null;
+  updatedAt: string;
+}
+
+export interface StaffQueueResponse {
+  items: StaffQueueRow[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+export interface StaffQueueParams {
+  search?: string;
+  currentStatus?: string;
+  itPriority?: RequestedPriority;
+  categoryId?: number;
+  /** `me`, `unassigned`, or a user id. */
+  owner?: string;
+  requesterIndicated?: "true";
+  sortBy?: "ticketDate" | "updatedAt" | "ticketNumber" | "itPriority" | "requestedPriority" | "currentStatus";
+  sortOrder?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
+}
+
+/**
+ * Only parameters with a value are sent. The queue rejects unknown or empty ones
+ * rather than ignoring them, so an empty filter must be absent from the query
+ * string rather than present and blank.
+ */
+export async function fetchStaffQueue(params: StaffQueueParams): Promise<StaffQueueResponse> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === "" || value === null) continue;
+    query.set(key, String(value));
+  }
+
+  const suffix = query.toString();
+  return requestJson<StaffQueueResponse>(`/api/staff/tickets${suffix ? `?${suffix}` : ""}`);
+}
+
+/** Active IT Staff and Administrators — the Owner filter and, later, assignment. */
+export async function fetchAssignees(): Promise<UserSummary[]> {
+  return requestJson<UserSummary[]>("/api/staff/assignees");
+}
+
+// ---------------------------------------------------------------------------
 // Issue 26 — Ticket Detail and attachments
 // ---------------------------------------------------------------------------
 

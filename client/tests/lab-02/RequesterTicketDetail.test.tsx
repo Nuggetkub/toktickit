@@ -74,7 +74,7 @@ type Handler = (init: RequestInit | undefined) => { status: number; body: unknow
  * ownership test assert on what was actually sent rather than on the props of a
  * component.
  */
-function mockApi(handlers: Record<string, Handler> = {}) {
+function mockApi(handlers: Record<string, Handler> = {}, asUser: unknown = USER) {
   const calls: { method: string; path: string; init: RequestInit | undefined; body: unknown }[] = [];
 
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
@@ -83,7 +83,7 @@ function mockApi(handlers: Record<string, Handler> = {}) {
     calls.push({ method, path: url.pathname, init, body: init?.body });
 
     if (url.pathname === "/api/auth/me") {
-      return { ok: true, status: 200, json: async () => ({ user: USER }), headers: new Headers() };
+      return { ok: true, status: 200, json: async () => ({ user: asUser }), headers: new Headers() };
     }
 
     const handler = handlers[`${method} ${url.pathname}`];
@@ -339,6 +339,47 @@ describe("Ticket Detail — uploading", () => {
     await screen.findByRole("list", { name: "Attachments" });
     expect(screen.getByLabelText("Add an attachment")).toBeDisabled();
     expect(screen.getByText(/already has 5 active attachments/)).toBeInTheDocument();
+  });
+});
+
+// ADDED IN LAB 3 (Issue #50). The queue links IT Staff to this screen, and the
+// server lets them read the ticket and download its active attachments while
+// refusing upload and removal (issue #47). The screen now follows that matrix
+// instead of offering buttons certain to be refused — asserted here, because a
+// control removed without a test comes back at the next refactor.
+describe("Ticket Detail — a member of staff who does not own the ticket", () => {
+  const STAFF = {
+    id: 7,
+    fullName: "Grace Okafor",
+    email: "grace.okafor@toktickit.local",
+    role: "IT_STAFF",
+    mustChangePassword: false,
+  };
+
+  it("may read the ticket and download, but is offered no upload or removal", async () => {
+    mockApi({ "GET /api/tickets/42": () => ({ status: 200, body: detail([ACTIVE_FILE]) }) }, STAFF);
+    await renderDetail();
+
+    await screen.findByRole("heading", { name: "Ticket TKT-2026-00042" });
+    const list = await screen.findByRole("list", { name: "Attachments" });
+
+    // Reading and downloading are permitted by the matrix.
+    expect(within(list).getByRole("button", { name: /^Download wifi-error\.png$/ })).toBeInTheDocument();
+
+    // Uploading and removing are the owning Requester's alone.
+    expect(screen.queryByLabelText("Add an attachment")).toBeNull();
+    expect(within(list).queryByRole("button", { name: /^Remove wifi-error\.png$/ })).toBeNull();
+  });
+
+  it("still offers the owning Requester both controls", async () => {
+    // The other half of the claim: the controls are hidden by role, not simply
+    // deleted from the screen.
+    mockApi({ "GET /api/tickets/42": () => ({ status: 200, body: detail([ACTIVE_FILE]) }) });
+    await renderDetail();
+
+    await screen.findByRole("list", { name: "Attachments" });
+    expect(screen.getByLabelText("Add an attachment")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Remove wifi-error\.png$/ })).toBeInTheDocument();
   });
 });
 

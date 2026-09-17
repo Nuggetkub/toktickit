@@ -108,6 +108,13 @@ export default function TicketDetail() {
   const activeCount = attachments.filter((file) => file.removedAt === null).length;
   const atLimit = activeCount >= MAX_FILES;
 
+  // IT Staff and Administrators may read this ticket and download its active
+  // attachments, but only the owning Requester may upload or remove one — that
+  // is the authorization matrix, enforced by the server in issue #47. The
+  // controls follow the server rather than offering a button certain to be
+  // refused; hiding them is a courtesy, not the protection.
+  const isOwner = Boolean(user && ticket && user.id === ticket.requester.id);
+
   async function upload(chosen: File | undefined, input: HTMLInputElement) {
     // The picker keeps its value, so choosing the same file twice after a failure
     // would otherwise be silent. Clearing it makes every choice a fresh event.
@@ -264,25 +271,27 @@ export default function TicketDetail() {
         {uploadingName && <StatusMessage>Uploading {uploadingName}…</StatusMessage>}
         {notice && <StatusMessage>{notice}</StatusMessage>}
 
-        <Field
-          id="attachment"
-          label="Add an attachment"
-          hint={
-            atLimit
-              ? `This Ticket already has ${MAX_FILES} active attachments. Remove one before adding another.`
-              : undefined
-          }
-        >
-          {(control) => (
-            <input
-              {...control}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,application/pdf"
-              disabled={atLimit || uploadingName !== ""}
-              onChange={(event) => void upload(event.target.files?.[0], event.target)}
-            />
-          )}
-        </Field>
+        {isOwner && (
+          <Field
+            id="attachment"
+            label="Add an attachment"
+            hint={
+              atLimit
+                ? `This Ticket already has ${MAX_FILES} active attachments. Remove one before adding another.`
+                : undefined
+            }
+          >
+            {(control) => (
+              <input
+                {...control}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,application/pdf"
+                disabled={atLimit || uploadingName !== ""}
+                onChange={(event) => void upload(event.target.files?.[0], event.target)}
+              />
+            )}
+          </Field>
+        )}
 
         {attachments.length === 0 ? (
           <p>No files have been attached to this Ticket.</p>
@@ -314,12 +323,16 @@ export default function TicketDetail() {
 
                   {!removed && (
                     <div className="zen-attachment__actions">
+                      {/* Download stays for every permitted role; removal is the
+                          owning Requester's alone. */}
                       <Button variant="secondary" onClick={() => void download(attachment)}>
                         Download {attachment.originalFilename}
                       </Button>
-                      <Button variant="destructive" onClick={() => startRemoval(attachment)}>
-                        Remove {attachment.originalFilename}
-                      </Button>
+                      {isOwner && (
+                        <Button variant="destructive" onClick={() => startRemoval(attachment)}>
+                          Remove {attachment.originalFilename}
+                        </Button>
+                      )}
                     </div>
                   )}
 

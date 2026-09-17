@@ -714,3 +714,128 @@ body {
   border: 1px solid var(--zen-primary);
   color: var(--zen-primary);
 }
+/* ---------------------------------------------------------------------------
+   Issue 50 — the IT Staff Ticket Queue (ui-spec.md sections 1 and 7)
+
+   The table itself needs no new layout: .zen-table already becomes one card per
+   row below 767px through the data-label pattern above, so the queue inherits
+   the mobile layout the contract asks for. Only what is specific to the queue
+   is added here.
+   --------------------------------------------------------------------------- */
+
+/* Status tones. Every badge already carries its status in words, so tone only
+   ever reinforces the label - Closed and Cancelled deliberately share a fill,
+   which colour alone could not tell apart. */
+.zen-badge--status-new {
+  border: 1px solid var(--zen-border);
+  color: var(--zen-text);
+}
+
+.zen-badge--status-open {
+  background: var(--zen-pale);
+  color: var(--zen-secondary);
+}
+
+.zen-badge--status-progress {
+  background: var(--zen-secondary);
+  color: #FFFFFF;
+}
+
+.zen-badge--status-waiting {
+  border: 1px solid var(--zen-warning);
+  color: var(--zen-warning);
+}
+
+.zen-badge--status-resolved {
+  background: var(--zen-primary);
+  color: #FFFFFF;
+}
+
+.zen-badge--status-closed,
+.zen-badge--status-cancelled {
+  background: var(--zen-readonly);
+  color: var(--zen-text-muted);
+}
+
+.zen-badge--status-reopened {
+  background: var(--zen-warning-surface);
+  color: var(--zen-warning);
+}
+
+/* Requested and IT priority share one scale, so each badge is preceded by the
+   label that says which it is. */
+.zen-priority {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-right: 0.4rem;
+}
+
+.zen-priority__label {
+  font-size: 0.75rem;
+  color: var(--zen-text-muted);
+}
+
+/* Summary keeps one line and folds the category beneath it, so seven columns
+   stay readable at 992px instead of becoming a mega-grid. */
+.zen-queue__summary {
+  display: block;
+  max-width: 28ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zen-queue__category {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--zen-text-muted);
+}
+
+.zen-queue__indicated {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--zen-warning);
+}
+
+.zen-queue__unassigned {
+  font-style: italic;
+  color: var(--zen-text-muted);
+}
+
+/* Open is a mobile-card action only. */
+.zen-queue__open {
+  display: none;
+}
+
+.zen-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Tablet: the Requester column goes, and returns on the mobile card and on
+   Ticket Detail (ui-spec.md section 7). */
+@media (min-width: 768px) and (max-width: 991px) {
+  .zen-queue__requester {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .zen-queue__summary {
+    max-width: none;
+    white-space: normal;
+  }
+
+  .zen-queue__open {
+    display: block;
+    margin-top: 0.5rem;
+  }
+
+  /* The labsheet asks for a 44px target on touch. */
+  .zen-queue__open .zen-button {
+    min-height: 44px;
+  }
+}

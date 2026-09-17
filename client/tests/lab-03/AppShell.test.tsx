@@ -52,6 +52,10 @@ function mockApi(user: unknown | null, ticketsAnswer?: { status: number; body?: 
       };
       return json(answer.status, answer.body ?? {});
     }
+    if (target.includes("/api/staff/tickets")) {
+      return json(200, { items: [], page: 1, pageSize: 10, totalItems: 0, totalPages: 1 });
+    }
+    if (target.includes("/api/staff/assignees")) return json(200, []);
     if (target.includes("/api/categories") || target.includes("/api/related-systems")) return json(200, []);
     throw new Error(`Unexpected request: ${target}`);
   });
@@ -96,13 +100,20 @@ describe("Application shell — who is signed in", () => {
     expect(nav).not.toHaveTextContent(/Users|Ticket Queue/);
   });
 
-  it("offers IT Staff none of the Requester screens", async () => {
+  it("lands IT Staff on the Ticket Queue and offers them none of the Requester screens", async () => {
+    // UPDATED IN LAB 3 (Issue #50). This asserted that IT Staff were offered no
+    // navigation at all, which was true only while their screens did not exist.
+    // The claim it was really making — that the Requester screens are not
+    // offered to them — is unchanged and still asserted below.
     mockApi(USERS.staff);
     renderAt("/");
 
-    // Their own screens arrive with later issues; what matters here is that the
-    // Requester navigation is not offered to them.
-    await waitFor(() => expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument());
+    expect(await screen.findByRole("heading", { name: "Ticket Queue" })).toBeInTheDocument();
+
+    const nav = screen.getByRole("navigation", { name: "Primary" });
+    expect(nav).toHaveTextContent("Ticket Queue");
+    expect(nav).not.toHaveTextContent(/My Tickets|Create Ticket/);
+
     expect(screen.getByText("Grace Okafor")).toBeInTheDocument();
     expect(screen.getByText("IT Staff")).toBeInTheDocument();
   });
@@ -135,6 +146,23 @@ describe("Application shell — start-up and direct URLs", () => {
     expect(await screen.findByRole("heading", { name: "You do not have access to this page" })).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "My Tickets" })).not.toBeInTheDocument();
+  });
+
+  it("refuses a Requester the Ticket Queue, and never asks the server for it", async () => {
+    // The boundary in the other direction. Issue #50 makes /queue an
+    // unauthorised destination for Requesters, and testing only the staff side
+    // of a rule is the asymmetry that lets the other half rot.
+    const { calls } = mockApi(USERS.requester);
+    renderAt("/queue");
+
+    expect(await screen.findByRole("heading", { name: "You do not have access to this page" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Ticket Queue" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+
+    // The guard runs before the screen mounts, so no queue request is made at
+    // all. The server would refuse it anyway (issue #49) — this is about not
+    // asking a question we already know the answer to.
+    expect(calls.some((url) => url.includes("/api/staff/"))).toBe(false);
   });
 });
 
