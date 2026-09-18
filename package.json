@@ -2,7 +2,7 @@
   "name": "toktickit",
   "version": "1.0.0",
   "private": true,
-  "description": "TokTickIT โ€” repository root. Holds only the end-to-end suite; the application lives in client/ and server/.",
+  "description": "TokTickIT — repository root. Holds only the end-to-end suite; the application lives in client/ and server/.",
   "type": "module",
   "scripts": {
     "e2e": "playwright test",

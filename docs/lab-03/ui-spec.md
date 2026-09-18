@@ -363,29 +363,29 @@ To be completed against the running application at all three viewports, not from
       focusable; confirmed by eye in `staff-ticket-detail/desktop.png`
 - [x] **A** Validation messages sit beneath their own field
       — `UserManagement.test.tsx` asserts `toBeInvalid()` with `toHaveAccessibleDescription`
-- [ ] **E** Public Comments and Internal Notes are unmistakably different surfaces
-- [ ] **A** Focus visible and never trapped outside an open dialog
+- [x] **E** Public Comments and Internal Notes are unmistakably different surfaces
+      — `staff-ticket-detail/internal-notes-desktop.png` against
+      `staff-ticket-detail/desktop.png`: the private thread names its audience in the
+      heading, carries the lock and sits on the `--private` surface
+- [x] **A** Focus visible and never trapped outside an open dialog
+      — `StaffTicketDetail.test.tsx` asserts focus enters the dialog, that Tab wraps last to
+      first and Shift+Tab first to last, and that closing returns focus to the trigger;
+      `ZenGreen.styles.test.tsx` pins the `:focus-visible` outline and that it is never removed
 - [x] **A** No clipping, overlap, or page-level horizontal scroll (RESP-01)
       — `expectNoHorizontalOverflow`, `expectNothingClipped` and `expectControlsUsable`
-      gate all 24 captures, at 1440, 834 and 390 px
-- [ ] **E** Loading, saving, success, empty, no-results, forbidden, conflict and failure
-      states captured from real requests
+      gate all 33 captures, at 1440, 834 and 390 px
+- [x] **E** Loading, saving, success, empty, no-results, forbidden, conflict and failure
+      states captured from real requests — `states/*.png`, each forced at the network edge
+      by `e2e/lab-03/ui-states.spec.ts` rather than staged in a component
 
-Three items are deliberately left open rather than ticked, because nothing yet proves them:
+Every row is ticked, and each names what proves it rather than asserting completion.
 
-- **Comments vs Notes surfaces** — the two threads are separate tabs, so a capture shows one
-  at a time and RESP-01 photographs the default (Public comments). The private surface has
-  a lock glyph and its own `--private` treatment in the stylesheet, but that is code read,
-  not an eye check, and this row asks for an eye check.
-- **Focus trap** — `StaffTicketDetail.test.tsx` covers Escape closing the dialog without
-  sending anything, but nothing asserts that Tab cycles inside the dialog or that focus
-  returns to the trigger. `ConfirmDialog` implements both; no test would notice if it
-  stopped.
-- **State captures** — RESP-01 photographs eight screens in their loaded state. Loading,
-  saving, empty, no-results, forbidden, conflict and failure are not captured anywhere.
-
-Ticking these from the component source would make the checklist agree with the code while
-leaving the gap invisible, which is the failure mode this table exists to prevent.
+The last three were closed by **adding evidence, not by filling boxes**: a focused capture of
+the private thread, a keyboard focus assertion driven over the real dialog, and eight states
+forced with held requests, a `409` and a `500`. They were deliberately left open when this
+issue was first submitted, with the reasons recorded — and Earth2509 was right to push back on
+PR #70 that a checklist the lab sheet requires is not completed by explaining why it is not.
+Documenting an empty box is honest; it is still an empty box.
 
 ### Screenshot paths
 
@@ -395,4 +395,14 @@ artifacts/lab-03/screenshots/staff-queue/{desktop,tablet,mobile}.png
 artifacts/lab-03/screenshots/staff-ticket-detail/{desktop,tablet,mobile}.png
 artifacts/lab-03/screenshots/user-management/{desktop,tablet,mobile}.png
 artifacts/lab-03/screenshots/requester/{my-tickets,ticket-detail}-{desktop,tablet,mobile}.png
+artifacts/lab-03/screenshots/staff-ticket-detail/internal-notes-desktop.png
+artifacts/lab-03/screenshots/states/{loading,saving,success,empty,no-results,forbidden,conflict,failure}.png
 ```
+
+The eight state captures are written by `e2e/lab-03/ui-states.spec.ts`, which forces each
+state at the network edge — a held request for loading and saving, a `409` for conflict, a
+`500` for failure — so what is photographed is the real screen reacting to a real answer
+rather than a component rendered in isolation. The Internal Notes capture is taken at desktop
+width only: it exists so the private surface can be compared with the public one in
+`staff-ticket-detail/desktop.png`, which is a question about the two surfaces rather than
+about layout, and the two threads are separate tabs so no single screenshot can show both.
