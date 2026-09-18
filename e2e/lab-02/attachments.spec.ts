@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { PNG_BYTES, REQUESTER_A, createTicket, selectRequester, uniqueSummary } from "./support.js";
+import { EMAIL_A, PNG_BYTES, createTicket, signIn, uniqueSummary } from "./support.js";
 
 // E2E-03 — AC-13, AC-15. The whole attachment lifecycle against the real API,
 // the real filesystem and a real browser download: upload, download, soft
@@ -7,7 +7,7 @@ import { PNG_BYTES, REQUESTER_A, createTicket, selectRequester, uniqueSummary } 
 // stays on the Ticket.
 
 test("an attachment can be uploaded, downloaded, removed with a reason, and then not downloaded", async ({ page }) => {
-  await selectRequester(page, REQUESTER_A);
+  await signIn(page, EMAIL_A);
   await createTicket(page, { summary: uniqueSummary("Screenshot of the Wi-Fi error dialog") });
   await page.getByRole("link", { name: "Open this Ticket" }).click();
 
@@ -73,7 +73,7 @@ test("an attachment can be uploaded, downloaded, removed with a reason, and then
 });
 
 test("a file the rules refuse is named with its reason and never reaches the Ticket", async ({ page }) => {
-  await selectRequester(page, REQUESTER_A);
+  await signIn(page, EMAIL_A);
   await createTicket(page, { summary: uniqueSummary("Cannot install the VPN client") });
   await page.getByRole("link", { name: "Open this Ticket" }).click();
   await expect(page.getByRole("heading", { name: "Attachments" })).toBeVisible();

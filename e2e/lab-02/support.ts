@@ -8,6 +8,19 @@ export const REQUESTER_A = "Nadia Rahman";
 export const REQUESTER_B = "Somchai Pattana";
 
 /**
+ * The seeded accounts these journeys sign in as, and the one development
+ * password every seeded account shares (BR-45, `server/src/seed-data.ts`).
+ *
+ * Issue #48 retired the Development Requester selector, so identity now comes
+ * from a real session. These suites kept driving `/select-requester` — a route
+ * that no longer exists — which is why they had to be repaired here rather than
+ * merely re-run.
+ */
+export const EMAIL_A = "nadia.rahman@toktickit.local";
+export const EMAIL_B = "somchai.pattana@toktickit.local";
+export const DEVELOPMENT_PASSWORD = process.env.SEED_PASSWORD ?? "TokTickIT-dev-2026";
+
+/**
  * A real PNG: the eight-byte signature followed by filler. The server decides an
  * attachment's type from its leading bytes and ignores the declared
  * `Content-Type` (BR-31), so an upload fixture has to *be* a PNG rather than
@@ -27,26 +40,71 @@ export function uniqueSummary(prefix: string): string {
   return `${prefix} ${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
 
-/** Starts at the selector and lands on My Tickets as the named Requester. */
-export async function selectRequester(page: Page, fullName: string): Promise<void> {
-  await page.goto("/select-requester");
-  await expect(page.getByRole("heading", { name: "Development Requester Selection" })).toBeVisible();
+/**
+ * Signs in as the given Requester and lands on My Tickets.
+ *
+ * Every seeded account is issued an initial password, and BR-12 leaves the
+ * mandatory-change gate on for all of them — so a first sign-in always lands on
+ * "Choose a new password" rather than on the requested screen. The helper
+ * completes that gate once, with the same password, which BR-11 forbids: it
+ * therefore sets a distinct session password the rest of the run uses.
+ *
+ * The fallback is deliberate rather than defensive. The E2E schema is dropped
+ * and recreated per run, so the first sign-in of a run always meets the gate;
+ * but a spec that signs the same account in twice must not meet it again, and a
+ * developer re-running against a warm schema should not have to reset it by
+ * hand.
+ */
+export async function signIn(page: Page, email: string): Promise<void> {
+  await page.goto("/login");
+  await expect(page.getByRole("heading", { name: "Sign in to your account" })).toBeVisible();
 
-  // Chosen by the name a person reads, not by a hard-coded id: the seed assigns
-  // ids and a re-seeded database would silently select someone else.
-  const select = page.getByLabel("Development Requester");
-  const value = await select.locator("option", { hasText: fullName }).getAttribute("value");
-  if (!value) throw new Error(`${fullName} is not offered by the selector — check the E2E seed.`);
-  await select.selectOption(value);
-  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByLabel(/^Email/).fill(email);
+  await page.getByLabel(/^Password/).fill(DEVELOPMENT_PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
 
-  await expect(page.getByRole("heading", { name: "My Tickets" })).toBeVisible();
+  const gate = page.getByRole("heading", { name: "Choose a new password" });
+  const landing = page.getByRole("heading", { name: "My Tickets" });
+  const failure = page.getByRole("alert");
+  await expect(gate.or(landing).or(failure)).toBeVisible();
+
+  // Already past the gate on a warm schema: the seeded password was replaced by
+  // a previous run, so sign in with the session password instead.
+  if (await failure.isVisible()) {
+    await page.getByLabel(/^Email/).fill(email);
+    await page.getByLabel(/^Password/).fill(SESSION_PASSWORD);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(landing).toBeVisible();
+    return;
+  }
+
+  if (await gate.isVisible()) {
+    await page.getByLabel("Current password").fill(DEVELOPMENT_PASSWORD);
+    // Anchored regex, not `{ exact: true }`, and not a bare substring.
+    //
+    // `Field` renders the required marker *inside* the <label>, so the label
+    // text is "New password*" and an exact match never lands — while a bare
+    // substring would also match "Confirm new password" and fail strict mode on
+    // two elements. `/^New password/` is the only form that selects exactly one.
+    await page.getByLabel(/^New password/).fill(SESSION_PASSWORD);
+    await page.getByLabel(/^Confirm new password/).fill(SESSION_PASSWORD);
+    await page.getByRole("button", { name: "Save new password" }).click();
+  }
+
+  await expect(landing).toBeVisible();
 }
 
-/** Clears the stored Requester, so the next visit starts from the selector. */
-export async function clearRequester(page: Page): Promise<void> {
-  await page.goto("/select-requester");
-  await page.evaluate(() => window.localStorage.clear());
+/**
+ * The password each account holds after its first sign-in of the run. BR-11
+ * refuses a new password equal to the current one, so the gate cannot be
+ * completed by re-entering the seeded value.
+ */
+export const SESSION_PASSWORD = "TokTickIT-e2e-session-2026";
+
+/** Ends the session through the control a user would use. */
+export async function signOut(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Log out" }).click();
+  await expect(page.getByRole("heading", { name: "Sign in to your account" })).toBeVisible();
 }
 
 export type TicketDraft = {

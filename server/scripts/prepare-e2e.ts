@@ -16,17 +16,25 @@ import { seedReferenceData } from "../src/seed-data.js";
  * `migrate deploy`, never `migrate dev`: a test run may only apply migrations
  * that are already committed, and can never invent one.
  */
+// Which schema to reset. Issue #56 gives the Lab 3 browser suite a schema of its
+// own, so the value now arrives from the Playwright config rather than being
+// fixed here — but it defaults to the Lab 2 one, so `npm run e2e` is unchanged.
+//
 // Typed as `string` rather than as the literal, for the same reason TEST_SCHEMA
 // is: otherwise TypeScript proves the guard below can never fire and rejects it
 // as an unintentional comparison, and the guard stops being real code.
-const E2E_SCHEMA: string = "lab2_e2e";
+const E2E_SCHEMA: string = process.env.E2E_SCHEMA ?? "lab2_e2e";
 
 async function main(): Promise<void> {
-  // This function drops a schema. The guard is not decoration: a bad edit to
-  // E2E_SCHEMA, or an empty value arriving from the environment, would otherwise
-  // point it at the development data.
-  if (!E2E_SCHEMA || E2E_SCHEMA === "public") {
-    throw new Error(`Refusing to reset schema "${E2E_SCHEMA}" — the E2E schema must not be "public".`);
+  // This function drops a schema. The guard is not decoration: a bad edit here,
+  // or an empty or hostile value arriving from the environment, would otherwise
+  // point it at the development data. Now that the name is configurable the
+  // guard has to be a whitelist rather than a check for one bad value — an
+  // `E2E_SCHEMA=public` or `E2E_SCHEMA=` would have passed the old one.
+  if (!/^lab\d_e2e$/.test(E2E_SCHEMA)) {
+    throw new Error(
+      `Refusing to reset schema "${E2E_SCHEMA}" — the E2E schema must be named lab<n>_e2e.`,
+    );
   }
 
   const url = withSchema(E2E_SCHEMA);

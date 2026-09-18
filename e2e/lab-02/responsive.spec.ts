@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import path from "node:path";
-import { PNG_BYTES, REQUESTER_A, createTicket, selectRequester, uniqueSummary } from "./support.js";
+import { EMAIL_A, PNG_BYTES, createTicket, signIn, uniqueSummary } from "./support.js";
 
 // RESP-01 — AC-16. Create Ticket, My Tickets and Ticket Detail at the three
 // widths the labsheet names, with a screenshot of each.
@@ -25,7 +25,7 @@ for (const viewport of VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
 
     const summary = uniqueSummary(`Responsive ${viewport.name} check`);
-    await selectRequester(page, REQUESTER_A);
+    await signIn(page, EMAIL_A);
 
     // ---- Create Ticket -----------------------------------------------------
     await page.getByRole("button", { name: "Create Ticket" }).first().click();

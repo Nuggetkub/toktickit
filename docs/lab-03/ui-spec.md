@@ -351,16 +351,41 @@ scope, the text is followed.
 To be completed against the running application at all three viewports, not from memory.
 **A** marks an item a test asserts; **E** marks one checked by eye.
 
-- [ ] **E** Zen Green tokens consistent across every Lab 3 screen and the Lab 2 screens
-- [ ] **A** Status, priority and role badges carry text and use the tones in §1
-- [ ] **E** Role navigation shows only permitted destinations for each role
-- [ ] **A** Editable Work panel fields visibly distinct from read-only ticket information
-- [ ] **A** Validation messages sit beneath their own field
+- [x] **E** Zen Green tokens consistent across every Lab 3 screen and the Lab 2 screens
+      — inspected across the 24 captures; `ZenGreen.styles.test.tsx` also pins the tokens
+- [x] **A** Status, priority and role badges carry text and use the tones in §1
+      — `ZenGreen.styles.test.tsx` asserts the tone class; E2E-02/E2E-03 assert the words
+- [x] **E** Role navigation shows only permitted destinations for each role
+      — observed for all three: Requester `My Tickets`/`Create Ticket`, IT Staff `Ticket
+      Queue` alone, Administrator `Ticket Queue`/`Users`
+- [x] **A** Editable Work panel fields visibly distinct from read-only ticket information
+      — `ZenGreen.styles.test.tsx` asserts `.zen-field--readonly` and that no control is
+      focusable; confirmed by eye in `staff-ticket-detail/desktop.png`
+- [x] **A** Validation messages sit beneath their own field
+      — `UserManagement.test.tsx` asserts `toBeInvalid()` with `toHaveAccessibleDescription`
 - [ ] **E** Public Comments and Internal Notes are unmistakably different surfaces
 - [ ] **A** Focus visible and never trapped outside an open dialog
-- [ ] **A** No clipping, overlap, or page-level horizontal scroll (RESP-01)
+- [x] **A** No clipping, overlap, or page-level horizontal scroll (RESP-01)
+      — `expectNoHorizontalOverflow`, `expectNothingClipped` and `expectControlsUsable`
+      gate all 24 captures, at 1440, 834 and 390 px
 - [ ] **E** Loading, saving, success, empty, no-results, forbidden, conflict and failure
       states captured from real requests
+
+Three items are deliberately left open rather than ticked, because nothing yet proves them:
+
+- **Comments vs Notes surfaces** — the two threads are separate tabs, so a capture shows one
+  at a time and RESP-01 photographs the default (Public comments). The private surface has
+  a lock glyph and its own `--private` treatment in the stylesheet, but that is code read,
+  not an eye check, and this row asks for an eye check.
+- **Focus trap** — `StaffTicketDetail.test.tsx` covers Escape closing the dialog without
+  sending anything, but nothing asserts that Tab cycles inside the dialog or that focus
+  returns to the trigger. `ConfirmDialog` implements both; no test would notice if it
+  stopped.
+- **State captures** — RESP-01 photographs eight screens in their loaded state. Loading,
+  saving, empty, no-results, forbidden, conflict and failure are not captured anywhere.
+
+Ticking these from the component source would make the checklist agree with the code while
+leaving the gap invisible, which is the failure mode this table exists to prevent.
 
 ### Screenshot paths
 

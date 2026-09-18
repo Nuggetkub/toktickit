@@ -2,12 +2,14 @@
   "name": "toktickit",
   "version": "1.0.0",
   "private": true,
-  "description": "TokTickIT — repository root. Holds only the end-to-end suite; the application lives in client/ and server/.",
+  "description": "TokTickIT โ€” repository root. Holds only the end-to-end suite; the application lives in client/ and server/.",
   "type": "module",
   "scripts": {
     "e2e": "playwright test",
     "e2e:install": "playwright install chromium",
-    "e2e:report": "playwright show-report artifacts/lab-02/playwright-report"
+    "e2e:lab3": "playwright test --config=playwright.lab3.config.ts",
+    "e2e:report": "playwright show-report artifacts/lab-02/playwright-report",
+    "e2e:report:lab3": "playwright show-report artifacts/lab-03/playwright-report"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0"

@@ -175,7 +175,16 @@ body {
 /* ---------------------------------------------------------------- button */
 
 .zen-button {
-  min-height: 44px; /* touch target floor, per ui-spec §9 */
+  /* The display matters as much as the height: `min-height` has no effect on a
+     non-replaced *inline* element. <button> is inline-block by default and so
+     honoured the floor below, while <a class="zen-button"> — "Back to My
+     Tickets", "Go to your start page" — is inline and silently escaped it. The
+     Lab 3 responsive suite caught it at 390px. Centring also seats the label in
+     the middle of the 44px box instead of on the text baseline. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px; /* touch target floor, per ui-spec §9 and §10 */
   padding: var(--zen-space-2) var(--zen-space-4);
   border: 1px solid transparent;
   border-radius: var(--zen-radius);
@@ -411,6 +420,14 @@ body {
   .zen-shell__nav .zen-button,
   .zen-nav__item {
     width: auto;
+  }
+
+  /* ui-spec.md §10: touch targets are at least 44px on mobile.
+     .zen-nav__item is a bare <button> rather than a .zen-button, so it never
+     inherited the floor that class carries at line 178 — the Lab 3 responsive
+     suite caught "My Tickets" and "Create Ticket" under 44px at 390px. */
+  .zen-nav__item {
+    min-height: 44px;
   }
 }
 
@@ -937,6 +954,16 @@ body {
   border-color: var(--zen-border);
   background: var(--zen-surface);
   color: var(--zen-primary);
+}
+
+/* The same floor for the same reason (ui-spec.md §10): the tabs are bare
+   <button>s too, so they opt out of .zen-button's touch target exactly as the
+   nav items do. Declared even though this padding may already clear 44px, so a
+   later padding change cannot quietly drop the tabs below the rule. */
+@media (max-width: 767px) {
+  .zen-tab {
+    min-height: 44px;
+  }
 }
 
 .zen-discussion__composer {

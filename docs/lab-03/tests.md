@@ -157,8 +157,19 @@ cd server && npm test
 cd client && npm test
 
 # responsive and E2E, from the repository root
-npm run e2e
+npm run e2e         # Lab 2 journeys        -> artifacts/lab-02
+npm run e2e:lab3    # Lab 3 journeys + RESP-01 -> artifacts/lab-03
+
+# the HTML report of either run
+npm run e2e:report
+npm run e2e:report:lab3
 ```
+
+The two suites are separate configurations sharing one webServer definition
+(`playwright.config.ts` exports a factory; `playwright.lab3.config.ts` calls it). They use
+different schemas — `lab2_e2e` and `lab3_e2e` — so neither can see the other's Tickets, and
+each writes its evidence under its own `artifacts/` root. **`npm run e2e` rewrites the
+committed Lab 2 screenshots**, so restore them if a Lab 3 branch is what is being changed.
 
 The Lab 2 isolation rules continue: Vitest resets its own schema on every run, the E2E run
 uses its own schema, ports and upload directory, and `migration.test.ts` uses a third schema,
@@ -175,6 +186,17 @@ the commit, the commands and their complete output copied from the run by script
 
 ## 7. Known Limitations and Deferred Tests
 
+- **The dialog focus trap is implemented but untested** (issue #56). `ConfirmDialog` moves
+  focus in, cycles Tab inside itself and returns focus to the trigger on close;
+  `StaffTicketDetail.test.tsx` covers only Escape closing the dialog without sending
+  anything. Nothing would fail if the trap were deleted, so `ui-spec.md` §13's focus row is
+  left unticked rather than ticked from the component source.
+- **Seven interface states are not captured anywhere** (issue #56). RESP-01 photographs
+  eight screens in their loaded state at three viewports; loading, saving, empty,
+  no-results, forbidden, conflict and failure are exercised by unit tests but never
+  captured, so `ui-spec.md` §13's last row stays unticked too.
+- **Public Comments and Internal Notes cannot be compared in one capture** (issue #56). They
+  are separate tabs, so a screenshot necessarily shows one surface at a time.
 - **Login throttling is per process** (D-16). Restarting the API clears the counts. Tests
   cover the rule within one process; a multi-process deployment would need a shared store.
 - **Retired Lab 2 suites.** `client/tests/lab-02/RequesterSelector.test.tsx` and
