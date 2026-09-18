@@ -3,22 +3,32 @@ import { Link, useParams } from "react-router-dom";
 import {
   ApiError,
   downloadAttachment,
+  fetchComments,
   fetchTicket,
+  indicateResolved,
+  postComment,
   removeAttachment,
   uploadAttachment,
   type Attachment,
-  type RequestedPriority,
+  type DiscussionEntry,
   type TicketDetail as TicketDetailResponse,
 } from "../api.js";
 import {
   Badge,
   Button,
   Card,
+  ConfirmDialog,
+  DiscussionPanel,
   ErrorAlert,
   Field,
+  PriorityBadge,
   ReadOnlyField,
+  StatusBadge,
   StatusMessage,
+  type TicketStatus,
 } from "../components/index.js";
+import { indicationAllowedFrom, isTerminal } from "../ticket-rules.js";
+import { describeSize, describeType, moment } from "./attachment-format.js";
 import { useAuth } from "../auth/index.js";
 import {
   MAX_FILES,
@@ -33,34 +43,9 @@ import { saveBlob } from "./save-file.js";
 const REASON_MIN = 5;
 const REASON_MAX = 250;
 
-const PRIORITY_TONE: Record<RequestedPriority, "neutral" | "warning" | "danger"> = {
-  LOW: "neutral",
-  MEDIUM: "neutral",
-  HIGH: "warning",
-  URGENT: "danger",
-};
-
-const TYPE_LABELS: Record<string, string> = {
-  "image/jpeg": "JPEG image",
-  "image/png": "PNG image",
-  "image/webp": "WEBP image",
-  "application/pdf": "PDF document",
-};
-
-function describeType(mimeType: string): string {
-  return TYPE_LABELS[mimeType] ?? mimeType;
-}
-
-function describeSize(bytes: number): string {
-  // Kilobytes below a megabyte: "0.2 MB" for a screenshot tells the reader less
-  // than "184 KB" does, and the column exists to be read rather than to be neat.
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function moment(value: string): string {
-  return new Date(value).toLocaleString();
-}
+// `describeType`, `describeSize` and `moment` now live in ./attachment-format,
+// because the IT Staff Ticket Detail shows the same rows to a different reader
+// and a second copy of them would drift.
 
 export default function TicketDetail() {
   const { ticketId = "" } = useParams();
@@ -79,6 +64,16 @@ export default function TicketDetail() {
   const [reason, setReason] = useState("");
   const [reasonError, setReasonError] = useState("");
   const [removalBusy, setRemovalBusy] = useState(false);
+
+  // Issue #53 — the discussion (ui-spec.md §6). Public Comments only: there is
+  // no Internal Notes panel, no control for one, and no request for one.
+  const [comments, setComments] = useState<DiscussionEntry[]>([]);
+  const [commentDraft, setCommentDraft] = useState("");
+  const [commentBusy, setCommentBusy] = useState(false);
+  const [commentError, setCommentError] = useState("");
+  const [confirmingIndication, setConfirmingIndication] = useState(false);
+  const [indicationBusy, setIndicationBusy] = useState(false);
+  const [indicationError, setIndicationError] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -105,6 +100,25 @@ export default function TicketDetail() {
     };
   }, [user, ticketId, reloadToken]);
 
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+
+    // Separate from the ticket request: a thread that fails to load must not
+    // take the ticket down with it, and the ticket is what the reader came for.
+    fetchComments(Number(ticketId))
+      .then((loaded) => {
+        if (active) setComments(loaded);
+      })
+      .catch(() => {
+        // Left empty; the ticket itself reports its own failure.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [user, ticketId, reloadToken]);
+
   const activeCount = attachments.filter((file) => file.removedAt === null).length;
   const atLimit = activeCount >= MAX_FILES;
 
@@ -114,6 +128,10 @@ export default function TicketDetail() {
   // controls follow the server rather than offering a button certain to be
   // refused; hiding them is a courtesy, not the protection.
   const isOwner = Boolean(user && ticket && user.id === ticket.requester.id);
+
+  // BR-27: a closed or cancelled ticket accepts nothing new — no comment, no
+  // upload, no removal. Everything on it stays readable and downloadable.
+  const frozen = Boolean(ticket && isTerminal(ticket.currentStatus as TicketStatus));
 
   async function upload(chosen: File | undefined, input: HTMLInputElement) {
     // The picker keeps its value, so choosing the same file twice after a failure
@@ -141,6 +159,39 @@ export default function TicketDetail() {
       setAttachmentError(`${chosen.name} was not uploaded — ${message}`);
     } finally {
       setUploadingName("");
+    }
+  }
+
+  async function addComment() {
+    if (!ticket) return;
+    setCommentError("");
+    setCommentBusy(true);
+    try {
+      const posted = await postComment(ticket.id, commentDraft.trim());
+      setComments((current) => [posted, ...current]);
+      setCommentDraft("");
+    } catch (error) {
+      const apiError = error instanceof ApiError ? error : null;
+      setCommentError(apiError?.fieldErrors?.content ?? apiError?.message ?? "The comment could not be posted.");
+    } finally {
+      setCommentBusy(false);
+    }
+  }
+
+  async function confirmIndication() {
+    if (!ticket) return;
+    setIndicationError("");
+    setIndicationBusy(true);
+    try {
+      // The answer is the whole ticket, so the screen redraws from the server —
+      // including `requesterResolvedAt`, which is what replaces the button.
+      setTicket(await indicateResolved(ticket.id));
+      setConfirmingIndication(false);
+    } catch (error) {
+      const apiError = error instanceof ApiError ? error : null;
+      setIndicationError(apiError?.message ?? "IT Staff could not be told just now.");
+    } finally {
+      setIndicationBusy(false);
     }
   }
 
@@ -248,16 +299,87 @@ export default function TicketDetail() {
           <ReadOnlyField label="Ticket Summary" value={ticket.summary} wide />
           <ReadOnlyField
             label="Requested Priority"
-            value={<Badge tone={PRIORITY_TONE[ticket.requestedPriority]}>{ticket.requestedPriority}</Badge>}
+            value={<PriorityBadge kind="Requested" priority={ticket.requestedPriority} />}
           />
-          <ReadOnlyField label="Current Status" value={<Badge tone="success">{ticket.currentStatus}</Badge>} />
+          {/* Lab 3 (ui-spec.md §6): the status in words, who is working on it,
+              and the resolution summary once there is one. */}
+          <ReadOnlyField
+            label="Current Status"
+            value={<StatusBadge status={ticket.currentStatus as TicketStatus} />}
+          />
+          <ReadOnlyField
+            label="Assigned to"
+            value={ticket.owner ? ticket.owner.fullName : "Not yet assigned"}
+          />
           <ReadOnlyField label="Description" value={ticket.description} wide />
+          {ticket.resolutionSummary && (
+            <ReadOnlyField label="Resolution Summary" value={ticket.resolutionSummary} wide />
+          )}
         </div>
+
+        {/* BR-32. Shown only while the rule allows it, and replaced by what the
+            reader did once they have done it — the status badge deliberately
+            does not move, so the screen never suggests IT has resolved it. */}
+        {ticket.requesterResolvedAt ? (
+          <p className="zen-indication" role="note">
+            You told IT Staff the problem appears resolved on {moment(ticket.requesterResolvedAt)}.
+          </p>
+        ) : (
+          isOwner &&
+          indicationAllowedFrom(ticket.currentStatus as TicketStatus) && (
+            <Button variant="secondary" onClick={() => setConfirmingIndication(true)}>
+              Problem Appears Resolved
+            </Button>
+          )
+        )}
 
         <Link className="zen-button zen-button--secondary" to="/tickets">
           Back to My Tickets
         </Link>
       </Card>
+
+      <Card>
+        <DiscussionPanel
+          heading="Comments"
+          entries={comments}
+          emptyText="No comments yet. Add one if you have more to tell IT Staff."
+          closedText={
+            frozen ? "This ticket is closed. Create a new ticket if you need more help." : undefined
+          }
+          composer={
+            frozen || !isOwner
+              ? undefined
+              : {
+                  id: "public-comment",
+                  label: "Add a comment",
+                  hint: "Visible to IT Staff.",
+                  submitLabel: "Post comment",
+                  busyLabel: "Posting…",
+                  value: commentDraft,
+                  onChange: setCommentDraft,
+                  onSubmit: () => void addComment(),
+                  busy: commentBusy,
+                  error: commentError,
+                }
+          }
+        />
+      </Card>
+
+      {confirmingIndication && (
+        <ConfirmDialog
+          title="Tell IT Staff the problem appears resolved?"
+          consequence="They will review and close the ticket."
+          confirmLabel="Tell IT Staff"
+          busy={indicationBusy}
+          busyLabel="Telling IT Staff…"
+          error={indicationError}
+          onConfirm={() => void confirmIndication()}
+          onCancel={() => {
+            setConfirmingIndication(false);
+            setIndicationError("");
+          }}
+        />
+      )}
 
       <Card title="Attachments">
         <p className="zen-field__hint">
@@ -271,7 +393,7 @@ export default function TicketDetail() {
         {uploadingName && <StatusMessage>Uploading {uploadingName}…</StatusMessage>}
         {notice && <StatusMessage>{notice}</StatusMessage>}
 
-        {isOwner && (
+        {isOwner && !frozen && (
           <Field
             id="attachment"
             label="Add an attachment"
@@ -328,7 +450,7 @@ export default function TicketDetail() {
                       <Button variant="secondary" onClick={() => void download(attachment)}>
                         Download {attachment.originalFilename}
                       </Button>
-                      {isOwner && (
+                      {isOwner && !frozen && (
                         <Button variant="destructive" onClick={() => startRemoval(attachment)}>
                           Remove {attachment.originalFilename}
                         </Button>

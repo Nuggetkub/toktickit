@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   REQUESTED_PRIORITIES,
   fetchAssignees,
@@ -80,10 +80,17 @@ function relativeTime(value: string): string {
 
 export default function StaffTicketQueue() {
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const [filters, setFilters] = useState<Filters>(DEFAULTS);
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [page, setPage] = useState(1);
+  // Ticket Detail hands the filters and page back when the reader returns
+  // (ui-spec.md §8). Rebuilding a seven-control query by hand after opening one
+  // ticket is the difference between a queue someone works from and one they
+  // avoid.
+  const restored = (location.state as { queue?: { filters: Filters; page: number } } | null)?.queue ?? null;
+
+  const [filters, setFilters] = useState<Filters>(restored?.filters ?? DEFAULTS);
+  const [debouncedSearch, setDebouncedSearch] = useState(restored?.filters.search.trim() ?? "");
+  const [page, setPage] = useState(restored?.page ?? 1);
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [assignees, setAssignees] = useState<UserSummary[]>([]);
@@ -355,13 +362,18 @@ export default function StaffTicketQueue() {
                 {results.items.map((ticket) => (
                   <tr key={ticket.id}>
                     <td data-label="Ticket No.">
-                      <Link to={`/tickets/${ticket.id}`}>{ticket.ticketNumber}</Link>
+                      <Link to={`/queue/${ticket.id}`} state={{ queue: { filters, page } }}>
+                        {ticket.ticketNumber}
+                      </Link>
                       {/* The Open action belongs to the mobile card only
                           (ui-spec.md §7). It lives inside this cell rather than
                           in a column of its own so the table keeps seven headers
                           and seven cells; CSS hides it above 767px. */}
                       <span className="zen-queue__open">
-                        <Button variant="secondary" onClick={() => navigate(`/tickets/${ticket.id}`)}>
+                        <Button
+                          variant="secondary"
+                          onClick={() => navigate(`/queue/${ticket.id}`, { state: { queue: { filters, page } } })}
+                        >
                           Open
                         </Button>
                       </span>
