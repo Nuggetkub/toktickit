@@ -57,6 +57,31 @@ function post(path: string, cookie: string, body: object) {
   return request(app).post(path).set("Cookie", cookie).set("Origin", TEST_ORIGIN).send(body);
 }
 
+// The same byte pattern the Lab 2 attachments suite uses. Content decides the
+// type (BR-31), and input validity is answered before state, so a real PNG
+// signature is needed to reach the status check at all — a dummy buffer would be
+// refused as a type violation and prove nothing about BR-27.
+//
+// At module scope rather than inside the API-21 block because the atomicity
+// suite needs a real attachment to try to remove.
+const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 7)]);
+
+function upload(ticketId: number, cookie: string) {
+  return request(app)
+    .post(`/api/tickets/${ticketId}/attachments`)
+    .set("Cookie", cookie)
+    .set("Origin", TEST_ORIGIN)
+    .attach("file", PNG, { filename: "evidence.png", contentType: "image/png" });
+}
+
+function removal(ticketId: number, attachmentId: number, cookie: string, removalReason: string) {
+  return request(app)
+    .patch(`/api/tickets/${ticketId}/attachments/${attachmentId}`)
+    .set("Cookie", cookie)
+    .set("Origin", TEST_ORIGIN)
+    .send({ removalReason });
+}
+
 beforeAll(async () => {
   await prisma.user.deleteMany({ where: { email: { endsWith: DOMAIN } } });
 
@@ -412,23 +437,34 @@ describe("the eligibility check and the write are one atomic step (Earth2509, PR
     const stored = await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
     expect(stored.requesterResolvedAt).toBeNull();
   });
+
+  it("refuses an attachment removal on a Ticket that closed while the request was in flight", async () => {
+    // Earth2509's second finding on this pull request. `uploadAttachment` took
+    // the Ticket row lock and `removeAttachment` did not, so the same
+    // check-then-write gap was still open one function away — it read
+    // `currentStatus` through the attachment's nested `ticket` select and
+    // mutated afterwards. Fixing a race in one route without grepping its
+    // siblings is how the same defect survives two rounds of review.
+    const ticket = await newTicket({ status: "OPEN" });
+    const attached = await upload(ticket.id, owner);
+    expect(attached.status).toBe(201);
+
+    const res = await whileClosing(ticket.id, "CLOSED", () =>
+      removal(ticket.id, attached.body.id, owner, "Removed just as it closed."),
+    );
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe("TICKET_TERMINAL");
+
+    // A refusal writes nothing: the file is still active and still has no
+    // removal record, so BR-27's freeze held under the interleaving.
+    const stored = await prisma.attachment.findUniqueOrThrow({ where: { id: attached.body.id } });
+    expect(stored.removedAt).toBeNull();
+    expect(stored.removalReason).toBeNull();
+  });
 });
 
 describe("API-21 — BR-27 freezes attachments too", () => {
-  // The same byte pattern the Lab 2 attachments suite uses. Content decides the
-  // type (BR-31), and input validity is answered before state, so a real PNG
-  // signature is needed to reach the status check at all — a dummy buffer would
-  // be refused as a type violation and prove nothing about BR-27.
-  const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 7)]);
-
-  function upload(ticketId: number, cookie: string) {
-    return request(app)
-      .post(`/api/tickets/${ticketId}/attachments`)
-      .set("Cookie", cookie)
-      .set("Origin", TEST_ORIGIN)
-      .attach("file", PNG, { filename: "evidence.png", contentType: "image/png" });
-  }
-
   it("refuses upload and removal once the ticket is closed, while every read still works", async () => {
     const ticket = await newTicket({ status: "OPEN" });
 

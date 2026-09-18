@@ -220,15 +220,37 @@ export async function removeAttachment(req: Request, res: Response): Promise<voi
 
   try {
     const outcome = await getPrisma().$transaction(async (tx) => {
+      // The Ticket row is locked before its status is read, exactly as
+      // uploadAttachment above already does.
+      //
+      // Reading `currentStatus` through the attachment's nested `ticket` select
+      // and writing afterwards is a check-then-write: a concurrent transition to
+      // CLOSED lands in the gap and the removal succeeds on a frozen Ticket,
+      // which BR-27 forbids. Earth2509 found this on PR #66 — the second time
+      // in one pull request, because I locked the row in upload and in the three
+      // discussion routes and never grepped this sibling.
+      //
+      // Ownership is part of the lock predicate, so another Requester's Ticket
+      // is refused with the same ATTACHMENT_NOT_FOUND as one that does not
+      // exist (BR-10, D-04).
+      const lockedTicket = await tx.$queryRaw<{ id: number; currentStatus: TicketStatus }[]>`
+        SELECT "id", "currentStatus" FROM "Ticket" WHERE "id" = ${ticketId} AND "requesterId" = ${user.id} FOR UPDATE
+      `;
+      if (lockedTicket.length === 0) return { notFound: true as const };
+
+      // The attachment is looked up before the status is judged, so api-spec.md
+      // §1's order still holds: a missing attachment is 404 even on a closed
+      // Ticket. The lock changes when the status is read, never which answer
+      // wins.
       const existing = await tx.attachment.findFirst({
-        where: { id: attachmentId, ticketId, ticket: { requesterId: user.id } },
-        select: { id: true, removedAt: true, ticket: { select: { currentStatus: true } } },
+        where: { id: attachmentId, ticketId },
+        select: { id: true, removedAt: true },
       });
       if (!existing) return { notFound: true as const };
 
       // BR-27 before the removal rules, as in the workflow routes: "this Ticket
       // is finished" is the truer answer than anything about this one file.
-      if (isTerminal(existing.ticket.currentStatus)) return { terminal: true as const };
+      if (isTerminal(lockedTicket[0].currentStatus)) return { terminal: true as const };
 
       // The first removal's reason and timestamp are the record. A second
       // removal must not overwrite who removed it or why.
