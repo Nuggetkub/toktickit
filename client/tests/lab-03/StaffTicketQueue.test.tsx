@@ -151,7 +151,8 @@ describe("Ticket Queue — the table", () => {
     await renderQueue();
 
     const table = await screen.findByRole("table");
-    expect(within(table).getByRole("link", { name: "TKT-2026-00001" })).toHaveAttribute("href", "/tickets/1");
+    // Issue #53: the queue opens the *operational* screen, not the Requester's.
+    expect(within(table).getByRole("link", { name: "TKT-2026-00001" })).toHaveAttribute("href", "/queue/1");
     expect(within(table).getByRole("button", { name: "Open" })).toBeInTheDocument();
   });
 });

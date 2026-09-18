@@ -24,6 +24,9 @@
   --zen-error-surface: #FDF2F2;
   --zen-warning: #B26A00;
   --zen-warning-surface: #FDF6E9;
+  /* Internal Notes and nothing else, so the surface itself reads as private
+     at a glance (ui-spec.md §1). */
+  --zen-private: #FFF7E8;
   --zen-success: #006B3C;
 
   /* 4px spacing scale */
@@ -838,4 +841,201 @@ body {
   .zen-queue__open .zen-button {
     min-height: 44px;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   IT Staff Ticket Detail and the discussion panels (ui-spec.md §1, §8)
+   --------------------------------------------------------------------------- */
+
+.zen-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--zen-space-2);
+  margin-bottom: var(--zen-space-4);
+  color: var(--zen-text-muted);
+}
+
+.zen-detail-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--zen-space-3);
+  margin-bottom: var(--zen-space-4);
+}
+
+.zen-detail-header__owner {
+  font-weight: 700;
+}
+
+/* The Requester's indication, and the Requester's own record of it. A note
+   rather than an alert: it is news, not a failure. */
+.zen-indication {
+  margin: var(--zen-space-4) 0;
+  padding: var(--zen-space-3) var(--zen-space-4);
+  border-left: 4px solid var(--zen-secondary);
+  border-radius: var(--zen-radius);
+  background: var(--zen-pale);
+}
+
+.zen-frozen {
+  margin: var(--zen-space-4) 0;
+  padding: var(--zen-space-3) var(--zen-space-4);
+  border: 1px solid var(--zen-border);
+  border-radius: var(--zen-radius);
+  background: var(--zen-readonly);
+  color: var(--zen-text-muted);
+  font-weight: 700;
+}
+
+/* One column by default; two from 992px, as §8 requires. Stacking is the
+   starting point rather than the exception, so the narrow case cannot be the
+   one nobody checked. */
+.zen-detail-columns {
+  display: grid;
+  gap: var(--zen-space-6);
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 992px) {
+  .zen-detail-columns {
+    grid-template-columns: 3fr 2fr;
+  }
+}
+
+.zen-work-panel {
+  padding: var(--zen-space-4);
+  border: 1px solid var(--zen-border);
+  border-radius: var(--zen-radius);
+  background: var(--zen-page);
+}
+
+.zen-work-panel .zen-button {
+  margin-bottom: var(--zen-space-4);
+}
+
+.zen-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--zen-space-2);
+  margin-bottom: var(--zen-space-4);
+  border-bottom: 1px solid var(--zen-border);
+}
+
+.zen-tab {
+  padding: var(--zen-space-3) var(--zen-space-4);
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: var(--zen-radius) var(--zen-radius) 0 0;
+  background: none;
+  color: var(--zen-text-muted);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.zen-tab--active {
+  border-color: var(--zen-border);
+  background: var(--zen-surface);
+  color: var(--zen-primary);
+}
+
+.zen-discussion__composer {
+  margin-bottom: var(--zen-space-4);
+}
+
+.zen-discussion__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.zen-discussion__entry {
+  padding: var(--zen-space-3) 0;
+  border-top: 1px solid var(--zen-border);
+}
+
+.zen-discussion__byline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--zen-space-2);
+  margin-bottom: var(--zen-space-2);
+}
+
+.zen-discussion__author {
+  font-weight: 700;
+}
+
+.zen-discussion__time,
+.zen-discussion__empty {
+  color: var(--zen-text-muted);
+}
+
+.zen-discussion__status-change {
+  margin: 0 0 var(--zen-space-2);
+  color: var(--zen-secondary);
+  font-weight: 700;
+}
+
+/* BR-36: line breaks are preserved by the stylesheet, so the content itself is
+   rendered as a plain text node and never as markup. */
+.zen-discussion__content {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.zen-discussion__closed {
+  margin-bottom: var(--zen-space-4);
+  color: var(--zen-text-muted);
+  font-weight: 700;
+}
+
+/* The private surface, used by Internal Notes and by nothing else. */
+.zen-discussion--private {
+  padding: var(--zen-space-4);
+  border-left: 4px solid var(--zen-warning);
+  border-radius: var(--zen-radius);
+  background: var(--zen-private);
+}
+
+.zen-discussion--private .zen-discussion__heading {
+  color: var(--zen-warning);
+}
+
+.zen-discussion__lock {
+  margin-right: var(--zen-space-2);
+}
+
+/* ConfirmDialog (ui-spec.md §1). */
+.zen-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--zen-space-4);
+  background: rgb(18 36 28 / 45%);
+}
+
+.zen-modal__dialog {
+  width: min(32rem, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: var(--zen-space-6);
+  border-radius: var(--zen-radius);
+  background: var(--zen-surface);
+  box-shadow: 0 16px 48px rgb(18 36 28 / 24%);
+}
+
+.zen-modal__title {
+  margin-top: 0;
+}
+
+.zen-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--zen-space-3);
+  margin-top: var(--zen-space-4);
 }

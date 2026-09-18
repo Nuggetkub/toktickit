@@ -46,7 +46,8 @@ records that replacement.
 | UNIT-03 | Unit | AC-16 | The transition function allows exactly the pairs in BR-29 among all 64, reports owner-required for exactly three target statuses, and treats exactly `CLOSED` and `CANCELLED` as terminal. | `server/tests/lab-03/ticket-workflow.test.ts` | Passed |
 | UNIT-04 | Unit | AC-13 | Queue query parsing accepts each whitelisted value, `owner=me`, `owner=unassigned` and a numeric owner, and reports every other value as a field error. | `server/tests/lab-03/staff-queue-query.test.ts` | Planned |
 | UNIT-05 | Unit | AC-05 | Login throttle: five failures allowed, the sixth throttled with the correct retry time, the window expiring, success clearing the count, and an unknown email counted identically. | `server/tests/lab-03/login-throttle.test.ts` | Planned |
-| UNIT-06 | Unit | AC-17 | Comment and note content: trimmed; 1 and 2000 accepted, 0 and 2001 rejected; whitespace-only rejected; markup kept as literal text. | `server/tests/lab-03/ticket-workflow.test.ts` | Planned |
+| UNIT-06 | Unit | AC-17 | Comment and note content: trimmed; 1 and 2000 accepted, 0 and 2001 rejected; whitespace-only rejected; markup kept as literal text. | `server/tests/lab-03/discussion.test.ts` | Passed |
+| UNIT-07 | Unit | AC-16, AC-19 | The client's copy of BR-29 equals the specification transcribed by hand a third time, swept across all 64 pairs and never offering a status to itself; terminal, owner-required and indication-allowed are the exact sets BR-27, BR-28 and BR-32 name, including the refusal from `RESOLVED`, which is not terminal; BR-30's limits are asserted not to be the attachment reason's. | `client/tests/lab-03/ticket-rules.test.ts` | Planned |
 | UNIT-08 | Unit | AC-20, AC-21, AC-22 | User administration rules: the list query rejects an unknown role, an empty search and an unknown parameter, and reports every bad parameter rather than stopping at the first; creation trims the name, normalises the email and names each invalid field, reporting password rules under `initialPassword` rather than `newPassword`; an empty or unknown-field edit is refused; BR-41 refuses self-deactivation and an own-role change while allowing a self-rename and a no-op role; BR-42 fires only when an active Administrator is actually removed and one would remain; unassignment and session revocation are decided from the change, not from the edit having happened. | `server/tests/lab-03/users-admin.test.ts` | Planned |
 | API-01 | API | AC-01 | A valid sign-in returns `200` with the user's id, name, email and role, sets an `HttpOnly`, `SameSite=Lax` cookie, and the body contains no hash or token. | `server/tests/lab-03/auth.api.test.ts` | Planned |
 | API-02 | API | AC-05 | An unknown email, a wrong password and an account with no password each return an identical `401 INVALID_CREDENTIALS` body; an inactive account with its correct password returns `403 ACCOUNT_INACTIVE`, and with a wrong one the generic `401`. No cookie is set on any failure. | `server/tests/lab-03/auth.api.test.ts` | Planned |
@@ -73,10 +74,10 @@ records that replacement.
 | API-18 | API | AC-14 | Assign and reassign to an active IT Staff or Administrator succeed; a Requester, an inactive user or a nonexistent id as target returns `400` on `ownerId`; unassign succeeds; the assignee list contains exactly the active IT Staff and Administrators. | `server/tests/lab-03/staff-ticket-detail.api.test.ts`, `server/tests/lab-03/staff-queue.api.test.ts` | Passed |
 | API-19 | API | AC-15 | A new ticket's IT Priority equals its Requested Priority; IT Staff change IT Priority and Requested Priority stays; a Requester receives `403`; a closed ticket returns `409 TICKET_TERMINAL`. | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Passed |
 | API-20 | API | AC-16 | Every transition in BR-29 succeeds from a real ticket in its source status; every other pair returns `409 INVALID_STATUS_TRANSITION`; an unassigned ticket entering an owner-required status returns `409 OWNER_REQUIRED`; missing or out-of-range summaries and reasons return `400`; each summary or reason also appears as a status-change Public Comment. | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Passed |
-| API-21 | API | AC-16 | On a closed and on a cancelled ticket, owner, priority, status, comment, note, upload, removal and indication each return `409 TICKET_TERMINAL`, while detail, comments, notes and downloads still return `200`. | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
-| API-22 | API | AC-17 | The owning Requester, IT Staff and an Administrator post and read comments; another Requester gets `404`; author and time come from the server even when the body supplies others; invalid content returns `400`; results are newest first; `PUT`, `PATCH` and `DELETE` return `404`. | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
-| API-23 | API | AC-04, AC-18 | IT Staff and an Administrator post and read notes; for a Requester, no ticket detail, ticket list, comment list or error body contains any note's content, even after notes exist on their ticket. | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
-| API-24 | API | AC-19 | The owning Requester's indication returns `200` with the status unchanged, and repeating it keeps the first time; another Requester gets `404` and IT Staff `403`; it is refused on `RESOLVED` and terminal tickets; it appears in the queue row and the `requesterIndicated` filter; `REOPENED` clears it. | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
+| API-21 | API | AC-16 | On a closed and on a cancelled ticket, owner, priority, status, comment, note, upload and removal each return `409 TICKET_TERMINAL`, and the resolution indication `409 INDICATION_NOT_ALLOWED` (BR-32), while detail, comments, notes and downloads still return `200`. | `server/tests/lab-03/staff-ticket-detail.api.test.ts`, `server/tests/lab-03/comments-notes.api.test.ts` | Passed |
+| API-22 | API | AC-17 | The owning Requester, IT Staff and an Administrator post and read comments; another Requester gets `404`; author and time come from the server even when the body supplies others; invalid content returns `400`; results are newest first; `PUT`, `PATCH` and `DELETE` return `404`. | `server/tests/lab-03/comments-notes.api.test.ts` | Passed |
+| API-23 | API | AC-04, AC-18 | IT Staff and an Administrator post and read notes; for a Requester, no ticket detail, ticket list, comment list or error body contains any note's content, even after notes exist on their ticket. | `server/tests/lab-03/comments-notes.api.test.ts` | Passed |
+| API-24 | API | AC-19 | The owning Requester's indication returns `200` with the status unchanged, and repeating it keeps the first time; another Requester gets `404` and IT Staff `403`; it is refused on `RESOLVED` and terminal tickets; it appears in the queue row and the `requesterIndicated` filter; `REOPENED` clears it. | `server/tests/lab-03/comments-notes.api.test.ts` | Passed |
 | API-25 | API | AC-20 | The user list searches name and email case-insensitively, filters by each role, combines both, and returns `400` for an unknown role. | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 | API-26 | API | AC-20 | Creating a user returns `201` with a pending password change and no password in the body; the new user can sign in only with that password; a duplicate email in different case returns `409 EMAIL_ALREADY_EXISTS`; each invalid field returns `400` naming it. | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 | API-27 | API | AC-21, AC-08 | Editing name, email, role and activation persists; setting an initial password makes the user's next sign-in land in a pending change and ends their open session. | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
@@ -220,12 +221,56 @@ the commit, the commands and their complete output copied from the run by script
   does not own the ticket may read it and download an active attachment but is offered no
   upload or removal control, and that the owning Requester still gets both. Its `mockApi`
   gained an optional user argument so a suite can render as someone other than the owner.
-- **API-21 is proven for the workflow half only** (issue #51). A closed and a cancelled ticket
-  refuse claim, owner, IT Priority and status with `409 TICKET_TERMINAL`, and still return `200`
-  when read — `staff-ticket-detail.api.test.ts` asserts that now. The rest of the row — comment,
-  note, upload, removal and indication — needs endpoints that arrive with issue #52, and is
-  asserted there against the same two tickets. The row stays **Planned** until that half exists,
-  rather than being marked Passed on the half that does.
+- **API-21 was completed in two halves, deliberately** (issues #51 and #52). #51 asserted the
+  workflow half — a closed or cancelled ticket refusing claim, owner, IT Priority and status —
+  and the row was left **Planned** rather than marked Passed on the half that existed. #52
+  supplied the rest: comment, note, upload and removal refused, the indication refused under
+  its own code, and detail, comments, notes and downloads all still answering `200`. The row is
+  Passed now because the whole of it is true, and it names both suites.
+- **BR-27 was not enforced on attachments, and issue #52 fixes it** (Definition of Done,
+  Part 1 item 4). `uploadAttachment` and `removeAttachment` checked ownership and the
+  five-active limit but never the ticket's status, so a Requester could attach a file to, or
+  withdraw one from, a `CLOSED` or `CANCELLED` ticket. `isTerminal` was used only by the
+  workflow routes. API-21 has promised this refusal since the contract was written, so the
+  row was describing behaviour that did not exist. The check now sits inside the existing row
+  lock and **before** the file is written, so a refusal cannot leave an orphaned file on disk.
+  This is a change to code merged under issue #25, carried in a comments pull request because
+  API-21 is the row that names it; it is called out in the pull request for exactly that
+  reason rather than left for a reader to find in the diff.
+- **API-21's row contradicted BR-32, and the rule wins.** The row said the resolution
+  indication answers `409 TICKET_TERMINAL` on a terminal ticket; specification.md BR-32 says
+  `409 INDICATION_NOT_ALLOWED`, and also refuses it on `RESOLVED`, which is not terminal at
+  all. The two codes mean different things to the screen, so the row has been corrected to
+  match the rule. Where a test plan and a business rule disagree, the rule is the contract and
+  the plan is the mistake.
+- **The concurrent resolution-indication test cannot prove the race it looks like it
+  proves** (issue #52). Both handlers re-read the ticket after writing, so the two
+  responses carry the same timestamp whether or not the write was guarded. It is kept as a
+  smoke test — two simultaneous requests must still both answer `200` — and it says so in
+  the file. The guard is proven instead by the sequential repeat, which works only because
+  the conditional `WHERE` is now the **single** expression of BR-32: an outer
+  `if (requesterResolvedAt === null)` used to sit around it, caught every case the tests
+  could reach, and thereby made the real guard deletable with the suite still green. The
+  break-the-code run for #52 is what exposed that, and the fix was to remove the duplicate
+  rule rather than to write a cleverer test. A guard no test can fail is indistinguishable
+  from no guard at all.
+- **The eligibility check and the write are one atomic step, after a review finding on
+  PR #66.** Earth2509 found that `POST /comments`, `POST /internal-notes` and the resolution
+  indication each read the Ticket, decided, and wrote afterwards with nothing holding the row:
+  a concurrent transition to `CLOSED` lands in that gap, and the write reaches a frozen Ticket
+  while the endpoint still answers `201`. The indication was worse — its conditional write
+  keyed only on `{ id, requesterResolvedAt: null }`, with no status in the predicate and the
+  result count ignored, so an indication could be stored on a status BR-32 forbids and still
+  return `200`. All three now take the Ticket's row lock inside their transaction, the way
+  `uploadAttachment` already did; api-spec.md §1's order (404, then 400, then 409) is
+  unchanged, because the lock alters *when* the status is read, not which answer wins.
+- **A `Promise.all` cannot see that class of defect, so the tests force the interleaving.**
+  Two requests fired together almost never land in the one window that matters, and a test
+  that usually passes for the wrong reason is worse than no test. The three concurrency cases
+  instead take the row lock in the test's own interactive transaction, fire the request so it
+  blocks inside the route, change the status, commit, and only then let the request proceed —
+  which makes the refusal deterministic. This is the same reasoning as the forced timestamp
+  collision used for BR-37: construct the race, never wait for it.
 - **The Lab 2 suites mint their sessions directly** rather than posting to
   `/api/auth/login`. A scrypt verification at N = 2^15 per call would add seconds to every
   file, and repeated sign-ins for one email would trip the login throttle (BR-09) and fail

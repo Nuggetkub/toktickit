@@ -412,9 +412,25 @@ export interface Attachment {
   removalReason: string | null;
 }
 
-/** The detail response: the create shape, with the attachments filled in. */
+/**
+ * The detail response: the create shape, the attachments, and the workflow
+ * fields issue #51 added (api-spec.md §4).
+ *
+ * One interface rather than a staff-only variant, because the API returns the
+ * *same* shape to every permitted role — "nothing in it is private". A second
+ * type would invite the belief that a Requester receives less than they do, and
+ * the real privacy boundary is Internal Notes, which are not in this shape at
+ * all and are fetched from their own endpoint (BR-34).
+ */
 export interface TicketDetail extends CreatedTicket {
   attachments: Attachment[];
+  itPriority: RequestedPriority;
+  /** Null is the answer, not an omission: the screen shows "Not yet assigned". */
+  owner: UserSummary | null;
+  resolutionSummary: string | null;
+  requesterResolvedAt: string | null;
+  /** Carried back on every workflow write, which is how BR-24 detects a stale edit. */
+  version: number;
 }
 
 export async function fetchTicket(ticketId: number): Promise<TicketDetail> {
@@ -467,4 +483,112 @@ export async function downloadAttachment(ticketId: number, attachmentId: number)
   const response = await send(`/api/tickets/${ticketId}/attachments/${attachmentId}/download`);
   if (!response.ok) throw await toApiError(response);
   return response.blob();
+}
+
+// ---------------------------------------------------------------------------
+// Issue 51 — the ticket workflow (api-spec.md §6)
+//
+// Every call carries the `version` last read and answers with the updated
+// detail, so the screen always redraws from the server's answer rather than
+// from what it hoped it wrote. A stale `version` comes back as
+// `409 TICKET_VERSION_CONFLICT`; the body also carries the current ticket, but
+// the screen deliberately refetches on Reload instead of reading it, so there
+// is one path to "what does this ticket look like now" rather than two.
+// ---------------------------------------------------------------------------
+
+async function writeTicket(path: string, method: "POST" | "PATCH", body: unknown): Promise<TicketDetail> {
+  return requestJson<TicketDetail>(path, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function claimTicket(ticketId: number, version: number): Promise<TicketDetail> {
+  return writeTicket(`/api/tickets/${ticketId}/claim`, "POST", { version });
+}
+
+/** `ownerId: null` unassigns. Null is sent, not omitted: it is the instruction. */
+export async function setTicketOwner(ticketId: number, ownerId: number | null, version: number): Promise<TicketDetail> {
+  return writeTicket(`/api/tickets/${ticketId}/owner`, "PATCH", { ownerId, version });
+}
+
+export async function setItPriority(
+  ticketId: number,
+  itPriority: RequestedPriority,
+  version: number,
+): Promise<TicketDetail> {
+  return writeTicket(`/api/tickets/${ticketId}/it-priority`, "PATCH", { itPriority, version });
+}
+
+export interface StatusChange {
+  toStatus: string;
+  version: number;
+  /** Required entering RESOLVED (BR-30). */
+  resolutionSummary?: string;
+  /** Required entering CANCELLED or REOPENED (BR-30). */
+  reason?: string;
+}
+
+export async function changeTicketStatus(ticketId: number, input: StatusChange): Promise<TicketDetail> {
+  return writeTicket(`/api/tickets/${ticketId}/status`, "POST", input);
+}
+
+// ---------------------------------------------------------------------------
+// Issue 52 — comments, internal notes and the resolution indication (§7)
+// ---------------------------------------------------------------------------
+
+/**
+ * One shape for both threads: the server returns the same fields, and Internal
+ * Notes differ only in lacking `statusChangedTo`. Separating them into two
+ * types would suggest the screens may treat them alike in some other respect —
+ * the difference that matters is which endpoint answers, and who may call it.
+ */
+export interface DiscussionEntry {
+  id: number;
+  ticketId: number;
+  author: UserSummary;
+  content: string;
+  /** Set on the comment a status change writes (BR-30). Absent on notes. */
+  statusChangedTo?: string | null;
+  createdAt: string;
+}
+
+/** BR-36, mirrored so the composer can refuse before a round trip. */
+export const CONTENT_MIN = 1;
+export const CONTENT_MAX = 2000;
+
+export async function fetchComments(ticketId: number): Promise<DiscussionEntry[]> {
+  return requestJson<DiscussionEntry[]>(`/api/tickets/${ticketId}/comments`);
+}
+
+export async function postComment(ticketId: number, content: string): Promise<DiscussionEntry> {
+  return requestJson<DiscussionEntry>(`/api/tickets/${ticketId}/comments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+}
+
+/**
+ * IT Staff and Administrators only. A Requester is refused `403` before the
+ * ticket is looked up (BR-35) — which is why no Requester screen calls this,
+ * and why the Requester test asserts the request is never made at all rather
+ * than that its answer was handled politely.
+ */
+export async function fetchInternalNotes(ticketId: number): Promise<DiscussionEntry[]> {
+  return requestJson<DiscussionEntry[]>(`/api/tickets/${ticketId}/internal-notes`);
+}
+
+export async function postInternalNote(ticketId: number, content: string): Promise<DiscussionEntry> {
+  return requestJson<DiscussionEntry>(`/api/tickets/${ticketId}/internal-notes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+}
+
+/** The owning Requester's "Problem Appears Resolved" (BR-32). No body. */
+export async function indicateResolved(ticketId: number): Promise<TicketDetail> {
+  return requestJson<TicketDetail>(`/api/tickets/${ticketId}/resolution-indication`, { method: "POST" });
 }

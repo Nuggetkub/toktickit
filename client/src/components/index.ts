@@ -3,6 +3,8 @@ export { AppShell, type NavItem } from "./AppShell.js";
 export { Badge, type BadgeTone } from "./Badge.js";
 export { Button, type ButtonVariant } from "./Button.js";
 export { Card } from "./Card.js";
+export { ConfirmDialog, type ConfirmField } from "./ConfirmDialog.js";
+export { DiscussionPanel, type ComposerProps } from "./DiscussionPanel.js";
 export { EmptyState } from "./EmptyState.js";
 export { ErrorAlert } from "./ErrorAlert.js";
 export { Field, ReadOnlyField, type FieldControlProps } from "./Field.js";
