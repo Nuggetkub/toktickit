@@ -21,6 +21,7 @@ import {
   listComments,
   listInternalNotes,
 } from "./discussion-route.js";
+import { createUser, editUser, listUsers, setInitialPassword } from "./users-admin-route.js";
 import multer from "multer";
 import { MAX_BYTES } from "./attachment-rules.js";
 import {
@@ -231,6 +232,18 @@ app.post(
   requireRole("REQUESTER"),
   asyncRoute(indicateResolved),
 );
+
+// Administrator user management (api-spec.md §8, FR-16).
+//
+// requireRole runs before every handler, so IT Staff and Requesters are refused
+// at step 4 — before any user is looked up, and identically whether or not the
+// id in the path exists (AC-23, BR-18).
+const adminOnly = [...signedIn, requireRole("ADMINISTRATOR")] as const;
+
+app.get("/api/admin/users", ...adminOnly, asyncRoute(listUsers));
+app.post("/api/admin/users", ...adminOnly, asyncRoute(createUser));
+app.patch("/api/admin/users/:userId", ...adminOnly, asyncRoute(editUser));
+app.post("/api/admin/users/:userId/initial-password", ...adminOnly, asyncRoute(setInitialPassword));
 
 // Multer rejects an oversized body before the route runs, so its error needs
 // translating into the documented envelope rather than reaching Express's
