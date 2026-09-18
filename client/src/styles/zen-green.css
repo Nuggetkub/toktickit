@@ -1039,3 +1039,58 @@ body {
   gap: var(--zen-space-3);
   margin-top: var(--zen-space-4);
 }
+
+/* ---------------------------------------------------------------------------
+   User Management (ui-spec.md §9)
+   --------------------------------------------------------------------------- */
+
+/* One column by default; the list and the panel sit side by side from 992px, as
+   §9 requires. Stacking is the starting point rather than the exception, so the
+   narrow case cannot be the one nobody checked. */
+.zen-users-layout {
+  display: grid;
+  gap: var(--zen-space-6);
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 992px) {
+  .zen-users-layout {
+    grid-template-columns: 3fr 2fr;
+    align-items: start;
+  }
+}
+
+.zen-users-panel {
+  padding: var(--zen-space-4);
+  border: 1px solid var(--zen-border);
+  border-radius: var(--zen-radius);
+  background: var(--zen-page);
+}
+
+/* The initial-password reset is its own section with its own button, so it can
+   never be saved by accident alongside a name change (§9). */
+.zen-users-panel__section {
+  margin-top: var(--zen-space-6);
+  padding-top: var(--zen-space-4);
+  border-top: 1px solid var(--zen-border);
+}
+
+.zen-users-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--zen-space-3);
+  margin-top: var(--zen-space-4);
+}
+
+/* The password rules, rendered from the same list that evaluates them. */
+.zen-password-rules {
+  margin: 0 0 var(--zen-space-4);
+  padding-left: var(--zen-space-6);
+  color: var(--zen-text-muted);
+  font-size: 0.9rem;
+}
+
+.zen-password-rules li[data-met="true"] {
+  color: var(--zen-primary);
+  font-weight: 600;
+}

@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-
 import { AppShell, StatusMessage, type NavItem } from "./components/index.js";
 import SystemCheck from "./SystemCheck.js";
 import { AuthProvider, ChangePassword, Login, RequireAuth, landingPath, useAuth } from "./auth/index.js";
+import UserManagement from "./admin/UserManagement.js";
 import StaffTicketDetail from "./staff/StaffTicketDetail.js";
 import StaffTicketQueue from "./staff/StaffTicketQueue.js";
 import CreateTicket from "./tickets/CreateTicket.js";
@@ -28,9 +29,15 @@ function navigationFor(role: string, navigate: (path: string) => void): NavItem[
     ];
   }
 
-  // IT Staff and Administrators share the queue (decision D-08). Users is added
-  // for Administrators by the issue that builds User Management.
-  return [{ key: "/queue", label: "Ticket Queue", onSelect: () => navigate("/queue") }];
+  // IT Staff and Administrators share the queue (decision D-08); only an
+  // Administrator is offered Users, which issue #55 adds. IT Staff must not see
+  // the control at all — the server refuses them at step 4, and offering a
+  // button that is certain to be refused is not a courtesy.
+  const items: NavItem[] = [{ key: "/queue", label: "Ticket Queue", onSelect: () => navigate("/queue") }];
+  if (role === "ADMINISTRATOR") {
+    items.push({ key: "/users", label: "Users", onSelect: () => navigate("/users") });
+  }
+  return items;
 }
 
 function Shell() {
@@ -103,6 +110,18 @@ function Shell() {
             // — not even one that would render them empty.
             <RequireAuth roles={["IT_STAFF", "ADMINISTRATOR"]}>
               <StaffTicketDetail />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/users"
+          element={
+            // Administrator only. The server refuses every /api/admin route to
+            // anyone else before it looks a user up, so this guard decides what
+            // the browser renders and nothing more (AC-23).
+            <RequireAuth roles={["ADMINISTRATOR"]}>
+              <UserManagement />
             </RequireAuth>
           }
         />

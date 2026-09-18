@@ -113,9 +113,11 @@ export function useAuth(): AuthContextValue {
 /**
  * Where each role starts (ui-spec.md §2).
  *
- * An Administrator lands on the Ticket Queue until User Management exists; the
- * issue that builds it moves them to Users.
+ * Issue #55 moved the Administrator from the Ticket Queue to Users, which is the
+ * screen only they have: landing them on a queue they share with IT Staff made
+ * the one screen that is theirs the one they had to go looking for.
  */
 export function landingPath(role: AuthUser["role"]): string {
-  return role === "REQUESTER" ? "/tickets" : "/queue";
+  if (role === "REQUESTER") return "/tickets";
+  return role === "ADMINISTRATOR" ? "/users" : "/queue";
 }
