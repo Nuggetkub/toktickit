@@ -592,3 +592,106 @@ export async function postInternalNote(ticketId: number, content: string): Promi
 export async function indicateResolved(ticketId: number): Promise<TicketDetail> {
   return requestJson<TicketDetail>(`/api/tickets/${ticketId}/resolution-indication`, { method: "POST" });
 }
+
+// ---------------------------------------------------------------------------
+// Issue 54 — Administrator user management (api-spec.md §8)
+//
+// Every call here is Administrator-only and is refused at the server before any
+// user is looked up, so the screen's job is to avoid offering what would be
+// refused — not to be the protection.
+// ---------------------------------------------------------------------------
+
+export const USER_ROLES = ["REQUESTER", "IT_STAFF", "ADMINISTRATOR"] as const;
+
+/** BR-39, mirrored so the panel can refuse before a round trip. */
+export const USER_NAME_MIN = 2;
+export const USER_NAME_MAX = 100;
+
+/** The Administrator's view of an account. No password material, ever. */
+export interface AdminUser {
+  id: number;
+  fullName: string;
+  email: string;
+  role: Role;
+  isActive: boolean;
+  mustChangePassword: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminUserListParams {
+  search?: string;
+  role?: Role;
+}
+
+/**
+ * The list is not paginated (BR-38) and the server rejects an empty `search`
+ * rather than ignoring it, so a blank filter is omitted from the query string
+ * instead of sent empty — the same rule the two ticket lists follow.
+ */
+export async function fetchAdminUsers(params: AdminUserListParams = {}): Promise<AdminUser[]> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === "" || value === null) continue;
+    query.set(key, String(value));
+  }
+
+  const suffix = query.toString();
+  const body = await requestJson<{ items: AdminUser[] }>(`/api/admin/users${suffix ? `?${suffix}` : ""}`);
+  return body.items;
+}
+
+export interface NewAdminUser {
+  fullName: string;
+  email: string;
+  role: Role;
+  isActive: boolean;
+  initialPassword: string;
+}
+
+export async function createAdminUser(input: NewAdminUser): Promise<AdminUser> {
+  return requestJson<AdminUser>("/api/admin/users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+/** Any subset of the four editable fields; the server rejects anything else. */
+export interface AdminUserEdit {
+  fullName?: string;
+  email?: string;
+  role?: Role;
+  isActive?: boolean;
+}
+
+/**
+ * `PATCH` answers with the user *and* the number of tickets the change
+ * unassigned (api-spec.md §8, BR-25). The count is part of the contract because
+ * deactivating an operator silently empties their queue otherwise — the
+ * Administrator is told what their edit did beyond the account itself.
+ */
+export interface AdminUserUpdate {
+  user: AdminUser;
+  unassignedTicketCount: number;
+}
+
+export async function updateAdminUser(userId: number, edit: AdminUserEdit): Promise<AdminUserUpdate> {
+  return requestJson<AdminUserUpdate>(`/api/admin/users/${userId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(edit),
+  });
+}
+
+/**
+ * Sets a new initial password and ends that account's sessions (BR-15). The
+ * password is never echoed back, so the answer is the user as they now are.
+ */
+export async function setUserInitialPassword(userId: number, initialPassword: string): Promise<AdminUser> {
+  return requestJson<AdminUser>(`/api/admin/users/${userId}/initial-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ initialPassword }),
+  });
+}

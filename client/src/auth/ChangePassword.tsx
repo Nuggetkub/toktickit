@@ -10,7 +10,21 @@ import { landingPath, useAuth } from "./AuthContext.js";
 const MIN = 12;
 const MAX = 128;
 
-type Rule = { label: string; met: (state: RuleInput) => boolean };
+export type Rule = {
+  label: string;
+  met: (state: RuleInput) => boolean;
+  /**
+   * The extra input this rule judges, beyond the password itself.
+   *
+   * It exists so a screen that has no such input can *remove* the rule rather
+   * than satisfy it vacuously. An Administrator setting somebody else's initial
+   * password has no "current password" and §9 gives them no confirmation field:
+   * passing `current: ""` and `confirm: next` would tick both boxes for every
+   * password ever typed, which is a checklist that cannot fail — worse than one
+   * that is absent, because it looks like a check.
+   */
+  needs?: "current" | "confirm";
+};
 
 type RuleInput = {
   current: string;
@@ -31,13 +45,32 @@ export const PASSWORD_RULES: Rule[] = [
   { label: `At least ${MIN} characters`, met: ({ next }) => next.length >= MIN },
   { label: `No more than ${MAX} characters`, met: ({ next }) => next.length > 0 && next.length <= MAX },
   { label: "Not only spaces", met: ({ next }) => next.trim().length > 0 },
-  { label: "Different from your current password", met: ({ next, current }) => next.length > 0 && next !== current },
+  {
+    label: "Different from your current password",
+    met: ({ next, current }) => next.length > 0 && next !== current,
+    needs: "current",
+  },
   {
     label: "Different from your email address",
     met: ({ next, email }) => next.length > 0 && next.toLowerCase() !== email.toLowerCase(),
   },
-  { label: "Matches the confirmation", met: ({ next, confirm }) => next.length > 0 && next === confirm },
+  {
+    label: "Matches the confirmation",
+    met: ({ next, confirm }) => next.length > 0 && next === confirm,
+    needs: "confirm",
+  },
 ];
+
+/**
+ * The subset an Administrator's "initial password" field can honestly show —
+ * derived from the list above rather than restated, so a change to BR-11 cannot
+ * reach one screen and miss the other.
+ *
+ * It is exactly what the server checks for this flow: `validateNewPassword` is
+ * called with the target's email and no current password, so length, whitespace
+ * and the email comparison are the whole of it.
+ */
+export const INITIAL_PASSWORD_RULES: Rule[] = PASSWORD_RULES.filter((rule) => rule.needs === undefined);
 
 export default function ChangePassword() {
   const { user, setUser } = useAuth();
