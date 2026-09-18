@@ -38,6 +38,11 @@ export type ErrorCode =
   | "INVALID_STATUS_TRANSITION"
   | "OWNER_REQUIRED"
   | "TICKET_TERMINAL"
+  // Lab 3 discussion (api-spec.md §7). The indication is refused on a RESOLVED
+  // or terminal ticket (BR-32). It is not TICKET_TERMINAL: a RESOLVED ticket is
+  // not terminal and can still be reopened, so the two refusals mean different
+  // things to the screen even though both answer 409.
+  | "INDICATION_NOT_ALLOWED"
   | "INTERNAL_ERROR"
   | "DEPENDENCY_UNAVAILABLE";
 
