@@ -232,6 +232,13 @@ it is deliberately not registered rather than answered with a `403`, so it retur
 | PATCH | `/api/admin/users/:id` | Administrator | Name, email, role, activation |
 | POST | `/api/admin/users/:id/initial-password` | Administrator | Reissue one; live sessions end |
 
+**Only two of these sit under `/api/staff`, and that is deliberate.**
+`GET /api/staff/tickets` and `GET /api/staff/assignees` are *queries across every Ticket*, so
+they are staff resources in their own right. Every staff *mutation* — claim, owner, IT
+Priority, status — acts on **one** Ticket, so it hangs off `/api/tickets/:id` and is guarded by
+role rather than by prefix. The authorization is identical either way; only the shape of the
+URL differs. Worth stating because the split is easy to read the other way round.
+
 Five conventions run through all of them:
 
 - **Identity travels in an HttpOnly session cookie**, never in a header, query string or body,
