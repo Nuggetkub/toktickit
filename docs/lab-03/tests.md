@@ -97,6 +97,7 @@ records that replacement.
 | E2E-02 | E2E | AC-13, AC-14, AC-15, AC-16, AC-17, AC-18, AC-19 | A Requester creates a ticket; IT Staff find it in the queue, claim it, raise IT Priority, move it to In Progress, post a comment and a note; the Requester sees the comment but not the note and indicates resolved; IT Staff see the marker, resolve with a summary, and close. | `e2e/lab-03/staff-ticket-flow.spec.ts` | Planned |
 | E2E-03 | E2E | AC-20, AC-21, AC-22, AC-23 | An Administrator searches, filters by role, creates an IT Staff user; that user must change the password at first sign-in; the Administrator deactivates them and their sign-in is then refused; own deactivation is prevented; IT Staff are shown Forbidden on Users. | `e2e/lab-03/user-administration.spec.ts` | Planned |
 | E2E-04 | E2E | AC-10 | The Lab 2 journeys — create and find, attachments, ownership — pass after signing in, with no selector anywhere. | `e2e/lab-03/requester-regression.spec.ts` | Planned |
+| E2E-05 | E2E | AC-24 | The interface states §13 requires, each forced at the network edge and captured from a real answer: loading and saving from held requests, success from a real creation, empty from a brand-new account, no-results from a search that matches nothing, forbidden from a role refusal, conflict from a `409`, failure from a `500`. Also captures the Internal Notes surface so it can be compared with the public thread. | `e2e/lab-03/ui-states.spec.ts` | Planned |
 | RESP-01 | Responsive | AC-24 | Login, Change Password, the shell, My Tickets, Requester Ticket Detail, the queue, staff Ticket Detail and User Management at 1440×900, 834×1112 and 390×844: no page-level horizontal scroll, no clipped label, no control outside the viewport, 44 px mobile targets; screenshots written to `artifacts/lab-03/screenshots/`. The two Requester screens are included because Lab 3 changes them — a status filter and column, Public Comments, and the Problem Appears Resolved action. | `e2e/lab-03/responsive.spec.ts` | Planned |
 
 ---
@@ -123,15 +124,15 @@ table and the AC column above were checked against each other by script.
 | AC-13 Queue search, filter, sort and paging | UNIT-04, API-15, API-16, UI-04, E2E-02 |
 | AC-14 Ownership rules and concurrent claims | API-17, API-18, UI-05, E2E-02 |
 | AC-15 IT Priority versus Requested Priority | API-19, UI-05, E2E-02 |
-| AC-16 Status transition matrix and terminal freeze | UNIT-03, API-20, API-21, UI-05, E2E-02 |
+| AC-16 Status transition matrix and terminal freeze | UNIT-03, UNIT-07, API-20, API-21, UI-05, E2E-02 |
 | AC-17 Public Comments | UNIT-06, API-22, UI-06, UI-07, E2E-02 |
 | AC-18 Internal Notes stay private | API-08, API-23, UI-06, E2E-02 |
-| AC-19 Resolution indication | API-24, UI-06, UI-07, E2E-02 |
-| AC-20 User list, search, role filter, create | API-25, API-26, UI-08, E2E-03 |
-| AC-21 Edit and set initial password | API-27, UI-08, E2E-03 |
-| AC-22 Administrator safety rules | API-28, UI-08, E2E-03 |
+| AC-19 Resolution indication | UNIT-07, API-24, UI-06, UI-07, E2E-02 |
+| AC-20 User list, search, role filter, create | UNIT-08, API-25, API-26, UI-08, E2E-03 |
+| AC-21 Edit and set initial password | UNIT-08, API-27, UI-08, E2E-03 |
+| AC-22 Administrator safety rules | UNIT-08, API-28, UI-08, E2E-03 |
 | AC-23 Non-Administrators refused | API-09, API-29, E2E-03 |
-| AC-24 Zen Green and three viewports | STYLE-01, RESP-01 |
+| AC-24 Zen Green and three viewports | STYLE-01, RESP-01, E2E-05 |
 
 ---
 
@@ -157,8 +158,19 @@ cd server && npm test
 cd client && npm test
 
 # responsive and E2E, from the repository root
-npm run e2e
+npm run e2e         # Lab 2 journeys        -> artifacts/lab-02
+npm run e2e:lab3    # Lab 3 journeys + RESP-01 -> artifacts/lab-03
+
+# the HTML report of either run
+npm run e2e:report
+npm run e2e:report:lab3
 ```
+
+The two suites are separate configurations sharing one webServer definition
+(`playwright.config.ts` exports a factory; `playwright.lab3.config.ts` calls it). They use
+different schemas — `lab2_e2e` and `lab3_e2e` — so neither can see the other's Tickets, and
+each writes its evidence under its own `artifacts/` root. **`npm run e2e` rewrites the
+committed Lab 2 screenshots**, so restore them if a Lab 3 branch is what is being changed.
 
 The Lab 2 isolation rules continue: Vitest resets its own schema on every run, the E2E run
 uses its own schema, ports and upload directory, and `migration.test.ts` uses a third schema,
@@ -175,6 +187,12 @@ the commit, the commands and their complete output copied from the run by script
 
 ## 7. Known Limitations and Deferred Tests
 
+- **Public Comments and Internal Notes need two captures, not one** (issue #56). They are
+  separate tabs, so no single screenshot can show both surfaces at once.
+  `staff-ticket-detail/desktop.png` carries the public thread and
+  `staff-ticket-detail/internal-notes-desktop.png` the private one, and `ui-spec.md` §13's
+  row is ticked against the pair rather than against either alone. This is a limitation of
+  the evidence format, not of the screens.
 - **Login throttling is per process** (D-16). Restarting the API clears the counts. Tests
   cover the rule within one process; a multi-process deployment would need a shared store.
 - **Retired Lab 2 suites.** `client/tests/lab-02/RequesterSelector.test.tsx` and

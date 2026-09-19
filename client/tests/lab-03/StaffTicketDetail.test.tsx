@@ -330,6 +330,52 @@ describe("IT Staff Ticket Detail — confirmation, validation and conflict", () 
     expect(calls.some((call) => call.path === "/api/tickets/42/status")).toBe(false);
   });
 
+  it("moves focus into the dialog, cycles Tab inside it, and returns focus to the trigger", async () => {
+    // ui-spec.md §13 asks that focus is visible and never trapped *outside* an
+    // open dialog. `ConfirmDialog` moves focus in, traps Tab, and restores it on
+    // close — all of which were implemented and none of which were asserted, so
+    // deleting any of it failed nothing. A keyboard user is the person who finds
+    // that out otherwise.
+    mockApi();
+    await renderDetail();
+
+    const trigger = screen.getByRole("button", { name: "Change status" });
+    await userEvent.selectOptions(screen.getByLabelText(/^Status/), "CANCELLED");
+    await userEvent.click(trigger);
+
+    const dialog = await screen.findByRole("dialog");
+    const reason = within(dialog).getByLabelText(/Reason/);
+
+    // Focus moved in, to the first control rather than being left on the trigger
+    // behind the modal.
+    expect(reason).toHaveFocus();
+
+    // A valid reason first, so the confirm button is enabled and therefore part
+    // of the cycle: `FOCUSABLE` excludes `[disabled]`, so an empty reason would
+    // silently shorten the trap and make this test assert a different shape than
+    // the one a user meets.
+    await userEvent.type(reason, "Raised in error");
+    const confirm = within(dialog).getByRole("button", { name: "Change status to Cancelled" });
+    const cancel = within(dialog).getByRole("button", { name: "Cancel" });
+    expect(confirm).toBeEnabled();
+
+    // Forward past the last control wraps to the first…
+    cancel.focus();
+    await userEvent.tab();
+    expect(reason).toHaveFocus();
+
+    // …and backward before the first wraps to the last. Between them, focus
+    // cannot reach the Work panel behind the modal.
+    await userEvent.tab({ shift: true });
+    expect(cancel).toHaveFocus();
+
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    // Closing returns the reader to where they were, not to the top of the page.
+    expect(trigger).toHaveFocus();
+  });
+
   it("reports a stale version as a conflict, keeps the typed comment, and re-sends nothing", async () => {
     const { calls } = mockApi({
       "PATCH /api/tickets/42/it-priority": () =>
