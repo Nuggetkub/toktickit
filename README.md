@@ -89,10 +89,15 @@ development. Real `.env` files are git-ignored and must never be committed.
 
 ### 4. Migrate and seed the database
 
+Prisma resolves its schema and migrations relative to the working directory, so this is the
+one step that genuinely runs from `server/`. It returns to the root afterwards, because every
+later command expects to start there:
+
 ```bash
 cd server
 npx prisma migrate deploy   # use `npx prisma migrate dev` when changing the schema
 npm run prisma:seed
+cd ..
 ```
 
 The seed is idempotent — it matches on unique natural keys, so running it
@@ -144,14 +149,14 @@ account with no password can never sign in.
 
 ### 5. Run the app
 
-Two terminals:
+Two terminals, each starting at the repository root:
 
 ```bash
-cd server && npm run dev    # http://localhost:3000
+npm --prefix server run dev    # http://localhost:3000
 ```
 
 ```bash
-cd client && npm run dev    # http://localhost:5173
+npm --prefix client run dev    # http://localhost:5173
 ```
 
 Open http://localhost:5173. The application opens on **Login** — there is no anonymous
@@ -166,11 +171,14 @@ cannot be reached.
 
 ## Tests
 
+Every command below runs from the repository root, and none of them changes directory, so
+the block can be pasted as it stands:
+
 ```bash
-cd server && npm test    # Vitest + Supertest — unit and API
-cd client && npm test    # Vitest + Testing Library — UI component and UI style
-npm run e2e              # Playwright — the Lab 2 journeys, from the root
-npm run e2e:lab3         # Playwright — the Lab 3 journeys and the §13 evidence
+npm --prefix server test   # Vitest + Supertest — unit and API
+npm --prefix client test   # Vitest + Testing Library — UI component and UI style
+npm run e2e                # Playwright — the Lab 2 journeys
+npm run e2e:lab3           # Playwright — the Lab 3 journeys and the §13 evidence
 ```
 
 Both browser suites start the API and the client themselves; nothing needs to be running
