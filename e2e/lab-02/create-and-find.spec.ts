@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { REQUESTER_A, createTicket, selectRequester, uniqueSummary } from "./support.js";
+import { EMAIL_A, REQUESTER_A, createTicket, signIn, uniqueSummary } from "./support.js";
 
 // E2E-01 — AC-04, AC-08. Select a Requester, raise a Ticket, read the official
 // number off the success screen, then find that number in My Tickets.
@@ -7,7 +7,7 @@ import { REQUESTER_A, createTicket, selectRequester, uniqueSummary } from "./sup
 test("a created Ticket keeps its official number and appears in My Tickets", async ({ page }) => {
   const summary = uniqueSummary("Campus Wi-Fi drops in Building 4");
 
-  await selectRequester(page, REQUESTER_A);
+  await signIn(page, EMAIL_A);
   const ticketNumber = await createTicket(page, { summary, priority: "HIGH" });
 
   // The success screen shows what the server assigned, not what the form held —
@@ -37,7 +37,7 @@ test("the Ticket opens from the list with the description the list omits", async
   const summary = uniqueSummary("VPN disconnects every few minutes");
   const description = "The VPN client drops the tunnel roughly every ten minutes from the library building.";
 
-  await selectRequester(page, REQUESTER_A);
+  await signIn(page, EMAIL_A);
   const ticketNumber = await createTicket(page, { summary, description, relatedSystem: "VPN" });
 
   await page.getByRole("link", { name: "Open this Ticket" }).click();
@@ -46,7 +46,25 @@ test("the Ticket opens from the list with the description the list omits", async
   await expect(page.getByText(description)).toBeVisible();
   await expect(page.getByText(REQUESTER_A).first()).toBeVisible();
 
-  // Read-only: none of the values sits in an editable control.
-  await expect(page.getByRole("textbox")).toHaveCount(0);
-  await expect(page.getByRole("combobox")).toHaveCount(0);
+  // Read-only: none of the ticket's values sits in an editable control.
+  //
+  // Scoped to the ticket card rather than the page, and narrowed deliberately
+  // rather than weakened. Lab 3 issue #53 added a Public Comments composer to
+  // this screen — a real <textarea> — so the original page-wide
+  // `getByRole("textbox")).toHaveCount(0)` became false by design: each change
+  // was green alone and broke together, the same semantic merge conflict I
+  // raised on Earth2509's Lab 2 PR #33.
+  //
+  // The claim Lab 2 actually makes is that the ticket *record* is read-only, and
+  // that is still true. Relaxing the count to "at most one" would instead pass
+  // even if a ticket field became editable.
+  const record = page.locator(".zen-card").filter({
+    has: page.getByRole("heading", { name: `Ticket ${ticketNumber}` }),
+  });
+  await expect(record.getByRole("textbox")).toHaveCount(0);
+  await expect(record.getByRole("combobox")).toHaveCount(0);
+
+  // And the composer really is the one editable thing on the screen, so the
+  // scoping above cannot quietly start passing because the panel disappeared.
+  await expect(page.getByLabel(/^Add a comment/)).toBeVisible();
 });

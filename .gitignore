@@ -22,3 +22,8 @@ server/storage/
 artifacts/lab-02/e2e-runtime/
 artifacts/lab-02/test-results/
 artifacts/lab-02/playwright-report/
+# Lab 3 the same way: artifacts/lab-03/screenshots/ is the evidence ui-spec.md
+# §13 names and stays committed; the run's own output does not.
+artifacts/lab-03/e2e-runtime/
+artifacts/lab-03/test-results/
+artifacts/lab-03/playwright-report/

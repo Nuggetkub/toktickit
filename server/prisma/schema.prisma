@@ -1,8 +1,8 @@
 // Prisma schema — datasource and generator are pre-wired.
 // Your DATABASE_URL lives in server/.env (copy it from .env.example).
 //
-// The Lab 2 data design and the reasoning behind it are in
-// docs/lab-02/specification.md §7. Constraints and indexes are not decorative:
+// The Lab 3 data design and the reasoning behind it are in
+// docs/lab-03/specification.md §7. Constraints and indexes are not decorative:
 // each one is justified there against the query that needs it.
 
 generator client {
@@ -16,7 +16,10 @@ datasource db {
 
 // Declared in severity order so PostgreSQL sorts by severity rather than
 // alphabetically. Sorting a string column would give HIGH, LOW, MEDIUM, URGENT,
-// which is meaningless to a user (BR-25, decision D-08).
+// which is meaningless to a user (Lab 2 BR-25, decision D-08).
+//
+// Lab 3 reuses this type for Ticket.itPriority: the scale is identical, and
+// renaming the type would touch every Lab 2 reference for no behavioural gain.
 enum RequestedPriority {
   LOW
   MEDIUM
@@ -24,10 +27,25 @@ enum RequestedPriority {
   URGENT
 }
 
-// Lab 2 has exactly one status. Lab 3 adds its remaining members without a data
-// migration (BR-03).
+// Lab 2 had only NEW. Lab 3 adds the remaining seven in lifecycle order, so
+// ordering a queue by status follows the life of a ticket rather than the
+// alphabet. The transition matrix is BR-29; the per-status rules are BR-26.
 enum TicketStatus {
   NEW
+  OPEN
+  IN_PROGRESS
+  WAITING_FOR_REQUESTER
+  RESOLVED
+  CLOSED
+  REOPENED
+  CANCELLED
+}
+
+// Exactly one role per user (BR-17). Multiple roles are excluded from Lab 3.
+enum Role {
+  REQUESTER
+  IT_STAFF
+  ADMINISTRATOR
 }
 
 // An IT request category. `name` is unique so the seed can upsert on it and
@@ -52,20 +70,52 @@ model RelatedSystem {
   tickets Ticket[]
 }
 
-// The person who owns tickets. In Lab 2 one of these is chosen through the
-// Development Requester selector, which is a testing mechanism and not
-// authentication (BR-05). In Lab 3 an authenticated identity resolves to this
-// same model, so ownership survives unchanged (BR-45).
-model Requester {
-  id        Int      @id @default(autoincrement())
-  fullName  String
-  email     String   @unique
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// Renamed from Lab 2's `Requester`, in place and keeping every id, so each
+// existing Ticket.requesterId and Attachment.removedByRequesterId still points
+// at the same person (BR-43, decision D-14). Lab 2 BR-45 promised exactly this:
+// the authenticated user *becomes* the Requester rather than replacing it.
+//
+// `passwordHash` is nullable because a migrated account has no password until an
+// Administrator or the development seed sets one, and a null hash can never
+// authenticate (BR-06).
+model User {
+  id                 Int      @id @default(autoincrement())
+  fullName           String
+  // Stored trimmed and lowercased, so the ordinary unique index below gives
+  // case-insensitive uniqueness (BR-08).
+  email              String   @unique
+  role               Role     @default(REQUESTER)
+  isActive           Boolean  @default(true)
+  passwordHash       String?
+  mustChangePassword Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  tickets           Ticket[]
-  removedAttachments Attachment[] @relation("AttachmentRemovedBy")
+  tickets            Ticket[]       @relation("TicketRequester")
+  ownedTickets       Ticket[]       @relation("TicketOwner")
+  sessions           Session[]
+  publicComments     PublicComment[]
+  internalNotes      InternalNote[]
+  removedAttachments Attachment[]   @relation("AttachmentRemovedBy")
+
+  // The assignee list and the last-active-Administrator check (BR-42) both
+  // filter on exactly this pair.
+  @@index([role, isActive])
+}
+
+// A signed-in session. Only the SHA-256 hash of the token is stored, so the
+// database never holds anything that could be replayed as a cookie (BR-13).
+model Session {
+  id        Int      @id @default(autoincrement())
+  tokenHash String   @unique
+  userId    Int
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id])
+
+  // Revoking every session a user holds (BR-15) is one indexed delete.
+  @@index([userId])
 }
 
 model Ticket {
@@ -77,30 +127,48 @@ model Ticket {
   summary         String
   description     String
   requestedPriority RequestedPriority
+  // Set equal to requestedPriority at creation and for every migrated ticket,
+  // and changed only by IT Staff or an Administrator afterwards (BR-23).
+  itPriority      RequestedPriority
   currentStatus   TicketStatus      @default(NEW)
+  // Zero or one owner, who must be an active IT_STAFF or ADMINISTRATOR at the
+  // moment of assignment (BR-21).
+  ownerId         Int?
+  // Optimistic concurrency for the workflow operations (BR-24): a stale value
+  // is refused rather than silently overwriting someone else's change.
+  version         Int               @default(1)
+  resolutionSummary String?
+  requesterResolvedAt DateTime?
   // Nullable because PostgreSQL permits many NULLs under a unique index, so a
-  // ticket created by any future path that has no key is unaffected (BR-19).
+  // ticket created by any future path that has no key is unaffected (Lab 2 BR-19).
   idempotencyKey  String?           @unique
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  requester     Requester     @relation(fields: [requesterId], references: [id])
+  requester     User          @relation("TicketRequester", fields: [requesterId], references: [id])
+  owner         User?         @relation("TicketOwner", fields: [ownerId], references: [id])
   category      Category      @relation(fields: [categoryId], references: [id])
   relatedSystem RelatedSystem @relation(fields: [relatedSystemId], references: [id])
   attachments   Attachment[]
+  publicComments PublicComment[]
+  internalNotes  InternalNote[]
 
   // Every My Tickets query filters by requester and orders by date descending.
   // This is the index that query exists for.
   @@index([requesterId, createdAt(sort: Desc)])
   @@index([categoryId])
   @@index([relatedSystemId])
+  // The queue's owner filter, status filter and Last Updated sort.
+  @@index([ownerId])
+  @@index([currentStatus])
+  @@index([updatedAt])
 }
 
 model Attachment {
   id               Int       @id @default(autoincrement())
   ticketId         Int
   // Server-generated. The original filename is display metadata only and never
-  // builds a server path (BR-35).
+  // builds a server path (Lab 2 BR-35).
   storageKey       String    @unique
   originalFilename String
   mimeType         String
@@ -108,26 +176,64 @@ model Attachment {
   uploadedAt       DateTime  @default(now())
 
   // Soft removal. Nullable columns rather than a boolean, so the row records
-  // when, by whom and why — see the justified decision in specification.md §7.
+  // when, by whom and why — see the justified decision in lab-02 specification §7.
   // `removedAt IS NULL` is the single indexable definition of "active".
   removedAt            DateTime?
   removedByRequesterId Int?
   removalReason        String?
 
-  ticket    Ticket     @relation(fields: [ticketId], references: [id])
-  removedBy Requester? @relation("AttachmentRemovedBy", fields: [removedByRequesterId], references: [id])
+  ticket    Ticket @relation(fields: [ticketId], references: [id])
+  // The column keeps its Lab 2 name and now references User (BR-43).
+  removedBy User?  @relation("AttachmentRemovedBy", fields: [removedByRequesterId], references: [id])
 
-  // The five-active-attachment count (BR-33) is the hottest attachment query.
+  // The five-active-attachment count (Lab 2 BR-33) is the hottest attachment query.
   @@index([ticketId, removedAt])
+}
+
+// Shared communication on a ticket, visible to the owning Requester, IT Staff
+// and Administrators (BR-04). Stored separately from InternalNote so that a
+// Requester-facing query cannot return a private note even if written
+// carelessly — it never touches the table notes live in (§7, decision D-11).
+model PublicComment {
+  id       Int      @id @default(autoincrement())
+  ticketId Int
+  authorId Int
+  content  String
+  // Set when the comment records a status change, so the thread doubles as the
+  // ticket's history without a separate audit table (BR-30, decision D-10).
+  statusChangedTo TicketStatus?
+  createdAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id])
+  author User   @relation(fields: [authorId], references: [id])
+
+  // Every read is one ticket's entries, newest first (BR-37).
+  @@index([ticketId, createdAt(sort: Desc)])
+}
+
+// Operational notes for IT Staff and Administrators only. No Requester-facing
+// query may read this table (BR-34, BR-35).
+model InternalNote {
+  id        Int      @id @default(autoincrement())
+  ticketId  Int
+  authorId  Int
+  content   String
+  createdAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id])
+  author User   @relation(fields: [authorId], references: [id])
+
+  @@index([ticketId, createdAt(sort: Desc)])
 }
 
 // One row per calendar year, holding the last Ticket Number issued in it.
 //
-// BR-02 specifies a per-year sequence — TKT-2026-00001 starts again at 00001 in
-// 2027 — so the number cannot be derived from the Ticket's own autoincrement id,
-// which is global and would only ever look per-year. The counter is incremented
-// inside the same transaction as the insert, with `ON CONFLICT DO UPDATE` taking
-// a row lock, so two concurrent creates cannot be issued the same number.
+// Lab 2 BR-02 specifies a per-year sequence — TKT-2026-00001 starts again at
+// 00001 in 2027 — so the number cannot be derived from the Ticket's own
+// autoincrement id, which is global and would only ever look per-year. The
+// counter is incremented inside the same transaction as the insert, with
+// `ON CONFLICT DO UPDATE` taking a row lock, so two concurrent creates cannot
+// be issued the same number.
 model TicketNumberSequence {
   year      Int @id
   lastValue Int @default(0)

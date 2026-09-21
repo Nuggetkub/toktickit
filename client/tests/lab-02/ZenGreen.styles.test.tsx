@@ -57,6 +57,15 @@ describe("Zen Green tokens", () => {
     expect(stylesheet).toMatch(/--zen-warning:/);
   });
 
+  it("never removes the focus ring, and draws it in the secondary tone", () => {
+    // ui-spec.md §13 asks that focus is *visible*, which is a separate claim
+    // from the dialog trap asserted in StaffTicketDetail's suite. This half
+    // lives entirely in CSS, where an `outline: none` added to tidy a control
+    // would go unnoticed until a keyboard user met it.
+    expect(stylesheet).toMatch(/:focus-visible\s*\{[^}]*outline:\s*3px solid var\(--zen-secondary\)/);
+    expect(stylesheet).not.toMatch(/:focus-visible\s*\{[^}]*outline:\s*none/);
+  });
+
   it("declares the three labsheet breakpoints", () => {
     expect(stylesheet).toMatch(/max-width:\s*991px/);
     expect(stylesheet).toMatch(/max-width:\s*767px/);
@@ -248,27 +257,37 @@ describe("AppShell", () => {
     expect(inactive).not.toHaveAttribute("aria-current");
   });
 
-  it("shows the selected requester and calls back on Change Requester", async () => {
-    const onChangeRequester = vi.fn();
+  // UPDATED IN LAB 3 (Issue #48). The shell carried the Development Requester
+  // and a Change Requester button; it now carries the signed-in user, their role
+  // in words, and the way out. The claim is the same one — that the shell shows
+  // who you are and offers the action that changes it — against the identity
+  // Lab 3 actually has.
+  it("shows the signed-in user with their role, and calls back on Log out", async () => {
+    const onLogout = vi.fn();
     render(
-      <AppShell requesterName="Nadia Rahman" onChangeRequester={onChangeRequester}>
+      <AppShell userName="Nadia Rahman" userRole="REQUESTER" onLogout={onLogout}>
         <p>content</p>
       </AppShell>,
     );
 
     expect(screen.getByText("Nadia Rahman")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Change Requester" }));
-    expect(onChangeRequester).toHaveBeenCalledTimes(1);
+    // The role is carried by words, never by a colour alone (ui-spec.md §1).
+    expect(screen.getByText("Requester")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Log out" }));
+    expect(onLogout).toHaveBeenCalledTimes(1);
   });
 
-  it("omits the requester context entirely when none is selected", () => {
+  it("omits the user context entirely when nobody is signed in", () => {
     render(
       <AppShell navItems={navItems}>
         <p>content</p>
       </AppShell>,
     );
 
-    expect(screen.queryByText("Development Requester")).not.toBeInTheDocument();
+    expect(screen.queryByText("Nadia Rahman")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Log out" })).not.toBeInTheDocument();
+    // The retired control must be gone, not merely unused.
     expect(screen.queryByRole("button", { name: "Change Requester" })).not.toBeInTheDocument();
   });
 

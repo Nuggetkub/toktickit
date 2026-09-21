@@ -24,6 +24,9 @@
   --zen-error-surface: #FDF2F2;
   --zen-warning: #B26A00;
   --zen-warning-surface: #FDF6E9;
+  /* Internal Notes and nothing else, so the surface itself reads as private
+     at a glance (ui-spec.md §1). */
+  --zen-private: #FFF7E8;
   --zen-success: #006B3C;
 
   /* 4px spacing scale */
@@ -172,7 +175,16 @@ body {
 /* ---------------------------------------------------------------- button */
 
 .zen-button {
-  min-height: 44px; /* touch target floor, per ui-spec §9 */
+  /* The display matters as much as the height: `min-height` has no effect on a
+     non-replaced *inline* element. <button> is inline-block by default and so
+     honoured the floor below, while <a class="zen-button"> — "Back to My
+     Tickets", "Go to your start page" — is inline and silently escaped it. The
+     Lab 3 responsive suite caught it at 390px. Centring also seats the label in
+     the middle of the 44px box instead of on the text baseline. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px; /* touch target floor, per ui-spec §9 and §10 */
   padding: var(--zen-space-2) var(--zen-space-4);
   border: 1px solid transparent;
   border-radius: var(--zen-radius);
@@ -408,6 +420,14 @@ body {
   .zen-shell__nav .zen-button,
   .zen-nav__item {
     width: auto;
+  }
+
+  /* ui-spec.md §10: touch targets are at least 44px on mobile.
+     .zen-nav__item is a bare <button> rather than a .zen-button, so it never
+     inherited the floor that class carries at line 178 — the Lab 3 responsive
+     suite caught "My Tickets" and "Create Ticket" under 44px at 390px. */
+  .zen-nav__item {
+    min-height: 44px;
   }
 }
 
@@ -648,4 +668,456 @@ body {
   .zen-form-grid > p {
     grid-column: 1 / -1;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Issue 48 — sign-in surfaces (ui-spec.md sections 2, 3 and 4)
+   --------------------------------------------------------------------------- */
+
+/* Login and the mandatory Change Password sit on their own, centred, with no
+   navigation behind them: there is nothing else the visitor may reach yet. */
+.zen-auth {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 0;
+}
+
+.zen-auth .zen-card {
+  width: 100%;
+  max-width: 420px;
+}
+
+.zen-password {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.zen-password input {
+  flex: 1 1 auto;
+}
+
+.zen-shell__user {
+  font-weight: 600;
+}
+
+/* The live password checklist. The tick and the wording carry the state; the
+   colour only reinforces it, so the list still reads correctly in monochrome. */
+.zen-checklist {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  font-size: 0.9rem;
+  color: var(--zen-text-muted);
+}
+
+.zen-checklist li {
+  padding: 0.15rem 0;
+}
+
+.zen-checklist__item--met {
+  color: var(--zen-primary);
+}
+
+/* Role badges: Requester neutral, IT Staff pale, Administrator outlined. */
+.zen-badge--role-requester {
+  border: 1px solid var(--zen-border);
+  color: var(--zen-text);
+}
+
+.zen-badge--role-staff {
+  background: var(--zen-pale);
+  color: var(--zen-secondary);
+}
+
+.zen-badge--role-admin {
+  border: 1px solid var(--zen-primary);
+  color: var(--zen-primary);
+}
+/* ---------------------------------------------------------------------------
+   Issue 50 — the IT Staff Ticket Queue (ui-spec.md sections 1 and 7)
+
+   The table itself needs no new layout: .zen-table already becomes one card per
+   row below 767px through the data-label pattern above, so the queue inherits
+   the mobile layout the contract asks for. Only what is specific to the queue
+   is added here.
+   --------------------------------------------------------------------------- */
+
+/* Status tones. Every badge already carries its status in words, so tone only
+   ever reinforces the label - Closed and Cancelled deliberately share a fill,
+   which colour alone could not tell apart. */
+.zen-badge--status-new {
+  border: 1px solid var(--zen-border);
+  color: var(--zen-text);
+}
+
+.zen-badge--status-open {
+  background: var(--zen-pale);
+  color: var(--zen-secondary);
+}
+
+.zen-badge--status-progress {
+  background: var(--zen-secondary);
+  color: #FFFFFF;
+}
+
+.zen-badge--status-waiting {
+  border: 1px solid var(--zen-warning);
+  color: var(--zen-warning);
+}
+
+.zen-badge--status-resolved {
+  background: var(--zen-primary);
+  color: #FFFFFF;
+}
+
+.zen-badge--status-closed,
+.zen-badge--status-cancelled {
+  background: var(--zen-readonly);
+  color: var(--zen-text-muted);
+}
+
+.zen-badge--status-reopened {
+  background: var(--zen-warning-surface);
+  color: var(--zen-warning);
+}
+
+/* Requested and IT priority share one scale, so each badge is preceded by the
+   label that says which it is. */
+.zen-priority {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-right: 0.4rem;
+}
+
+.zen-priority__label {
+  font-size: 0.75rem;
+  color: var(--zen-text-muted);
+}
+
+/* Summary keeps one line and folds the category beneath it, so seven columns
+   stay readable at 992px instead of becoming a mega-grid. */
+.zen-queue__summary {
+  display: block;
+  max-width: 28ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zen-queue__category {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--zen-text-muted);
+}
+
+.zen-queue__indicated {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--zen-warning);
+}
+
+.zen-queue__unassigned {
+  font-style: italic;
+  color: var(--zen-text-muted);
+}
+
+/* Open is a mobile-card action only. */
+.zen-queue__open {
+  display: none;
+}
+
+.zen-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Tablet: the Requester column goes, and returns on the mobile card and on
+   Ticket Detail (ui-spec.md section 7). */
+@media (min-width: 768px) and (max-width: 991px) {
+  .zen-queue__requester {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .zen-queue__summary {
+    max-width: none;
+    white-space: normal;
+  }
+
+  .zen-queue__open {
+    display: block;
+    margin-top: 0.5rem;
+  }
+
+  /* The labsheet asks for a 44px target on touch. */
+  .zen-queue__open .zen-button {
+    min-height: 44px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   IT Staff Ticket Detail and the discussion panels (ui-spec.md §1, §8)
+   --------------------------------------------------------------------------- */
+
+.zen-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--zen-space-2);
+  margin-bottom: var(--zen-space-4);
+  color: var(--zen-text-muted);
+}
+
+.zen-detail-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--zen-space-3);
+  margin-bottom: var(--zen-space-4);
+}
+
+.zen-detail-header__owner {
+  font-weight: 700;
+}
+
+/* The Requester's indication, and the Requester's own record of it. A note
+   rather than an alert: it is news, not a failure. */
+.zen-indication {
+  margin: var(--zen-space-4) 0;
+  padding: var(--zen-space-3) var(--zen-space-4);
+  border-left: 4px solid var(--zen-secondary);
+  border-radius: var(--zen-radius);
+  background: var(--zen-pale);
+}
+
+.zen-frozen {
+  margin: var(--zen-space-4) 0;
+  padding: var(--zen-space-3) var(--zen-space-4);
+  border: 1px solid var(--zen-border);
+  border-radius: var(--zen-radius);
+  background: var(--zen-readonly);
+  color: var(--zen-text-muted);
+  font-weight: 700;
+}
+
+/* One column by default; two from 992px, as §8 requires. Stacking is the
+   starting point rather than the exception, so the narrow case cannot be the
+   one nobody checked. */
+.zen-detail-columns {
+  display: grid;
+  gap: var(--zen-space-6);
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 992px) {
+  .zen-detail-columns {
+    grid-template-columns: 3fr 2fr;
+  }
+}
+
+.zen-work-panel {
+  padding: var(--zen-space-4);
+  border: 1px solid var(--zen-border);
+  border-radius: var(--zen-radius);
+  background: var(--zen-page);
+}
+
+.zen-work-panel .zen-button {
+  margin-bottom: var(--zen-space-4);
+}
+
+.zen-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--zen-space-2);
+  margin-bottom: var(--zen-space-4);
+  border-bottom: 1px solid var(--zen-border);
+}
+
+.zen-tab {
+  padding: var(--zen-space-3) var(--zen-space-4);
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: var(--zen-radius) var(--zen-radius) 0 0;
+  background: none;
+  color: var(--zen-text-muted);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.zen-tab--active {
+  border-color: var(--zen-border);
+  background: var(--zen-surface);
+  color: var(--zen-primary);
+}
+
+/* The same floor for the same reason (ui-spec.md §10): the tabs are bare
+   <button>s too, so they opt out of .zen-button's touch target exactly as the
+   nav items do. Declared even though this padding may already clear 44px, so a
+   later padding change cannot quietly drop the tabs below the rule. */
+@media (max-width: 767px) {
+  .zen-tab {
+    min-height: 44px;
+  }
+}
+
+.zen-discussion__composer {
+  margin-bottom: var(--zen-space-4);
+}
+
+.zen-discussion__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.zen-discussion__entry {
+  padding: var(--zen-space-3) 0;
+  border-top: 1px solid var(--zen-border);
+}
+
+.zen-discussion__byline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--zen-space-2);
+  margin-bottom: var(--zen-space-2);
+}
+
+.zen-discussion__author {
+  font-weight: 700;
+}
+
+.zen-discussion__time,
+.zen-discussion__empty {
+  color: var(--zen-text-muted);
+}
+
+.zen-discussion__status-change {
+  margin: 0 0 var(--zen-space-2);
+  color: var(--zen-secondary);
+  font-weight: 700;
+}
+
+/* BR-36: line breaks are preserved by the stylesheet, so the content itself is
+   rendered as a plain text node and never as markup. */
+.zen-discussion__content {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.zen-discussion__closed {
+  margin-bottom: var(--zen-space-4);
+  color: var(--zen-text-muted);
+  font-weight: 700;
+}
+
+/* The private surface, used by Internal Notes and by nothing else. */
+.zen-discussion--private {
+  padding: var(--zen-space-4);
+  border-left: 4px solid var(--zen-warning);
+  border-radius: var(--zen-radius);
+  background: var(--zen-private);
+}
+
+.zen-discussion--private .zen-discussion__heading {
+  color: var(--zen-warning);
+}
+
+.zen-discussion__lock {
+  margin-right: var(--zen-space-2);
+}
+
+/* ConfirmDialog (ui-spec.md §1). */
+.zen-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--zen-space-4);
+  background: rgb(18 36 28 / 45%);
+}
+
+.zen-modal__dialog {
+  width: min(32rem, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: var(--zen-space-6);
+  border-radius: var(--zen-radius);
+  background: var(--zen-surface);
+  box-shadow: 0 16px 48px rgb(18 36 28 / 24%);
+}
+
+.zen-modal__title {
+  margin-top: 0;
+}
+
+.zen-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--zen-space-3);
+  margin-top: var(--zen-space-4);
+}
+
+/* ---------------------------------------------------------------------------
+   User Management (ui-spec.md §9)
+   --------------------------------------------------------------------------- */
+
+/* One column by default; the list and the panel sit side by side from 992px, as
+   §9 requires. Stacking is the starting point rather than the exception, so the
+   narrow case cannot be the one nobody checked. */
+.zen-users-layout {
+  display: grid;
+  gap: var(--zen-space-6);
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 992px) {
+  .zen-users-layout {
+    grid-template-columns: 3fr 2fr;
+    align-items: start;
+  }
+}
+
+.zen-users-panel {
+  padding: var(--zen-space-4);
+  border: 1px solid var(--zen-border);
+  border-radius: var(--zen-radius);
+  background: var(--zen-page);
+}
+
+/* The initial-password reset is its own section with its own button, so it can
+   never be saved by accident alongside a name change (§9). */
+.zen-users-panel__section {
+  margin-top: var(--zen-space-6);
+  padding-top: var(--zen-space-4);
+  border-top: 1px solid var(--zen-border);
+}
+
+.zen-users-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--zen-space-3);
+  margin-top: var(--zen-space-4);
+}
+
+/* The password rules, rendered from the same list that evaluates them. */
+.zen-password-rules {
+  margin: 0 0 var(--zen-space-4);
+  padding-left: var(--zen-space-6);
+  color: var(--zen-text-muted);
+  font-size: 0.9rem;
+}
+
+.zen-password-rules li[data-met="true"] {
+  color: var(--zen-primary);
+  font-weight: 600;
 }

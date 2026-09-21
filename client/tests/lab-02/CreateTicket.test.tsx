@@ -3,11 +3,24 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import App from "../../src/App.js";
-import { REQUESTER_STORAGE_KEY } from "../../src/requester/index.js";
 
 // UI-03, UI-04, UI-05, UI-06 — AC-03, AC-04, AC-05, AC-07.
+//
+// UPDATED IN LAB 3 (Issue #48), and only in how the caller is identified: the
+// Development Requester selector is gone, so the suite signs in through
+// `/api/auth/me` instead of seeding a requester id into localStorage, and the
+// assertion that the requester travelled in `X-Dev-Requester-Id` is replaced by
+// one that the request carries the session cookie and names no requester at all
+// (BR-03). Every other assertion is the Lab 2 assertion, unchanged.
 
-const REQUESTERS = [{ id: 1, fullName: "Nadia Rahman", email: "nadia.rahman@toktickit.local" }];
+const USER = {
+  id: 1,
+  fullName: "Nadia Rahman",
+  email: "nadia.rahman@toktickit.local",
+  role: "REQUESTER",
+  mustChangePassword: false,
+};
+
 const CATEGORIES = [{ id: 2, name: "Network" }];
 const RELATED_SYSTEMS = [{ id: 5, name: "Campus Wi-Fi" }];
 
@@ -33,19 +46,26 @@ function mockApi(overrides: { create?: Handler; reference?: Handler } = {}) {
     const target = String(url);
     calls.push({ url: target, init });
 
+    if (target.endsWith("/api/auth/me")) {
+      return { ok: true, status: 200, json: async () => ({ user: USER }), headers: new Headers() };
+    }
+
     if (target.endsWith("/api/tickets") && init?.method === "POST") {
       const result = overrides.create ? overrides.create(target, init) : CREATED;
       if (result instanceof Error) throw result;
       if (result && typeof result === "object" && "status" in (result as object)) {
         const failure = result as { status: number; body: unknown };
-        return { ok: false, status: failure.status, json: async () => failure.body };
+        return { ok: false, status: failure.status, json: async () => failure.body, headers: new Headers() };
       }
-      return { ok: true, status: 201, json: async () => result };
+      return { ok: true, status: 201, json: async () => result, headers: new Headers() };
     }
 
-    if (target.endsWith("/api/requesters")) return { ok: true, status: 200, json: async () => REQUESTERS };
-    if (target.endsWith("/api/categories")) return { ok: true, status: 200, json: async () => CATEGORIES };
-    if (target.endsWith("/api/related-systems")) return { ok: true, status: 200, json: async () => RELATED_SYSTEMS };
+    if (target.endsWith("/api/categories")) {
+      return { ok: true, status: 200, json: async () => CATEGORIES, headers: new Headers() };
+    }
+    if (target.endsWith("/api/related-systems")) {
+      return { ok: true, status: 200, json: async () => RELATED_SYSTEMS, headers: new Headers() };
+    }
     throw new Error(`Unexpected request: ${target}`);
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -53,7 +73,6 @@ function mockApi(overrides: { create?: Handler; reference?: Handler } = {}) {
 }
 
 async function renderCreateTicket() {
-  window.localStorage.setItem(REQUESTER_STORAGE_KEY, "1");
   render(
     <MemoryRouter initialEntries={["/create"]}>
       <App />
@@ -78,7 +97,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
-  window.localStorage.clear();
 });
 
 describe("Create Ticket — reference data and read-only values", () => {
@@ -92,7 +110,7 @@ describe("Create Ticket — reference data and read-only values", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the Requester from context, and the system-assigned fields as pending", async () => {
+  it("shows the signed-in Requester, and the system-assigned fields as pending", async () => {
     mockApi();
     await renderCreateTicket();
 
@@ -133,7 +151,7 @@ describe("Create Ticket — validation", () => {
 });
 
 describe("Create Ticket — submission", () => {
-  it("sends the requester and idempotency key as headers, not in the body", async () => {
+  it("sends the session cookie and the idempotency key, and names no requester", async () => {
     const { calls } = mockApi();
     await renderCreateTicket();
     await fillValidForm();
@@ -143,8 +161,11 @@ describe("Create Ticket — submission", () => {
 
     const post = calls.find((call) => call.init?.method === "POST")!;
     const headers = post.init!.headers as Record<string, string>;
-    expect(headers["X-Dev-Requester-Id"]).toBe("1");
     expect(headers["Idempotency-Key"]).toMatch(/^[0-9a-f-]{36}$/);
+    // Ownership comes from the session now (BR-03), so the retired header must
+    // not merely be unused — it must be absent.
+    expect(headers["X-Dev-Requester-Id"]).toBeUndefined();
+    expect(post.init).toMatchObject({ credentials: "include" });
 
     // D-01: the body describes a Ticket and nothing else.
     const body = JSON.parse(post.init!.body as string);

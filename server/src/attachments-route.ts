@@ -2,31 +2,31 @@ import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import type { Request, Response } from "express";
+import type { TicketStatus } from "@prisma/client";
 import { getPrisma } from "./prisma.js";
 import { attachmentSelect } from "./attachment-view.js";
 import { sendDependencyUnavailable, sendError } from "./errors.js";
-import { resolveRequester } from "./requester-context.js";
+import { currentUser } from "./auth-middleware.js";
+import type { SessionUser } from "./session.js";
 import { MAX_ACTIVE, checkAttachment, safeDownloadName, validateRemovalReason } from "./attachment-rules.js";
+import { isTerminal } from "./ticket-workflow.js";
 
 // Files live outside the database: binaries in Postgres make backups and query
 // plans worse for no gain (decision D-06). The directory is configurable so the
 // test run and the E2E run do not write into a developer's working copy.
 const storageDirectory = path.resolve(process.env.ATTACHMENT_STORAGE_DIR ?? path.join(process.cwd(), "storage", "attachments"));
 
-type RequesterContext = { id: number; fullName: string };
-
-/** Resolves identity, or answers. Returns null when the caller has been answered. */
-async function requireRequester(req: Request, res: Response, context: string): Promise<RequesterContext | null> {
-  const resolved = await resolveRequester(req).catch(() => null);
-  if (resolved === null) {
-    sendDependencyUnavailable(res, context, new Error("requester lookup failed"));
-    return null;
-  }
-  if (!resolved.requester) {
-    sendError(res, 401, "REQUESTER_CONTEXT_REQUIRED", "Select a Development Requester first.");
-    return null;
-  }
-  return resolved.requester;
+/**
+ * Which tickets this caller may reach, as a query predicate rather than a check
+ * performed afterwards (BR-19).
+ *
+ * A Requester is confined to their own ticket, exactly as in Lab 2. IT Staff and
+ * Administrators may *read* any ticket's attachments and download the active
+ * ones, per the authorization matrix — they are refused upload and removal at
+ * the route, by requireRole, before anything here runs.
+ */
+function visibleTicket(user: SessionUser, ticketId: number) {
+  return user.role === "REQUESTER" ? { id: ticketId, requesterId: user.id } : { id: ticketId };
 }
 
 function positiveId(value: unknown): number | null {
@@ -35,8 +35,9 @@ function positiveId(value: unknown): number | null {
 }
 
 export async function uploadAttachment(req: Request, res: Response): Promise<void> {
-  const requester = await requireRequester(req, res, "POST attachment");
-  if (!requester) return;
+  // Requester-only (authorization matrix), enforced at the route; the owner is
+  // the session user, so there is no id here for a caller to influence.
+  const user = currentUser(res);
 
   const ticketId = positiveId(req.params.ticketId);
   if (ticketId === null) {
@@ -70,10 +71,19 @@ export async function uploadAttachment(req: Request, res: Response): Promise<voi
       // together each read a count below the limit and each proceed, and a
       // multi-file picker uploading in parallel is the ordinary case rather than
       // an exotic one. Serialising per Ticket costs nothing at five attachments.
-      const owned = await tx.$queryRaw<{ id: number }[]>`
-        SELECT "id" FROM "Ticket" WHERE "id" = ${ticketId} AND "requesterId" = ${requester.id} FOR UPDATE
+      const owned = await tx.$queryRaw<{ id: number; currentStatus: TicketStatus }[]>`
+        SELECT "id", "currentStatus" FROM "Ticket" WHERE "id" = ${ticketId} AND "requesterId" = ${user.id} FOR UPDATE
       `;
       if (owned.length === 0) return { notFound: true as const };
+
+      // BR-27: a closed or cancelled Ticket is frozen, and an attachment is part
+      // of the Ticket. Checked here, inside the lock and before the file is
+      // written, so a refusal never leaves bytes on disk.
+      //
+      // This route had no status check at all until issue #52 — the workflow
+      // routes enforced BR-27 and the attachment routes did not, so a Requester
+      // could still add to or withdraw from a finished Ticket.
+      if (isTerminal(owned[0].currentStatus)) return { terminal: true as const };
 
       const active = await tx.attachment.count({ where: { ticketId, removedAt: null } });
       if (active >= MAX_ACTIVE) return { limitReached: true as const };
@@ -100,6 +110,10 @@ export async function uploadAttachment(req: Request, res: Response): Promise<voi
       sendError(res, 404, "TICKET_NOT_FOUND", "That Ticket could not be found.");
       return;
     }
+    if ("terminal" in created) {
+      sendError(res, 409, "TICKET_TERMINAL", "This Ticket is closed and can no longer change.");
+      return;
+    }
     if ("limitReached" in created) {
       sendError(res, 409, "ATTACHMENT_LIMIT_REACHED", `A Ticket may have at most ${MAX_ACTIVE} active attachments.`);
       return;
@@ -114,8 +128,7 @@ export async function uploadAttachment(req: Request, res: Response): Promise<voi
 }
 
 export async function listAttachments(req: Request, res: Response): Promise<void> {
-  const requester = await requireRequester(req, res, "GET attachments");
-  if (!requester) return;
+  const user = currentUser(res);
 
   const ticketId = positiveId(req.params.ticketId);
   if (ticketId === null) {
@@ -125,7 +138,7 @@ export async function listAttachments(req: Request, res: Response): Promise<void
 
   try {
     const owned = await getPrisma().ticket.findFirst({
-      where: { id: ticketId, requesterId: requester.id },
+      where: visibleTicket(user, ticketId),
       select: { id: true },
     });
     if (!owned) {
@@ -146,8 +159,7 @@ export async function listAttachments(req: Request, res: Response): Promise<void
 }
 
 export async function downloadAttachment(req: Request, res: Response): Promise<void> {
-  const requester = await requireRequester(req, res, "GET attachment download");
-  if (!requester) return;
+  const user = currentUser(res);
 
   const ticketId = positiveId(req.params.ticketId);
   const attachmentId = positiveId(req.params.attachmentId);
@@ -164,7 +176,7 @@ export async function downloadAttachment(req: Request, res: Response): Promise<v
         id: attachmentId,
         ticketId,
         removedAt: null,
-        ticket: { requesterId: requester.id },
+        ...(user.role === "REQUESTER" ? { ticket: { requesterId: user.id } } : {}),
       },
       select: { storageKey: true, originalFilename: true, mimeType: true },
     });
@@ -190,8 +202,8 @@ export async function downloadAttachment(req: Request, res: Response): Promise<v
 }
 
 export async function removeAttachment(req: Request, res: Response): Promise<void> {
-  const requester = await requireRequester(req, res, "PATCH attachment");
-  if (!requester) return;
+  // Requester-only, like upload: IT Staff were refused at the route.
+  const user = currentUser(res);
 
   const ticketId = positiveId(req.params.ticketId);
   const attachmentId = positiveId(req.params.attachmentId);
@@ -208,11 +220,37 @@ export async function removeAttachment(req: Request, res: Response): Promise<voi
 
   try {
     const outcome = await getPrisma().$transaction(async (tx) => {
+      // The Ticket row is locked before its status is read, exactly as
+      // uploadAttachment above already does.
+      //
+      // Reading `currentStatus` through the attachment's nested `ticket` select
+      // and writing afterwards is a check-then-write: a concurrent transition to
+      // CLOSED lands in the gap and the removal succeeds on a frozen Ticket,
+      // which BR-27 forbids. Earth2509 found this on PR #66 — the second time
+      // in one pull request, because I locked the row in upload and in the three
+      // discussion routes and never grepped this sibling.
+      //
+      // Ownership is part of the lock predicate, so another Requester's Ticket
+      // is refused with the same ATTACHMENT_NOT_FOUND as one that does not
+      // exist (BR-10, D-04).
+      const lockedTicket = await tx.$queryRaw<{ id: number; currentStatus: TicketStatus }[]>`
+        SELECT "id", "currentStatus" FROM "Ticket" WHERE "id" = ${ticketId} AND "requesterId" = ${user.id} FOR UPDATE
+      `;
+      if (lockedTicket.length === 0) return { notFound: true as const };
+
+      // The attachment is looked up before the status is judged, so api-spec.md
+      // §1's order still holds: a missing attachment is 404 even on a closed
+      // Ticket. The lock changes when the status is read, never which answer
+      // wins.
       const existing = await tx.attachment.findFirst({
-        where: { id: attachmentId, ticketId, ticket: { requesterId: requester.id } },
+        where: { id: attachmentId, ticketId },
         select: { id: true, removedAt: true },
       });
       if (!existing) return { notFound: true as const };
+
+      // BR-27 before the removal rules, as in the workflow routes: "this Ticket
+      // is finished" is the truer answer than anything about this one file.
+      if (isTerminal(lockedTicket[0].currentStatus)) return { terminal: true as const };
 
       // The first removal's reason and timestamp are the record. A second
       // removal must not overwrite who removed it or why.
@@ -222,7 +260,7 @@ export async function removeAttachment(req: Request, res: Response): Promise<voi
         where: { id: existing.id },
         data: {
           removedAt: new Date(),
-          removedByRequesterId: requester.id,
+          removedByRequesterId: user.id,
           removalReason: validation.reason,
         },
         select: attachmentSelect,
@@ -232,6 +270,10 @@ export async function removeAttachment(req: Request, res: Response): Promise<voi
 
     if ("notFound" in outcome) {
       sendError(res, 404, "ATTACHMENT_NOT_FOUND", "That attachment could not be found.");
+      return;
+    }
+    if ("terminal" in outcome) {
+      sendError(res, 409, "TICKET_TERMINAL", "This Ticket is closed and can no longer change.");
       return;
     }
     if ("alreadyRemoved" in outcome) {

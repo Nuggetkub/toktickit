@@ -3,7 +3,7 @@ import request from "supertest";
 import { randomUUID } from "node:crypto";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
-import { REQUESTER_HEADER } from "../../src/requester-context.js";
+import { sessionCookieFor, TEST_ORIGIN } from "../support/session.js";
 
 // API-10 — AC-12. Cross-requester access must be indistinguishable from a
 // ticket that does not exist (BR-10, D-04): a 403 would confirm the row is real.
@@ -11,6 +11,9 @@ import { REQUESTER_HEADER } from "../../src/requester-context.js";
 const prisma = getPrisma();
 let ownerId = 0;
 let otherId = 0;
+// Identity is the session's since issue #47; the assertions are unchanged.
+let ownerCookie = "";
+let otherCookie = "";
 let ownedTicketId = 0;
 
 // Explicit bytes rather than a string literal: an escape that survives into the
@@ -26,7 +29,7 @@ async function newDetailTicket(summary: string): Promise<number> {
 
   const res = await request(app)
     .post("/api/tickets")
-    .set(REQUESTER_HEADER, String(ownerId))
+    .set("Cookie", ownerCookie).set("Origin", TEST_ORIGIN)
     .set("Idempotency-Key", randomUUID())
     .send({
       categoryId: category.id,
@@ -41,16 +44,18 @@ async function newDetailTicket(summary: string): Promise<number> {
 
 beforeAll(async () => {
   const [requesters, category, relatedSystem] = await Promise.all([
-    prisma.requester.findMany({ where: { isActive: true }, orderBy: { id: "asc" }, take: 2 }),
+    prisma.user.findMany({ where: { isActive: true, role: "REQUESTER" }, orderBy: { id: "asc" }, take: 2 }),
     prisma.category.findFirstOrThrow({ where: { isActive: true } }),
     prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } }),
   ]);
   ownerId = requesters[0].id;
   otherId = requesters[1].id;
+  ownerCookie = await sessionCookieFor(ownerId);
+  otherCookie = await sessionCookieFor(otherId);
 
   const created = await request(app)
     .post("/api/tickets")
-    .set(REQUESTER_HEADER, String(ownerId))
+    .set("Cookie", ownerCookie).set("Origin", TEST_ORIGIN)
     .set("Idempotency-Key", randomUUID())
     .send({
       categoryId: category.id,
@@ -66,7 +71,7 @@ describe("GET /api/tickets/:ticketId", () => {
   it("returns the ticket to its owner, with the description the list omits", async () => {
     const res = await request(app)
       .get(`/api/tickets/${ownedTicketId}`)
-      .set(REQUESTER_HEADER, String(ownerId));
+      .set("Cookie", ownerCookie).set("Origin", TEST_ORIGIN);
 
     expect(res.status).toBe(200);
     expect(res.body.id).toBe(ownedTicketId);
@@ -78,7 +83,7 @@ describe("GET /api/tickets/:ticketId", () => {
   it("refuses another requester's ticket as not found", async () => {
     const res = await request(app)
       .get(`/api/tickets/${ownedTicketId}`)
-      .set(REQUESTER_HEADER, String(otherId));
+      .set("Cookie", otherCookie).set("Origin", TEST_ORIGIN);
 
     expect(res.status).toBe(404);
     expect(res.body.error.code).toBe("TICKET_NOT_FOUND");
@@ -89,23 +94,25 @@ describe("GET /api/tickets/:ticketId", () => {
     // ticket exists.
     const foreign = await request(app)
       .get(`/api/tickets/${ownedTicketId}`)
-      .set(REQUESTER_HEADER, String(otherId));
+      .set("Cookie", otherCookie).set("Origin", TEST_ORIGIN);
     const missing = await request(app)
       .get("/api/tickets/98765432")
-      .set(REQUESTER_HEADER, String(otherId));
+      .set("Cookie", otherCookie).set("Origin", TEST_ORIGIN);
     const malformed = await request(app)
       .get("/api/tickets/not-a-number")
-      .set(REQUESTER_HEADER, String(otherId));
+      .set("Cookie", otherCookie).set("Origin", TEST_ORIGIN);
 
     expect(foreign.status).toBe(missing.status);
     expect(foreign.body).toEqual(missing.body);
     expect(malformed.body).toEqual(missing.body);
   });
 
-  it("requires a requester context", async () => {
+  it("requires a session", async () => {
+    // Lab 2 answered REQUESTER_CONTEXT_REQUIRED; that code retires with the
+    // header it described (api-spec.md §9). The refusal is unchanged.
     const res = await request(app).get(`/api/tickets/${ownedTicketId}`);
     expect(res.status).toBe(401);
-    expect(res.body.error.code).toBe("REQUESTER_CONTEXT_REQUIRED");
+    expect(res.body.error.code).toBe("UNAUTHENTICATED");
   });
 });
 
@@ -118,20 +125,20 @@ describe("GET /api/tickets/:ticketId — attachment metadata", () => {
 
     const kept = await request(app)
       .post(`/api/tickets/${ticketId}/attachments`)
-      .set(REQUESTER_HEADER, String(ownerId))
+      .set("Cookie", ownerCookie).set("Origin", TEST_ORIGIN)
       .attach("file", PNG, { filename: "kept.png", contentType: "image/png" });
     const doomed = await request(app)
       .post(`/api/tickets/${ticketId}/attachments`)
-      .set(REQUESTER_HEADER, String(ownerId))
+      .set("Cookie", ownerCookie).set("Origin", TEST_ORIGIN)
       .attach("file", PNG, { filename: "withdrawn.png", contentType: "image/png" });
     expect([kept.status, doomed.status]).toEqual([201, 201]);
 
     await request(app)
       .patch(`/api/tickets/${ticketId}/attachments/${doomed.body.id}`)
-      .set(REQUESTER_HEADER, String(ownerId))
+      .set("Cookie", ownerCookie).set("Origin", TEST_ORIGIN)
       .send({ removalReason: "Uploaded the wrong screenshot" });
 
-    const res = await request(app).get(`/api/tickets/${ticketId}`).set(REQUESTER_HEADER, String(ownerId));
+    const res = await request(app).get(`/api/tickets/${ticketId}`).set("Cookie", ownerCookie).set("Origin", TEST_ORIGIN);
 
     expect(res.status).toBe(200);
     expect(res.body.attachments).toHaveLength(2);
@@ -156,10 +163,10 @@ describe("GET /api/tickets/:ticketId — attachment metadata", () => {
     const ticketId = await newDetailTicket("Detail attachments ownership");
     await request(app)
       .post(`/api/tickets/${ticketId}/attachments`)
-      .set(REQUESTER_HEADER, String(ownerId))
+      .set("Cookie", ownerCookie).set("Origin", TEST_ORIGIN)
       .attach("file", PNG, { filename: "private.png", contentType: "image/png" });
 
-    const res = await request(app).get(`/api/tickets/${ticketId}`).set(REQUESTER_HEADER, String(otherId));
+    const res = await request(app).get(`/api/tickets/${ticketId}`).set("Cookie", otherCookie).set("Origin", TEST_ORIGIN);
 
     expect(res.status).toBe(404);
     expect(JSON.stringify(res.body)).not.toContain("private.png");
