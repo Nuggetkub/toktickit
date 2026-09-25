@@ -1,6 +1,7 @@
 # Lab 3 Test Plan and Results
 
-**Status:** Planned — no Lab 3 test has run yet
+**Status:** Executed on `main` at `86c30ca` — 55 of 58 rows `Passed`; the three exceptions and
+their reasons are in §6, and are owned by issue #78
 **Companion document:** [`specification.md`](./specification.md)
 **Status convention:** a row reads `Planned` until that test has actually run and passed on
 `main`. Nothing is marked `Passed` from a feature branch.
@@ -93,11 +94,11 @@ records that replacement.
 | UI-08 | UI | AC-20, AC-21, AC-22 | User list columns, search and role filter; create and edit panels with field-level errors including duplicate email; set initial password; own Active and Role disabled with the reason; the last-Administrator error shown. | `client/tests/lab-03/UserManagement.test.tsx` | Passed |
 | UI-09 | UI | AC-10 | The Lab 2 Create Ticket, My Tickets and Requester Ticket Detail suites pass with a signed-in Requester in place of the selector; My Tickets offers the status filter. | `client/tests/lab-02/CreateTicket.test.tsx`, `client/tests/lab-02/MyTickets.test.tsx`, `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Planned |
 | STYLE-01 | UI style | AC-24 | Status, priority and role badges carry text and their specified tone classes; the notes panel uses `--zen-private`; Work panel fields are editable and ticket information read-only; focus rings are present. | `client/tests/lab-03/ZenGreen.lab3.styles.test.tsx` | Planned |
-| E2E-01 | E2E | AC-01, AC-02, AC-05, AC-07 | A first-login account is forced to change its password and then lands on its page; a wrong password and an inactive account show their messages; after logout, a direct URL shows Login and a direct API call with the old cookie returns `401`. | `e2e/lab-03/authentication.spec.ts` | Planned |
-| E2E-02 | E2E | AC-13, AC-14, AC-15, AC-16, AC-17, AC-18, AC-19 | A Requester creates a ticket; IT Staff find it in the queue, claim it, raise IT Priority, move it to In Progress, post a comment and a note; the Requester sees the comment but not the note and indicates resolved; IT Staff see the marker, resolve with a summary, and close. | `e2e/lab-03/staff-ticket-flow.spec.ts` | Planned |
-| E2E-03 | E2E | AC-20, AC-21, AC-22, AC-23 | An Administrator searches, filters by role, creates an IT Staff user; that user must change the password at first sign-in; the Administrator deactivates them and their sign-in is then refused; own deactivation is prevented; IT Staff are shown Forbidden on Users. | `e2e/lab-03/user-administration.spec.ts` | Planned |
-| E2E-04 | E2E | AC-10 | The Lab 2 journeys — create and find, attachments, ownership — pass after signing in, with no selector anywhere. | `e2e/lab-03/requester-regression.spec.ts` | Planned |
-| E2E-05 | E2E | AC-24 | The interface states §13 requires, each forced at the network edge and captured from a real answer: loading and saving from held requests, success from a real creation, empty from a brand-new account, no-results from a search that matches nothing, forbidden from a role refusal, conflict from a `409`, failure from a `500`. Also captures the Internal Notes surface so it can be compared with the public thread. | `e2e/lab-03/ui-states.spec.ts` | Planned |
+| E2E-01 | E2E | AC-01, AC-02, AC-05, AC-07 | A first-login account is forced to change its password and then lands on its page; a wrong password and an inactive account show their messages; after logout, a direct URL shows Login and a direct API call with the old cookie returns `401`. | `e2e/lab-03/authentication.spec.ts` | Passed |
+| E2E-02 | E2E | AC-13, AC-14, AC-15, AC-16, AC-17, AC-18, AC-19 | A Requester creates a ticket; IT Staff find it in the queue, claim it, raise IT Priority, move it to In Progress, post a comment and a note; the Requester sees the comment but not the note and indicates resolved; IT Staff see the marker, resolve with a summary, and close. | `e2e/lab-03/staff-ticket-flow.spec.ts` | Passed |
+| E2E-03 | E2E | AC-20, AC-21, AC-22, AC-23 | An Administrator searches, filters by role, creates an IT Staff user; that user must change the password at first sign-in; the Administrator deactivates them and their sign-in is then refused; own deactivation is prevented; IT Staff are shown Forbidden on Users. | `e2e/lab-03/user-administration.spec.ts` | Passed |
+| E2E-04 | E2E | AC-10 | The Lab 2 journeys — create and find, attachments, ownership — pass after signing in, with no selector anywhere. | `e2e/lab-03/requester-regression.spec.ts` | Passed |
+| E2E-05 | E2E | AC-24 | The interface states §13 requires, each forced at the network edge and captured from a real answer: loading and saving from held requests, success from a real creation, empty from a brand-new account, no-results from a search that matches nothing, forbidden from a role refusal, conflict from a `409`, failure from a `500`. Also captures the Internal Notes surface so it can be compared with the public thread. | `e2e/lab-03/ui-states.spec.ts` | Passed |
 | RESP-01 | Responsive | AC-24 | Login, Change Password, the shell, My Tickets, Requester Ticket Detail, the queue, staff Ticket Detail and User Management at 1440×900, 834×1112 and 390×844: no page-level horizontal scroll, no clipped label, no control outside the viewport, 44 px mobile targets; screenshots written to `artifacts/lab-03/screenshots/`. The two Requester screens are included because Lab 3 changes them — a status filter and column, Public Comments, and the Problem Appears Resolved action. | `e2e/lab-03/responsive.spec.ts` | Passed |
 
 ---
@@ -209,7 +210,7 @@ API-01: it mocks Prisma **per model** so the session lookups succeed while the r
 rejects with that literal string, proving the reference endpoints answer a safe `503` and
 never leak the cause. The server logging it is the behaviour under test.
 
-### Three rows remain `Planned`, and why
+### Three rows of the fifty-eight remain `Planned`, and why
 
 The Final column moves to `Passed` only for a row whose named file ran on `main` and whose
 clauses that run exercised. Three rows do not qualify, and are **not** reworded to fit what
@@ -229,7 +230,7 @@ All three are owned by **issue #78**, filed at the release rather than left impl
 first two were raised when issue #53 was delivered and never found a home, which is how they
 reached the release; recording that plainly is the point of this section.
 
-The remaining **50** rows are `Passed`, each against a file named in its own row that is
+The remaining **55** rows are `Passed`, each against a file named in its own row that is
 listed in the captured run.
 
 ---
