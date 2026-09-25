@@ -165,12 +165,12 @@ Labsheet §4.2, restated so that none of it creeps in:
 | Follow-up Note | User | Required when follow-up is required: 5 to 1000 characters after trimming. See BR-09. |
 | Attachment Notes | User | Optional. At most 500 characters. See BR-10. |
 | Assignee | User | Required. See BR-06. |
-| Action Status | Server | `OPEN`, `COMPLETED` or `CANCELLED`. See BR-04. |
+| Action Status | User at creation, then server | `OPEN` or `COMPLETED` is chosen when the Action is created. After that, it changes only through complete and cancel. See BR-04. |
 | Cancellation Reason | User | Required to cancel: 5 to 500 characters after trimming. |
 | Recorded by, Recorded At, Last Updated | **Server** | The creating user and the creation and last-change times. |
 
   Free text is rendered as plain text with line breaks kept, never as HTML (as Lab 3 BR-36).
-  An author, performer, status or time sent in a request is ignored.
+  An author, performer or server-set time sent in a request is ignored.
 
 ### Actions Taken: lifecycle
 
@@ -199,7 +199,8 @@ Labsheet §4.2, restated so that none of it creeps in:
   the Ticket's attachments.
 - **BR-11** Actions are listed by Action Date/Time, newest first, with the Action id as the
   tie-breaker, so the order is stable even when two Actions share a time. This matches the
-  newest-first order of comments and notes (Lab 3 D-17).
+  newest-first order of comments and notes (Lab 3 D-17). Like them, the list is not
+  paginated: a Ticket's work log is short.
 
 ### Actions Taken: when, who and concurrency
 
@@ -508,12 +509,15 @@ envelope, `400` with `fieldErrors`, and `404` for an ownership refusal. Lab 4 ad
 
 It also alters:
 
-- `GET /api/tickets/:ticketId` for IT Staff and Administrators gains
-  `resolutionGate: { open, completed, latestFollowUpRequired, ready }`, so the interface can
-  explain the gate before it is attempted. The server still decides under the lock.
-- `POST /api/tickets/:ticketId/status` may answer `409 RESOLUTION_BLOCKED` with
-  `details.unmet`: any of `OPEN_ACTIONS` (with a count), `NO_COMPLETED_ACTION` and
-  `FOLLOW_UP_REQUIRED` (with the Action id).
+- `GET /api/tickets/:ticketId` gains `resolutionGate`, so the interface can explain the
+  gate before it is attempted. The server still decides under the lock. It's returned to
+  every role, as the Ticket detail shape has been since Lab 3: nothing in it is private.
+- `POST /api/tickets/:ticketId/status` may answer `409 RESOLUTION_BLOCKED`, with an
+  `unmet` list inside the error listing any of `OPEN_ACTIONS` (with a count),
+  `NO_COMPLETED_ACTION` and `FOLLOW_UP_REQUIRED` (with the Action id). The gate is decided
+  after every Lab 3 check, so every Lab 3 answer is unchanged. The route now also takes the
+  Ticket row lock (BR-14). Its version check alone cannot see an Action created
+  concurrently, because Actions do not bump the Ticket `version` (D-11).
 - `currentStatus` accepts a list (BR-30).
 - `PATCH /api/admin/users/:userId` reports `unassignedActionCount` beside the existing
   `unassignedTicketCount` (BR-17).
@@ -686,4 +690,4 @@ Checked separately from product completion:
 | D-11 | Recording an Action does not bump the Ticket `version`. | This is the same reasoning as comments in Lab 3 D-12: two people on one Ticket is normal, and logging work must not invalidate a colleague's pending status change. The gate is still safe, because it is evaluated under the row lock (BR-14), not from the client's version. |
 | D-12 | `currentStatus` accepts a list rather than a new `statusGroup` parameter. | Every drill-down, including "active", is then expressible with the existing parameter, and a list names the statuses it means. A group name would hide a definition that could drift from BR-25. |
 | D-13 | Issue #78 is part of Lab 4. | The Requester dashboard's drill-down needs the My Tickets status filter that Lab 3 promised and did not deliver. Folding it in closes that debt and gives the drill-down something to land on. |
-| D-14 | This contract was drafted before reviewing the peer's Lab 4 contract (`Earth2509/toktickit` PR #61). | It is written independently from the labsheet and this repository's Lab 3 contract. Any point adopted from that review will be recorded here, as Lab 3 D-18 did. |
+| D-14 | This contract was drafted before I reviewed the peer's Lab 4 contract (`Earth2509/toktickit` PR #61, reviewed 2026-09-25). | It was written independently from the labsheet and this repository's Lab 3 contract. Nothing was adopted from his contract. The review confirmed two choices made here beforehand: the Requester seeing Actions read-only (D-04), and the unassigned count including active-work Tickets (S-1). Anything adopted after his revision will be recorded here, as Lab 3 D-18 did. |
