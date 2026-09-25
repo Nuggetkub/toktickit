@@ -27,6 +27,8 @@ Prompts are quoted as they were actually sent.
 
 | 5 | "check Earth2509's pull request and review", then "still request changes as you recommand" | This was his round-two commit on Earth2509 PR #61. The agent checked each round-one finding against his new text and found all five closed. It then tested the new rules themselves, not only whether they had been written. Two new gate sentences don't do what they claim. "Re-evaluated after reopen" re-checks conditions the old Actions still meet. A follow-up flag on a frozen, completed Action can never clear. **This time the draft came to me first**, with a recommended verdict. I chose to keep requesting changes, and only then was it posted. |
 
+| 6 | "check Earth2509's pull request and review", then "post it as approve" | This was his round-three commit. The agent confirmed each round-two point was closed by a rule that works, not just by a sentence claiming it: the reopen check compares against the latest `REOPENED` event, and only the latest completed Action's follow-up counts. It also checked for new defects in the wording and found only three non-blocking gaps. It recommended approval and showed me the draft. I approved, and it confirmed the head commit had not moved before posting. |
+
 ### Deliberate constraints I placed on the agent
 
 - **Draft, then let me check, then post.** Nothing is published to my partner's repository
