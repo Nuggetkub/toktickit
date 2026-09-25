@@ -45,4 +45,50 @@ Prompts are quoted as they were actually sent.
 
 ## My Reflection
 
-To be written at release (issue #57), once the implementation has tested this contract.
+The sprint's most useful result was not a feature. It was learning how often a thing that
+looks verified is not, and building the habit of checking the cheapest available fact first.
+
+**The agent is fast and confident, and confidence is the part I had to supervise.** Chasing one
+Playwright failure, it produced five mechanism-level explanations in a row — a missing seed
+row, an `isActive` filter, an enablement race, an empty option list, a re-render swapping the
+DOM — and wrote waits and diagnostics for each. The real cause was that the test asked for a
+Related System named "Projector", and the seeded catalogue has seven names, none of them that.
+Playwright's message, `did not find some options`, had been literally true the whole time. The
+rule I now apply: when an error states a plain fact, verify the fact before modelling the
+machinery, and reproduce with the exact input that failed rather than a similar one.
+
+**Break-the-code is the only evidence I trust about a test.** Twice this sprint a suite was
+green for the wrong reason. A break harness once reported "7 of 7 proven" without running a
+single test, because it spawned `npx.cmd` and Node refused it, and the empty failure was scored
+as a red suite; every proof now includes a no-op CONTROL that must stay green, or the result
+means nothing. Another proof stayed green when the rule was deleted, and the fix was to delete
+my duplicated guard rather than write a cleverer test — a guard no test can fail is
+indistinguishable from no guard.
+
+**Peer review found things neither of us would have found alone, in both directions.** My
+partner caught a genuine time-of-check/time-of-use race in our comments and notes, and then
+caught the same shape one route away in `removeAttachment` after I had fixed the first three
+and not grepped for siblings. He caught mojibake I introduced and had read past the same day.
+He caught a README command block that fails when pasted. And he was right that documenting why
+three checklist boxes were empty does not fill them. Going the other way, I found an
+unauthenticated endpoint in his repository that returned every staff and administrator email,
+and a `vitest.config.ts` exclusion hiding 29 failing tests behind a passing summary — and I
+required the same checks on our own code immediately, which is where several of our own fixes
+came from.
+
+**The trap that catches both of us is whose contract a rule belongs to.** Twice I nearly
+reported his code against our specification; twice he reported ours against his, most recently
+asking for five API rows that were his own routes. Two repositories implementing one labsheet
+make that the default error, not an unusual one. The answer is boring and works: open the other
+person's spec before writing the finding.
+
+**What I would do differently.** I let two promises — a Current Status filter named by UI-09 and
+API-14 — sit unowned from issue #53 until the release, where they had to be recorded as
+`Planned` and handed to issue #78. A row that describes something nobody is building should
+become an issue the day it is noticed, not at the end. I also let `reviewer.md` fall eleven rows
+behind its own rule that entries are written as reviews happen; the log is only worth the
+discipline that maintains it.
+
+What I keep from Lab 3 is a preference for evidence that can fail. A test that cannot go red, a
+checklist box explained rather than ticked, a command block that was never pasted, a screenshot
+with no assertion behind it — all of them look like work and prove nothing.
