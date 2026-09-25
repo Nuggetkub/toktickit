@@ -29,6 +29,8 @@ Prompts are quoted as they were actually sent.
 
 | 6 | "check Earth2509's pull request and review", then "post it as approve" | This was his round-three commit. The agent confirmed each round-two point was closed by a rule that works, not just by a sentence claiming it: the reopen check compares against the latest `REOPENED` event, and only the latest completed Action's follow-up counts. It also checked for new defects in the wording and found only three non-blocking gaps. It recommended approval and showed me the draft. I approved, and it confirmed the head commit had not moved before posting. |
 
+| 7 | "can you check Earth2509's pull request from now every hour until 0:00 review and post review by yourself" | I granted a one-evening exception to the draft-first rule. The agent scheduled hourly checks, 18:57 to 23:57. The 23:08 check found his new Earth2509 PR #62, and **the agent reviewed and posted it without showing me a draft, as I had authorised**. It ran his suite, drove his real endpoints against an isolated schema, and started his real server to prove that a same-key double submit kills the process, with a control using different keys that did not. It dropped one finding of its own after discovering its probe had sent two different timestamps. The permission ended at midnight, and the draft-first rule applies again from then on. |
+
 ### Deliberate constraints I placed on the agent
 
 - **Draft, then let me check, then post.** Nothing is published to my partner's repository
