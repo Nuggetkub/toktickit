@@ -48,6 +48,7 @@ export type SeedUser = {
 /**
  * The accounts specification.md §7 requires: four active Requesters and one
  * inactive, three active IT Staff and one inactive, and one Administrator.
+ * Lab 4 adds a fourth active IT Staff member who owns nothing (BR-35).
  *
  * The first five Requesters carry the Lab 2 e-mail addresses unchanged, because
  * those rows are *migrated*, not recreated — the seed finds them by email and
@@ -64,6 +65,11 @@ export const USERS: readonly SeedUser[] = [
   { fullName: "Grace Okafor", email: "grace.okafor@toktickit.local", role: "IT_STAFF", isActive: true },
   { fullName: "Daniel Reyes", email: "daniel.reyes@toktickit.local", role: "IT_STAFF", isActive: true },
   { fullName: "Wichai Boonmee (on leave)", email: "wichai.boonmee@toktickit.local", role: "IT_STAFF", isActive: false },
+  // Lab 4: an active IT Staff member who owns no Ticket and is assigned no
+  // Action, so the staff dashboard's personal metrics can be shown at zero
+  // (docs/lab-04/specification.md BR-35). Every other active IT Staff member
+  // already owns demo Tickets.
+  { fullName: "Kanya Srisuk", email: "kanya.srisuk@toktickit.local", role: "IT_STAFF", isActive: true },
   { fullName: "Pim Srisawat", email: "pim.srisawat@toktickit.local", role: "ADMINISTRATOR", isActive: true },
 ] as const;
 

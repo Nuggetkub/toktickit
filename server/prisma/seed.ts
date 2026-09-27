@@ -1,6 +1,7 @@
 import { getPrisma } from "../src/prisma.js";
 import { seedReferenceData } from "../src/seed-data.js";
 import { seedDemoTickets } from "../src/demo-tickets.js";
+import { seedDemoActivity } from "../src/demo-activity.js";
 
 // Thin runner. The data and the upsert logic live in src/seed-data.ts and
 // src/demo-tickets.ts so that the Lab 3 seed tests can execute them directly and
@@ -12,6 +13,7 @@ async function main() {
 
   await seedReferenceData(prisma);
   const demo = await seedDemoTickets(prisma);
+  const activity = await seedDemoActivity(prisma);
 
   const categories = await prisma.category.count();
   const relatedSystems = await prisma.relatedSystem.count();
@@ -33,6 +35,10 @@ async function main() {
   console.log(
     `Demo tickets: ${demo.created} created, ${demo.skipped} already present ` +
       `(${demo.comments} comments and ${demo.notes} internal notes created).`,
+  );
+  console.log(
+    `Demo activity: ${activity.actionsCreated} Actions Taken created, ${activity.actionsSkipped} already present; ` +
+      `status history written for ${activity.ticketsGivenHistory} tickets (${activity.eventsCreated} events).`,
   );
   console.log("The development password for every seeded account is in README.md — it is a local fixture, not a secret.");
 }

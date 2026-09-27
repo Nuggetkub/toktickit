@@ -102,9 +102,25 @@ cd ..
 
 The seed is idempotent — it matches on unique natural keys, so running it
 repeatedly creates no duplicates. It inserts the four categories (Account and
-Access, Hardware, Software, Network), seven related systems, the eleven
+Access, Hardware, Software, Network), seven related systems, the twelve
 development accounts below, and around thirty demo tickets spread across every
-status and priority so the IT Staff queue has realistic volume.
+status and priority so the IT Staff queue has realistic volume. Lab 4 adds
+Actions Taken on some of those tickets and a status history for each. Both are
+keyed, so a re-seed creates neither twice and never overwrites one you have
+edited.
+
+**Undoing the Lab 4 migration.** It only adds tables, so it can be rolled back
+without touching any Lab 3 data. Every Action Taken and history row is lost,
+though, so back up first:
+
+```bash
+cd server
+npx prisma db execute --file prisma/rollback/20260925_lab4_actions_and_history.down.sql
+cd ..
+```
+
+The script is one transaction, and it also removes the migration's record, so a
+later `migrate deploy` applies it again.
 
 Re-seeding restores a seeded account's name, role and activation state, but
 **never resets a password that has been changed** — it fills one in only where
@@ -140,6 +156,7 @@ without setting its own password first.
 | `grace.okafor@toktickit.local` | IT Staff | active |
 | `daniel.reyes@toktickit.local` | IT Staff | active |
 | `wichai.boonmee@toktickit.local` | IT Staff | inactive |
+| `kanya.srisuk@toktickit.local` | IT Staff | active — owns nothing, for the empty staff dashboard |
 | `pim.srisawat@toktickit.local` | Administrator | active |
 
 The Lab 3 migration renames Lab 2's `Requester` table to `User` in place, so every

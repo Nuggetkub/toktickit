@@ -41,6 +41,15 @@ enum TicketStatus {
   CANCELLED
 }
 
+// An Action Taken is created OPEN (planned or under way) or directly COMPLETED,
+// and may move only from OPEN to COMPLETED or CANCELLED; both of those are final
+// (docs/lab-04/specification.md BR-04). Declared in lifecycle order.
+enum ActionStatus {
+  OPEN
+  COMPLETED
+  CANCELLED
+}
+
 // Exactly one role per user (BR-17). Multiple roles are excluded from Lab 3.
 enum Role {
   REQUESTER
@@ -97,6 +106,11 @@ model User {
   publicComments     PublicComment[]
   internalNotes      InternalNote[]
   removedAttachments Attachment[]   @relation("AttachmentRemovedBy")
+  assignedActions    ActionTaken[]  @relation("ActionAssignee")
+  performedActions   ActionTaken[]  @relation("ActionPerformer")
+  recordedActions    ActionTaken[]  @relation("ActionCreator")
+  cancelledActions   ActionTaken[]  @relation("ActionCanceller")
+  statusEvents       TicketStatusEvent[]
 
   // The assignee list and the last-active-Administrator check (BR-42) both
   // filter on exactly this pair.
@@ -152,10 +166,14 @@ model Ticket {
   attachments   Attachment[]
   publicComments PublicComment[]
   internalNotes  InternalNote[]
+  actionsTaken   ActionTaken[]
+  statusEvents   TicketStatusEvent[]
 
   // Every My Tickets query filters by requester and orders by date descending.
   // This is the index that query exists for.
   @@index([requesterId, createdAt(sort: Desc)])
+  // Every Requester dashboard count filters on exactly this pair (Lab 4 §7).
+  @@index([requesterId, currentStatus])
   @@index([categoryId])
   @@index([relatedSystemId])
   // The queue's owner filter, status filter and Last Updated sort.
@@ -224,6 +242,78 @@ model InternalNote {
   author User   @relation(fields: [authorId], references: [id])
 
   @@index([ticketId, createdAt(sort: Desc)])
+}
+
+// One unit of work on a Ticket (docs/lab-04/specification.md §5 and §7).
+//
+// Three people are recorded separately because they answer different questions
+// (justified decision 3): who wrote the entry (`createdById`), who is responsible
+// for doing it (`assigneeId`), and who actually did it (`performedById`, set by
+// the server on completion). `assigneeId` is nullable only because deactivating
+// a user clears it on their open Actions (BR-17); the API never accepts null.
+//
+// The migration adds CHECK constraints Prisma cannot express, so the database
+// refuses a state the rules forbid even from a code path that forgets one:
+// COMPLETED needs a performer, a completion time and a result; CANCELLED needs a
+// canceller, a time and a reason; no follow-up means no follow-up note.
+model ActionTaken {
+  id                 Int          @id @default(autoincrement())
+  ticketId           Int
+  // Action Date/Time: when the work happened or is planned (BR-07, D-03).
+  actionAt           DateTime
+  description        String
+  result             String?
+  followUpRequired   Boolean
+  followUpNote       String?
+  // A pointer such as "screenshot error.png in Attachments"; never an upload (BR-10).
+  attachmentNotes    String?
+  status             ActionStatus @default(OPEN)
+  assigneeId         Int?
+  performedById      Int?
+  createdById        Int
+  cancelledById      Int?
+  cancellationReason String?
+  completedAt        DateTime?
+  cancelledAt        DateTime?
+  // Optimistic concurrency for edit, complete and cancel (BR-13).
+  version            Int          @default(1)
+  // Replay detection for create (BR-15), as on Ticket since Lab 2.
+  idempotencyKey     String       @unique
+  // Recorded At, and Last Updated.
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  ticket      Ticket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  assignee    User?  @relation("ActionAssignee", fields: [assigneeId], references: [id], onDelete: Restrict)
+  performedBy User?  @relation("ActionPerformer", fields: [performedById], references: [id], onDelete: Restrict)
+  createdBy   User   @relation("ActionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  cancelledBy User?  @relation("ActionCanceller", fields: [cancelledById], references: [id], onDelete: Restrict)
+
+  // Every Ticket Detail read is one Ticket's Actions newest first (BR-11), and
+  // the resolution gate's "latest completed" lookup walks the same order.
+  @@index([ticketId, actionAt(sort: Desc), id(sort: Desc)])
+  // "My open Actions" (S-3) and BR-17's unassignment.
+  @@index([assigneeId, status])
+}
+
+// One row per status change, append-only (BR-22). Creation is recorded as
+// from nothing to NEW. Tickets that existed before Lab 4 have no rows from
+// before the migration: none are invented (D-07).
+model TicketStatusEvent {
+  id         Int           @id @default(autoincrement())
+  ticketId   Int
+  fromStatus TicketStatus?
+  toStatus   TicketStatus
+  actorId    Int
+  createdAt  DateTime      @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  actor  User   @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  // The history read, oldest first with the id as tie-breaker (BR-23).
+  @@index([ticketId, createdAt, id])
+  // R-4 and "Recently resolved": events into RESOLVED within a window.
+  @@index([toStatus, createdAt])
 }
 
 // One row per calendar year, holding the last Ticket Number issued in it.
