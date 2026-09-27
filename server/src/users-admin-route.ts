@@ -150,7 +150,7 @@ type EditOutcome =
   | { kind: "missing" }
   | { kind: "refused"; status: number; code: "CANNOT_DEACTIVATE_SELF" | "CANNOT_CHANGE_OWN_ROLE" | "LAST_ACTIVE_ADMINISTRATOR"; message: string }
   | { kind: "duplicate" }
-  | { kind: "updated"; user: AdminUserRow; unassignedTicketCount: number };
+  | { kind: "updated"; user: AdminUserRow; unassignedTicketCount: number; unassignedActionCount: number };
 
 export async function editUser(req: Request, res: Response): Promise<void> {
   const targetId = userId(req.params.userId);
@@ -229,7 +229,22 @@ export async function editUser(req: Request, res: Response): Promise<void> {
         unassignedTicketCount = unassigned.count;
       }
 
-      return { kind: "updated", user, unassignedTicketCount };
+      // Lab 4 BR-17: the same reasoning for open Actions, in the same
+      // transaction. An open Action assigned to someone who can no longer sign
+      // in is work nobody will do. Completed and cancelled Actions keep every
+      // name, because those are history. `version` moves so a colleague editing
+      // the Action from before this change is refused rather than restoring the
+      // departed assignee.
+      let unassignedActionCount = 0;
+      if (losesOperatorAccess({ targetRole, edit })) {
+        const cleared = await tx.actionTaken.updateMany({
+          where: { assigneeId: targetId, status: "OPEN" },
+          data: { assigneeId: null, version: { increment: 1 } },
+        });
+        unassignedActionCount = cleared.count;
+      }
+
+      return { kind: "updated", user, unassignedTicketCount, unassignedActionCount };
     });
 
     if (outcome.kind === "missing") {
@@ -245,7 +260,11 @@ export async function editUser(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    res.status(200).json({ user: outcome.user, unassignedTicketCount: outcome.unassignedTicketCount });
+    res.status(200).json({
+      user: outcome.user,
+      unassignedTicketCount: outcome.unassignedTicketCount,
+      unassignedActionCount: outcome.unassignedActionCount,
+    });
   } catch (error) {
     if (isUniqueViolation(error)) {
       duplicateEmail(res);
