@@ -178,8 +178,9 @@ npm run e2e:lab4    # Lab 4 journeys + RESP-01   -> artifacts/lab-04
 
 `e2e:lab4` and `playwright.lab4.config.ts` are added by issue #90, following the Lab 3 pattern:
 the config calls the shared webServer factory, the run uses its own schema `lab4_e2e`, and it
-writes under `artifacts/lab-04/`. The migration test uses its own schema,
-`lab4_migration_test`, and drops it when it finishes. None of these may be `public`.
+writes under `artifacts/lab-04/`. The migration test uses its own schemas,
+`lab4_migration_test` and `lab4_migration_lab3_reference`, and the seed test uses
+`lab4_seed_test`, each dropped when its file finishes. None of these may be `public`.
 
 ---
 
@@ -198,6 +199,19 @@ transcribed.
   request that makes the change (issue #83).
 - **Lab 3's `currentStatus` refusal of a list** becomes acceptance (BR-30). No Lab 3 test sent
   a list, so none is expected to change. This is recorded in case one does.
+- **Lab 3 DB-03 now applies every later migration before comparing** (issue #81).
+  `server/tests/lab-03/migration.test.ts` "leaves a schema that matches schema.prisma" built
+  the Lab 2 and Lab 3 migrations and compared the result with `schema.prisma`. Once Lab 4
+  extended the models, that comparison could only fail. It now also applies
+  `MIGRATIONS_AFTER_LAB3` (currently the Lab 4 migration alone), so it still proves what it
+  was written for: the hand-edited Lab 3 SQL lines up with the models, or the chain could not
+  match. Nothing is weakened. The Lab 3 assertions are untouched, and the list is where each
+  future migration must be added.
+- **The Lab 3 scratch-schema guard admits `lab4_*` too** (issue #81).
+  `server/tests/lab-03/support.ts` refused any schema not named `lab3_*`. The Lab 4 migration
+  and seed tests reuse those helpers with `lab4_migration_test`,
+  `lab4_migration_lab3_reference` and `lab4_seed_test`, so the guard now accepts `lab3_*` or
+  `lab4_*`. It still refuses `public` and every other name.
 - **The performance smoke test is not a benchmark.** It runs on the development machine
   against the seed, and it catches an accidental N+1 query or a missing index. It makes no
   claim about production load.

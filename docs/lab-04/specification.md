@@ -443,7 +443,7 @@ enum ActionStatus { OPEN COMPLETED CANCELLED }   // declared in lifecycle order
 | Index `TicketStatusEvent(ticketId, createdAt, id)` | The history read, oldest first. |
 | Index `TicketStatusEvent(toStatus, createdAt)` | R-4 and "Recently resolved": the events into `RESOLVED` within a window. |
 | Index `Ticket(requesterId, currentStatus)` | Every Requester dashboard count filters on exactly this pair. |
-| `CHECK` constraints on `ActionTaken` | `COMPLETED` implies `performedById`, `completedAt` and `result` are set. `CANCELLED` implies `cancelledById`, `cancelledAt` and `cancellationReason` are set. `followUpRequired = false` implies `followUpNote IS NULL`. The database refuses a state the rules forbid, even from a code path that forgets one. |
+| `CHECK` constraints on `ActionTaken` | The three lifecycle rules are mutually exclusive, so each status carries exactly its own audit facts. `OPEN` has no `performedById`, `completedAt` or cancellation fields (BR-05). `COMPLETED` has `performedById`, `completedAt` and `result`, and no cancellation fields. `CANCELLED` has `cancelledById`, `cancelledAt` and `cancellationReason`, and no `performedById` or `completedAt` (BR-05). `result` belongs to none of them alone: BR-03 allows it on open work, and a cancelled Action may keep it. `followUpRequired = false` implies `followUpNote IS NULL`. The database refuses a state the rules forbid, even from a code path that forgets one, or that forgets to clear a column. |
 | `ON DELETE RESTRICT` on every new foreign key | Nothing deletes Tickets or Users (Lab 3 §7). |
 
 **Justified design decision 1 — a status history table rather than the comment thread.**

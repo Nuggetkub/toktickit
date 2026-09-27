@@ -3,6 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import {
   LAB2_MIGRATIONS,
   LAB3_MIGRATION,
+  MIGRATIONS_AFTER_LAB3,
   applyMigration,
   dropSchema,
   resetSchema,
@@ -157,6 +158,10 @@ describe("Lab 3 migration against a populated Lab 2 database", () => {
     await resetSchema(SCHEMA);
     for (const migration of LAB2_MIGRATIONS) applyMigration(migration, url);
     applyMigration(LAB3_MIGRATION, url);
+    // schema.prisma now describes the latest lab, so every later migration is
+    // applied too. The Lab 3 SQL still has to line up for the chain to match;
+    // the Lab 4 migration is only additive (docs/lab-04/tests.md §7).
+    for (const migration of MIGRATIONS_AFTER_LAB3) applyMigration(migration, url);
 
     // If this fails, the hand-edited SQL and the Prisma models have diverged,
     // and the next `migrate dev` would generate a surprise migration.
