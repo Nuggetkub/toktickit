@@ -42,6 +42,13 @@ function create(overrides: Record<string, unknown> = {}) {
   );
 }
 
+const validOpen = () => ({
+  status: "OPEN",
+  description: "Replace the access point.",
+  followUpRequired: false,
+  assigneeId: 7,
+});
+
 function errors(parsed: { kind: string; fieldErrors?: Record<string, string> }): string[] {
   return parsed.kind === "invalid" ? Object.keys(parsed.fieldErrors!).sort() : [];
 }
@@ -109,6 +116,42 @@ describe("creating an Action (BR-03, BR-04, BR-07, BR-09, BR-10)", () => {
     expect(errors(create({ actionAt: "2026-09-27T09:00:00" }))).toEqual(["actionAt"]);
     expect(create({ actionAt: "2026-09-27T16:00:00+07:00" }).kind).toBe("ok");
     expect(errors(create({ actionAt: "yesterday" }))).toEqual(["actionAt"]);
+  });
+
+  it("refuses impossible calendar dates instead of normalising them (Earth2509's review of PR #94)", () => {
+    // Each of these parses under new Date() as a DIFFERENT, real instant.
+    for (const impossible of [
+      "2027-02-31T12:00:00Z", // 3 March
+      "2027-02-29T12:00:00Z", // 2027 is not a leap year
+      "2026-11-31T12:00:00Z", // November has 30 days
+      "2026-12-00T12:00:00Z",
+      "2026-13-01T12:00:00Z",
+      "2026-12-01T24:00:00Z", // the next day
+      "2026-12-01T12:60:00Z",
+      "2026-12-01T12:00:60Z",
+      "2026-12-01T12:00:00+25:00",
+      "2026-12-01T12:00:00+14:01",
+      "2026-12-01T12:00:00+05:60",
+    ]) {
+      expect(errors(create({ status: "OPEN", result: null, actionAt: impossible })), impossible).toEqual(["actionAt"]);
+    }
+    // The real ones on either side of each boundary are accepted, at exactly the instant written.
+    const leapNow = new Date("2028-02-20T00:00:00Z");
+    const leapTicket = { createdAt: new Date("2028-01-01T00:00:00Z") };
+    const leap = parseCreate({ ...validOpen(), actionAt: "2028-02-29T23:59:59.999Z" }, leapTicket, leapNow);
+    expect(leap.kind).toBe("ok");
+    if (leap.kind === "ok") expect(leap.value.actionAt.toISOString()).toBe("2028-02-29T23:59:59.999Z");
+    for (const [written, instant] of [
+      ["2026-11-30T12:00:00Z", "2026-11-30T12:00:00.000Z"],
+      ["2026-12-31T23:59:59Z", "2026-12-31T23:59:59.000Z"],
+      ["2026-12-01T12:00:00+14:00", "2026-11-30T22:00:00.000Z"],
+      ["2026-12-01T12:00:00-12:00", "2026-12-02T00:00:00.000Z"],
+      ["2026-12-01T12:00:00.5Z", "2026-12-01T12:00:00.500Z"],
+    ] as const) {
+      const ok = create({ status: "OPEN", result: null, actionAt: written });
+      expect(ok.kind, written).toBe("ok");
+      if (ok.kind === "ok") expect(ok.value.actionAt.toISOString(), written).toBe(instant);
+    }
   });
 
   it("names every failing field at once, not only the first", () => {

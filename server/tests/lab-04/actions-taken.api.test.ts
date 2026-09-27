@@ -177,6 +177,14 @@ describe("API-02 invalid input (AC-03)", () => {
     expect(Object.keys(bad.body.error.fieldErrors).sort()).toEqual(["attachmentNotes", "description", "followUpNote", "result"]);
     expect(await prisma.actionTaken.count({ where: { ticketId: ticket.id } })).toBe(0);
 
+    // An impossible date is refused, never saved as the date JavaScript rolls it into.
+    for (const actionAt of ["2027-02-31T12:00:00Z", "2027-02-29T12:00:00Z"]) {
+      const res = await post(`/api/tickets/${ticket.id}/actions`, cookies.staff, body({ status: "OPEN", result: null, actionAt }), randomUUID());
+      expect(res.status, actionAt).toBe(400);
+      expect(Object.keys(res.body.error.fieldErrors), actionAt).toEqual(["actionAt"]);
+    }
+    expect(await prisma.actionTaken.count({ where: { ticketId: ticket.id } })).toBe(0);
+
     const forged = await post(
       `/api/tickets/${ticket.id}/actions`,
       cookies.staff,
@@ -406,6 +414,90 @@ describe("API-08 who sees what, and in what order (AC-09)", () => {
     const cross = await patch(`/api/tickets/${elsewhere.id}/actions/${action.id}`, cookies.staff, { version: 1, description: "Wrong ticket." });
     expect(cross.status).toBe(404);
     expect(cross.body.error.code).toBe("ACTION_NOT_FOUND");
+  });
+});
+
+describe("an assignment cannot race a deactivation (BR-06, BR-17; Earth2509's review of PR #94)", () => {
+  // The deactivation below is done exactly as the admin route does it: update
+  // the user, clear their open Actions and Tickets, and only then commit. It is
+  // held open while the assignment is dispatched. A plain read of the user sees
+  // the last committed version, active, so without a lock on the user's row the
+  // assignment passes its check, writes after the cleanup, and leaves open work
+  // with an assignee who can no longer sign in.
+  async function whileDeactivating<T>(userId: number, fire: () => Promise<T>) {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const admin = prisma.$transaction(
+      async (tx) => {
+        await tx.user.update({ where: { id: userId }, data: { isActive: false } });
+        await tx.actionTaken.updateMany({ where: { assigneeId: userId, status: "OPEN" }, data: { assigneeId: null, version: { increment: 1 } } });
+        await tx.ticket.updateMany({ where: { ownerId: userId, currentStatus: { notIn: ["CLOSED", "CANCELLED"] } }, data: { ownerId: null, version: { increment: 1 } } });
+        await held;
+      },
+      { timeout: 20_000 },
+    );
+    await new Promise((r) => setTimeout(r, 150));
+    const pending = fire();
+    await new Promise((r) => setTimeout(r, 300));
+    release();
+    await admin;
+    return pending;
+  }
+
+  const newLeaver = async () =>
+    (await prisma.user.create({ data: { fullName: "Racing Rae", email: `${randomUUID().slice(0, 8)}${DOMAIN}`, role: "IT_STAFF" } })).id;
+
+  it("refuses to create an Action for a user being deactivated", async () => {
+    const leaver = await newLeaver();
+    const ticket = await newTicket();
+    const res = await whileDeactivating(leaver, () =>
+      post(`/api/tickets/${ticket.id}/actions`, cookies.staff, body({ status: "OPEN", result: null, assigneeId: leaver }), randomUUID()).then((r) => r),
+    );
+    expect(res.status, JSON.stringify(res.body)).toBe(400);
+    expect(Object.keys(res.body.error.fieldErrors)).toEqual(["assigneeId"]);
+    expect(await prisma.actionTaken.count({ where: { assigneeId: leaver, status: "OPEN" } })).toBe(0);
+  });
+
+  it("refuses to reassign an open Action to a user being deactivated", async () => {
+    const leaver = await newLeaver();
+    const ticket = await newTicket();
+    const action = await created(ticket.id, { status: "OPEN", result: null });
+    const res = await whileDeactivating(leaver, () =>
+      patch(`/api/tickets/${ticket.id}/actions/${action.id}`, cookies.staff, { version: 1, assigneeId: leaver }).then((r) => r),
+    );
+    expect(res.status, JSON.stringify(res.body)).toBe(400);
+    expect(Object.keys(res.body.error.fieldErrors)).toEqual(["assigneeId"]);
+    expect(await prisma.actionTaken.count({ where: { assigneeId: leaver, status: "OPEN" } })).toBe(0);
+  });
+
+  it("refuses to make a user being deactivated the Ticket Owner (the Lab 3 sibling, BR-21 and BR-25)", async () => {
+    const leaver = await newLeaver();
+    const ticket = await newTicket("IN_PROGRESS", ids.staff);
+    const res = await whileDeactivating(leaver, () =>
+      patch(`/api/tickets/${ticket.id}/owner`, cookies.staff, { ownerId: leaver, version: ticket.version }).then((r) => r),
+    );
+    expect(res.status, JSON.stringify(res.body)).toBe(400);
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } })).ownerId).toBe(ids.staff);
+  });
+
+  it("refuses a claim by a user who is deactivated while claiming (the Lab 3 sibling, BR-22 and BR-25)", async () => {
+    // The caller passed the session check before the deactivation committed; the
+    // claim itself re-checks under the lock and ends the session instead.
+    const leaver = await newLeaver();
+    const leaverCookie = await sessionCookieFor(leaver);
+    const ticket = await prisma.ticket.create({
+      data: {
+        ticketNumber: `TKT-2097-${randomUUID().slice(0, 12)}`, requesterId: ids.owner, categoryId, relatedSystemId,
+        summary: "Unowned ticket", description: "Nobody owns this yet, so it can be claimed.",
+        requestedPriority: "MEDIUM", itPriority: "MEDIUM", currentStatus: "OPEN", idempotencyKey: randomUUID(),
+      },
+    });
+    const res = await whileDeactivating(leaver, () =>
+      post(`/api/tickets/${ticket.id}/claim`, leaverCookie, { version: ticket.version }).then((r) => r),
+    );
+    expect(res.status, JSON.stringify(res.body)).toBe(401);
+    expect(res.body.error.code).toBe("UNAUTHENTICATED");
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } })).ownerId).toBeNull();
   });
 });
 

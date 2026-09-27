@@ -64,12 +64,37 @@ export type StoredAction = {
 
 // --- field readers -----------------------------------------------------------
 
-const ISO_WITH_OFFSET = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
+const ISO_WITH_OFFSET = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?(?:Z|([+-])(\d{2}):(\d{2}))$/;
 
+/**
+ * An ISO 8601 instant with a time zone, checked component by component.
+ *
+ * `new Date()` alone is not a validator: it silently normalises impossible
+ * values, so `2027-02-31T12:00:00Z` becomes 3 March and `T24:00` becomes the
+ * next day. A planned Action would then be saved at a time nobody entered.
+ * Earth2509 found this in review of PR #94. Every part is checked against the
+ * calendar first, including the day count of the month in that year, so a leap
+ * day is accepted only in a leap year.
+ */
 function readInstant(raw: unknown): Date | undefined {
-  if (typeof raw !== "string" || !ISO_WITH_OFFSET.test(raw)) return undefined;
-  const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  if (typeof raw !== "string") return undefined;
+  const m = ISO_WITH_OFFSET.exec(raw);
+  if (!m) return undefined;
+  const [year, month, day, hour, minute] = [m[1], m[2], m[3], m[4], m[5]].map(Number);
+  const second = m[6] === undefined ? 0 : Number(m[6]);
+  const millis = m[7] === undefined ? 0 : Number(m[7].padEnd(3, "0"));
+  const offsetSign = m[8] === "-" ? -1 : 1;
+  const offsetHours = m[9] === undefined ? 0 : Number(m[9]);
+  const offsetMinutes = m[10] === undefined ? 0 : Number(m[10]);
+
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (month < 1 || month > 12 || day < 1 || day > daysInMonth) return undefined;
+  if (hour > 23 || minute > 59 || second > 59) return undefined;
+  // Real offsets run from -12:00 to +14:00; anything outside is a typing error.
+  if (offsetMinutes > 59 || offsetHours * 60 + offsetMinutes > 14 * 60) return undefined;
+
+  const utc = Date.UTC(year, month - 1, day, hour, minute, second, millis);
+  return new Date(utc - offsetSign * (offsetHours * 60 + offsetMinutes) * 60_000);
 }
 
 /** Trimmed text within bounds, or undefined when invalid. */

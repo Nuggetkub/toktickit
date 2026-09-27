@@ -13,6 +13,7 @@ import {
   requestFingerprint,
   type StoredAction,
 } from "./action-rules.js";
+import { lockEligibleOperator } from "./operator-lock.js";
 
 // Actions Taken (docs/lab-04/api-spec.md §2). The rules live in action-rules.ts;
 // this file owns the transaction.
@@ -85,13 +86,15 @@ async function lockTicket(tx: Prisma.TransactionClient, id: number): Promise<Loc
   return rows[0] ?? null;
 }
 
-/** BR-06: an active IT Staff or Administrator user, checked inside the transaction. */
-async function isEligibleAssignee(tx: Prisma.TransactionClient, userId: number): Promise<boolean> {
-  const user = await tx.user.findFirst({
-    where: { id: userId, isActive: true, role: { in: ["IT_STAFF", "ADMINISTRATOR"] } },
-    select: { id: true },
-  });
-  return user !== null;
+/**
+ * The assignee a request names, if it names a well-formed one. Its row is locked
+ * FIRST in the transaction, before the Ticket, because a deactivation locks the
+ * user and then the Tickets it unassigns; the same order here cannot deadlock
+ * with it (operator-lock.ts).
+ */
+function candidateAssignee(body: unknown): number | undefined {
+  const raw = typeof body === "object" && body !== null ? (body as Record<string, unknown>).assigneeId : undefined;
+  return typeof raw === "number" && Number.isSafeInteger(raw) && raw > 0 ? raw : undefined;
 }
 
 const INELIGIBLE = "Choose an active IT Staff member or Administrator.";
@@ -164,6 +167,9 @@ export async function createAction(req: Request, res: Response): Promise<void> {
 
   try {
     const outcome = await prisma.$transaction(async (tx) => {
+      // BR-06 under a share lock on the assignee's row, taken before the Ticket's.
+      const candidate = candidateAssignee(req.body);
+      const eligible = candidate !== undefined && (await lockEligibleOperator(tx, candidate));
       const ticket = await lockTicket(tx, ticketId);
       if (!ticket) return { kind: "missing" as const };
 
@@ -185,7 +191,7 @@ export async function createAction(req: Request, res: Response): Promise<void> {
 
       const parsed = parseCreate(req.body, ticket, now);
       const fieldErrors = parsed.kind === "invalid" ? { ...parsed.fieldErrors } : {};
-      if (parsed.kind === "ok" && !(await isEligibleAssignee(tx, parsed.value.assigneeId))) {
+      if (parsed.kind === "ok" && !eligible) {
         fieldErrors.assigneeId = INELIGIBLE;
       }
       if (parsed.kind === "invalid" || Object.keys(fieldErrors).length > 0) {
@@ -267,7 +273,12 @@ export async function createAction(req: Request, res: Response): Promise<void> {
 
 // --- the three changes to an existing Action ---------------------------------------------
 
-type Loaded = { ticket: LockedTicket; stored: StoredAction & { status: string; version: number } };
+type Loaded = {
+  ticket: LockedTicket;
+  stored: StoredAction & { status: string; version: number };
+  /** Whether the assignee this request names is eligible, decided under its row lock. */
+  assigneeEligible: boolean;
+};
 
 /**
  * Shared shape of edit, complete and cancel: lock the Ticket, find the Action on
@@ -280,7 +291,7 @@ async function changeAction(
   req: Request,
   res: Response,
   route: string,
-  decide: (loaded: Loaded, now: Date, tx: Prisma.TransactionClient) => Promise<
+  decide: (loaded: Loaded, now: Date) => Promise<
     { kind: "invalid"; fieldErrors: Record<string, string> } | { kind: "write"; version: number; data: Prisma.ActionTakenUncheckedUpdateManyInput }
   >,
 ): Promise<void> {
@@ -291,6 +302,9 @@ async function changeAction(
   const prisma = getPrisma();
   try {
     const outcome = await prisma.$transaction(async (tx) => {
+      // A reassignment's candidate is locked before the Ticket, as on create.
+      const candidate = candidateAssignee(req.body);
+      const assigneeEligible = candidate !== undefined && (await lockEligibleOperator(tx, candidate));
       const ticket = await lockTicket(tx, ticketId);
       if (!ticket) return { kind: "missingTicket" as const };
       if (actionId === null) return { kind: "missingAction" as const };
@@ -301,7 +315,7 @@ async function changeAction(
       if (!stored) return { kind: "missingAction" as const };
 
       const now = new Date();
-      const decision = await decide({ ticket, stored }, now, tx);
+      const decision = await decide({ ticket, stored, assigneeEligible }, now);
       if (decision.kind === "invalid") return decision;
 
       const refused = actionWriteRefusal(ticket.currentStatus);
@@ -349,13 +363,13 @@ async function changeAction(
 
 /** PATCH /api/tickets/:ticketId/actions/:actionId — edit an open Action (BR-08). */
 export async function editAction(req: Request, res: Response): Promise<void> {
-  await changeAction(req, res, "PATCH /api/tickets/:ticketId/actions/:actionId", async ({ ticket, stored }, now, tx) => {
+  await changeAction(req, res, "PATCH /api/tickets/:ticketId/actions/:actionId", async ({ ticket, stored, assigneeEligible }, now) => {
     const parsed = parseEdit(req.body, stored, ticket, now);
     const fieldErrors = parsed.kind === "invalid" ? { ...parsed.fieldErrors } : {};
     const assigneeId = parsed.kind === "ok" ? parsed.value.assigneeId : undefined;
     // BR-06: only an assignee being set now is checked. One set earlier stays
     // valid until BR-17 clears it, and that is handled by the deactivation.
-    if (assigneeId !== undefined && assigneeId !== stored.assigneeId && !(await isEligibleAssignee(tx, assigneeId))) {
+    if (assigneeId !== undefined && assigneeId !== stored.assigneeId && !assigneeEligible) {
       fieldErrors.assigneeId = INELIGIBLE;
     }
     if (parsed.kind === "invalid" || Object.keys(fieldErrors).length > 0) return { kind: "invalid", fieldErrors };
