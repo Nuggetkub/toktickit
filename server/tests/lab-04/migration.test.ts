@@ -218,6 +218,25 @@ describe("Lab 4 migration against a populated Lab 3 database", () => {
     // A follow-up note without follow-up.
     await expect(create({ followUpNote: "Check again next week." })).rejects.toThrow(/ActionTaken_follow_up_note_check/);
 
+    // The lifecycle rules are mutually exclusive (Earth2509's review of PR #93):
+    // no status may carry another status's audit facts.
+    const completion = { performedById: staff.id, completedAt: new Date() };
+    const cancellation = { cancelledById: staff.id, cancelledAt: new Date(), cancellationReason: "Duplicate." };
+    // Open work with completion or cancellation facts.
+    await expect(create({ performedById: staff.id })).rejects.toThrow(/ActionTaken_open_is_unfinished_check/);
+    await expect(create({ completedAt: new Date() })).rejects.toThrow(/ActionTaken_open_is_unfinished_check/);
+    await expect(create({ cancellationReason: "Not yet." })).rejects.toThrow(/ActionTaken_open_is_unfinished_check/);
+    // Completed work that also claims to be cancelled, one fact at a time.
+    for (const [field, value] of Object.entries(cancellation)) {
+      await expect(create({ status: "COMPLETED", ...completion, result: "Done.", [field]: value })).rejects.toThrow(/ActionTaken_completed_is_complete_check/);
+    }
+    // Cancelled work that also claims a performer or a completion.
+    await expect(create({ status: "CANCELLED", ...cancellation, performedById: staff.id })).rejects.toThrow(/ActionTaken_cancelled_is_explained_check/);
+    await expect(create({ status: "CANCELLED", ...cancellation, completedAt: new Date() })).rejects.toThrow(/ActionTaken_cancelled_is_explained_check/);
+    // `result` belongs to no single status: open work and a cancelled Action may keep one (BR-03).
+    await expect(create({ result: "Partly done so far." })).resolves.toBeTruthy();
+    await expect(create({ status: "CANCELLED", ...cancellation, result: "Partly done before cancelling." })).resolves.toBeTruthy();
+
     // The positive controls: each rule admits the state it describes, so the
     // refusals above are the constraints and not something else.
     await expect(create({ status: "COMPLETED", performedById: staff.id, completedAt: new Date(), result: "Done." })).resolves.toBeTruthy();

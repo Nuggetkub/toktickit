@@ -253,9 +253,11 @@ model InternalNote {
 // a user clears it on their open Actions (BR-17); the API never accepts null.
 //
 // The migration adds CHECK constraints Prisma cannot express, so the database
-// refuses a state the rules forbid even from a code path that forgets one:
-// COMPLETED needs a performer, a completion time and a result; CANCELLED needs a
-// canceller, a time and a reason; no follow-up means no follow-up note.
+// refuses a state the rules forbid even from a code path that forgets one. The
+// three lifecycle rules are mutually exclusive: OPEN has no completion or
+// cancellation facts; COMPLETED has a performer, a completion time and a result,
+// and no cancellation facts; CANCELLED has a canceller, a time and a reason, and
+// no performer or completion. And no follow-up means no follow-up note.
 model ActionTaken {
   id                 Int          @id @default(autoincrement())
   ticketId           Int

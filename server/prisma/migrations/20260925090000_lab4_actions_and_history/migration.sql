@@ -93,16 +93,29 @@ ALTER TABLE "TicketStatusEvent" ADD CONSTRAINT "TicketStatusEvent_ticketId_fkey"
 -- AddForeignKey
 ALTER TABLE "TicketStatusEvent" ADD CONSTRAINT "TicketStatusEvent_actorId_fkey" FOREIGN KEY ("actorId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- Hand-written: the three state rules of specification §7, enforced by the
--- database itself.
+-- Hand-written: the state rules of specification §7, enforced by the database
+-- itself. The three lifecycle rules are mutually exclusive: each status carries
+-- exactly its own audit facts and none of another's, so a code path that forgets
+-- to clear a column cannot store a contradictory record. `result` is not part of
+-- them, because BR-03 allows it on open work and a cancelled Action may keep it.
 
--- A completed Action names who did it, when, and what came of it (BR-03, BR-05).
+-- An open Action has been neither completed nor cancelled (BR-05: Performed by
+-- is empty while it is open).
+ALTER TABLE "ActionTaken" ADD CONSTRAINT "ActionTaken_open_is_unfinished_check"
+    CHECK ("status" <> 'OPEN' OR ("performedById" IS NULL AND "completedAt" IS NULL
+        AND "cancelledById" IS NULL AND "cancelledAt" IS NULL AND "cancellationReason" IS NULL));
+
+-- A completed Action names who did it, when, and what came of it, and was not
+-- cancelled (BR-03, BR-05).
 ALTER TABLE "ActionTaken" ADD CONSTRAINT "ActionTaken_completed_is_complete_check"
-    CHECK ("status" <> 'COMPLETED' OR ("performedById" IS NOT NULL AND "completedAt" IS NOT NULL AND "result" IS NOT NULL));
+    CHECK ("status" <> 'COMPLETED' OR ("performedById" IS NOT NULL AND "completedAt" IS NOT NULL AND "result" IS NOT NULL
+        AND "cancelledById" IS NULL AND "cancelledAt" IS NULL AND "cancellationReason" IS NULL));
 
--- A cancelled Action names who cancelled it, when, and why (BR-03).
+-- A cancelled Action names who cancelled it, when, and why, and has no
+-- performer or completion (BR-03; BR-05: a cancelled Action has no performer).
 ALTER TABLE "ActionTaken" ADD CONSTRAINT "ActionTaken_cancelled_is_explained_check"
-    CHECK ("status" <> 'CANCELLED' OR ("cancelledById" IS NOT NULL AND "cancelledAt" IS NOT NULL AND "cancellationReason" IS NOT NULL));
+    CHECK ("status" <> 'CANCELLED' OR ("cancelledById" IS NOT NULL AND "cancelledAt" IS NOT NULL AND "cancellationReason" IS NOT NULL
+        AND "performedById" IS NULL AND "completedAt" IS NULL));
 
 -- No follow-up means no follow-up note (BR-09).
 ALTER TABLE "ActionTaken" ADD CONSTRAINT "ActionTaken_follow_up_note_check"
