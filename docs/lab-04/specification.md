@@ -381,8 +381,9 @@ Labsheet §4.2, restated so that none of it creeps in:
   - Actions in every Action status, including one open Action whose assignee was cleared by a
     deactivation;
   - Status Events consistent with each seeded Ticket's status, some inside the 7-day window;
-  - a Requester (Ananya Wong) and an IT Staff member (Daniel Reyes) for whom every personal
-    metric is zero.
+  - a Requester (Ananya Wong) and an IT Staff member (Kanya Srisuk, a new seeded account) for
+    whom every personal metric is zero. A new account is needed because the Lab 3 seed already
+    makes every other active IT Staff member a Ticket Owner.
 
 ## 6. UI Specification Summary
 
