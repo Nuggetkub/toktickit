@@ -406,22 +406,35 @@ Both endpoints are `GET`, take **no** query parameters (any parameter is
 
 ---
 
-## 8. Status and Error Code Summary — Lab 4 additions
+## 8. Status and Error Code Summary — the Lab 4 endpoints
 
-| Status | `code` | Endpoints |
-|---|---|---|
-| `200` | — | Action create replay, and every read |
-| `201` | — | Action create |
-| `400` | `IDEMPOTENCY_KEY_REQUIRED` | Action create |
-| `400` | `VALIDATION_FAILED` | every Lab 4 write, the list filters, the dashboards |
-| `404` | `ACTION_NOT_FOUND` | Action edit, complete and cancel |
-| `409` | `IDEMPOTENCY_KEY_CONFLICT` | Action create |
-| `409` | `ACTION_NOT_ALLOWED` | Action writes on a `RESOLVED` Ticket |
-| `409` | `ACTION_FINAL` | edit, complete or cancel of a final Action |
-| `409` | `ACTION_VERSION_CONFLICT` | edit, complete, cancel |
-| `409` | `RESOLUTION_BLOCKED` | status change to `RESOLVED` |
+Every status and code the endpoints in §2 to §6 can return, so the list is complete in one
+place. **New** marks a code Lab 4 introduces. Every other code already existed, keeps its
+Lab 2 or Lab 3 meaning, and is listed here because it now reaches a Lab 4 endpoint. No
+existing code is renamed.
 
-Every other code keeps its Lab 2 or Lab 3 meaning. No existing code is renamed.
+| Status | `code` | New | Lab 4 endpoints |
+|---|---|---|---|
+| `200` | — | | every read; Action edit, complete and cancel; Action create replay; status change |
+| `201` | — | | Action create |
+| `400` | `IDEMPOTENCY_KEY_REQUIRED` | | Action create |
+| `400` | `VALIDATION_FAILED` | | every Lab 4 write, the list filters, the dashboards |
+| `401` | `UNAUTHENTICATED` | | every Lab 4 endpoint, with no valid session (§1 step 2) |
+| `403` | `ORIGIN_REJECTED` | | every Lab 4 write, from an untrusted origin (§1 step 1) |
+| `403` | `PASSWORD_CHANGE_REQUIRED` | | every Lab 4 endpoint, while a password change is pending (§1 step 3) |
+| `403` | `FORBIDDEN` | | Action writes by a Requester; the dashboard of another role (§1 step 4, before any lookup) |
+| `404` | `TICKET_NOT_FOUND` | | every Ticket-scoped Lab 4 endpoint: no such Ticket, or another Requester's |
+| `404` | `ACTION_NOT_FOUND` | **New** | Action edit, complete and cancel: no such Action on this Ticket |
+| `409` | `IDEMPOTENCY_KEY_CONFLICT` | | Action create |
+| `409` | `TICKET_TERMINAL` | | Action create, edit, complete and cancel on a `CLOSED` or `CANCELLED` Ticket (BR-12) |
+| `409` | `ACTION_NOT_ALLOWED` | **New** | Action create, edit, complete and cancel on a `RESOLVED` Ticket (BR-12) |
+| `409` | `ACTION_FINAL` | **New** | edit, complete or cancel of a completed or cancelled Action (BR-08) |
+| `409` | `ACTION_VERSION_CONFLICT` | **New** | edit, complete, cancel, with a stale `version` (BR-13) |
+| `409` | `RESOLUTION_BLOCKED` | **New** | status change to `RESOLVED` while the gate is closed (BR-19) |
+| `503` | `DEPENDENCY_UNAVAILABLE` | | every Lab 4 endpoint, when the database is unreachable; nothing partial is returned |
+
+The status change keeps every Lab 3 answer (Lab 3 api-spec §6) and adds only
+`RESOLUTION_BLOCKED`.
 
 ---
 
