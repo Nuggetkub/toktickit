@@ -3,7 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import {
   LAB2_MIGRATIONS,
   LAB3_MIGRATION,
-  LAB4_MIGRATION,
+  LAB4_MIGRATIONS,
   applyMigration,
   dropSchema,
   executeSqlFile,
@@ -53,6 +53,11 @@ afterAll(async () => {
   await dropSchema(SCHEMA);
   await dropSchema(REFERENCE);
 });
+
+/** Every Lab 4 migration, in order: the tables, then the request fingerprint. */
+function applyLab4(target: string): void {
+  for (const migration of LAB4_MIGRATIONS) applyMigration(migration, target);
+}
 
 /** A schema at the exact state Lab 3 left behind. */
 async function buildLab3Database(schema: string, target: string): Promise<void> {
@@ -148,7 +153,7 @@ describe("Lab 4 migration against a populated Lab 3 database", () => {
     const before = await snapshot(prisma);
     expect(before.Ticket).toHaveLength(8);
 
-    applyMigration(LAB4_MIGRATION, url);
+    applyLab4(url);
 
     // Row for row, column for column, every Lab 3 table is what it was.
     expect(await snapshot(prisma)).toEqual(before);
@@ -168,7 +173,7 @@ describe("Lab 4 migration against a populated Lab 3 database", () => {
     // The reference: a database the Lab 3 migrations alone produce.
     await buildLab3Database(REFERENCE, referenceUrl);
 
-    applyMigration(LAB4_MIGRATION, url);
+    applyLab4(url);
 
     // The comparison must be able to fail, or its later pass means nothing:
     // migrated, the schema is NOT Lab 3's.
@@ -190,7 +195,7 @@ describe("Lab 4 migration against a populated Lab 3 database", () => {
     expect(await snapshot(prisma)).toEqual(before);
 
     // The round trip works: the migration applies cleanly again afterwards.
-    applyMigration(LAB4_MIGRATION, url);
+    applyLab4(url);
     expect(schemaMatchesDatamodel(url)).toBe(true);
     expect(await snapshot(prisma)).toEqual(before);
   }, 180_000);
@@ -199,7 +204,7 @@ describe("Lab 4 migration against a populated Lab 3 database", () => {
     await buildLab3Database(SCHEMA, url);
     const prisma = client();
     await populate(prisma);
-    applyMigration(LAB4_MIGRATION, url);
+    applyLab4(url);
 
     const ticket = await prisma.ticket.findFirstOrThrow({ where: { currentStatus: "IN_PROGRESS" } });
     const staff = await prisma.user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: true } });
