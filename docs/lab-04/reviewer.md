@@ -35,7 +35,7 @@ thing its label names.
 
 | My issue / My pull request | Scope | Reviewer feedback | Author response | Outcome |
 |---|---|---|---|---|
-| — | — | No Lab 4 pull request has been reviewed yet. | — | — |
+| Issue [#80](https://github.com/Nuggetkub/toktickit/issues/80) / [PR #92](https://github.com/Nuggetkub/toktickit/pull/92) | The Lab 4 engineering contract: `specification.md`, `api-spec.md`, `ui-spec.md`, `tests.md`, `reviewer.md`, `ai-use.md` | [**Changes requested**, 2026-09-27](https://github.com/Nuggetkub/toktickit/pull/92#issuecomment-5852494720), on `28b2150`, as a PR comment rather than a formal review. The api-spec §8 error-code summary omitted `409 TICKET_TERMINAL`, which §2, BR-12 and AC-08 all specify for Action writes on a `CLOSED` or `CANCELLED` Ticket. | Accepted, and fixed as a class in `3d14307`. The table was titled "additions" but already listed one existing code (`VALIDATION_FAILED`) because it reached the new endpoints, so the other existing codes that do were missing too: `TICKET_NOT_FOUND`, `FORBIDDEN`, the three §1 refusals and `503`. §8 now lists every code the Lab 4 endpoints return, marks the five new ones, and a cross-check confirms none named in §1–§7 is missing. [Reply](https://github.com/Nuggetkub/toktickit/pull/92#issuecomment-5852621417), and review re-requested. | Open |
 
 ## Reviews I Gave on My Peer's Pull Requests — `Earth2509/toktickit`
 
