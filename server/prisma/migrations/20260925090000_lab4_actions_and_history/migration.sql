@@ -36,6 +36,7 @@ CREATE TABLE "ActionTaken" (
     "cancelledAt" TIMESTAMP(3),
     "version" INTEGER NOT NULL DEFAULT 1,
     "idempotencyKey" TEXT NOT NULL,
+    "requestFingerprint" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

@@ -414,11 +414,11 @@ accessibility rule unchanged. It adds:
 
 | Model | Change | Fields |
 |---|---|---|
-| `ActionTaken` | New | `id`, `ticketId`, `actionAt`, `description`, `result` (nullable), `followUpRequired`, `followUpNote` (nullable), `attachmentNotes` (nullable), `status`, `assigneeId` (nullable FK `User`), `performedById` (nullable FK `User`), `createdById` (FK `User`), `cancelledById` (nullable FK `User`), `cancellationReason` (nullable), `completedAt` (nullable), `cancelledAt` (nullable), `version` (default 1), `idempotencyKey` (unique), `createdAt`, `updatedAt` |
+| `ActionTaken` | New | `id`, `ticketId`, `actionAt`, `description`, `result` (nullable), `followUpRequired`, `followUpNote` (nullable), `attachmentNotes` (nullable), `status`, `assigneeId` (nullable FK `User`), `performedById` (nullable FK `User`), `createdById` (FK `User`), `cancelledById` (nullable FK `User`), `cancellationReason` (nullable), `completedAt` (nullable), `cancelledAt` (nullable), `version` (default 1), `idempotencyKey` (unique), `requestFingerprint` (nullable), `createdAt`, `updatedAt` |
 | `TicketStatusEvent` | New | `id`, `ticketId`, `fromStatus` (nullable), `toStatus`, `actorId` (FK `User`), `createdAt` |
 | `Ticket`, `User` and every other model | Unchanged | Only the reverse relations are added |
 
-`assigneeId` is nullable only because of BR-17. The API never accepts a null assignee.
+`assigneeId` is nullable only because of BR-17. The API never accepts a null assignee. `requestFingerprint` is a hash of the create request as received. BR-15 compares a replay with it rather than with the row, because an open Action may have been edited since. It is null for rows no API request created, such as the demo seed's.
 
 ### Enum
 
