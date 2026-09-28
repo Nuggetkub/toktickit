@@ -6,6 +6,7 @@ import { currentUser } from "./auth-middleware.js";
 import { attachmentSelect } from "./attachment-view.js";
 import { serializeTicketDetail, ticketDetailSelect } from "./tickets-route.js";
 import { decideStatusChange, isTerminal } from "./ticket-workflow.js";
+import { lockEligibleOperator } from "./operator-lock.js";
 
 // The operations that move a ticket through its life (api-spec.md §6).
 //
@@ -140,13 +141,17 @@ async function respond(res: Response, outcome: Outcome, prisma: PrismaClient, id
   res.status(200).json(outcome.detail);
 }
 
-/** An owner must be an active IT Staff or Administrator at the moment of assignment (BR-21). */
+/**
+ * An owner must be an active IT Staff or Administrator at the moment of
+ * assignment (BR-21). Decided under a share lock on the user's row, so a
+ * concurrent deactivation cannot slip between this check and the write
+ * (operator-lock.ts; found in Earth2509's review of PR #94). mutate() reads the
+ * Ticket without a lock and locks it only at the write, so the user row is
+ * always locked first, the same order as a deactivation, and the two cannot
+ * deadlock.
+ */
 async function eligibleOwner(tx: Prisma.TransactionClient, ownerId: number): Promise<boolean> {
-  const user = await tx.user.findFirst({
-    where: { id: ownerId, isActive: true, role: { in: ["IT_STAFF", "ADMINISTRATOR"] } },
-    select: { id: true },
-  });
-  return user !== null;
+  return lockEligibleOperator(tx, ownerId);
 }
 
 export async function claimTicket(req: Request, res: Response): Promise<void> {
@@ -166,7 +171,7 @@ export async function claimTicket(req: Request, res: Response): Promise<void> {
 
   const prisma = getPrisma();
   try {
-    const outcome = await mutate(prisma, id, version, actor.id, (ticket) => {
+    const outcome = await mutate(prisma, id, version, actor.id, async (ticket, tx) => {
       if (isTerminal(ticket.currentStatus)) {
         return { refuse: { status: 409, code: "TICKET_TERMINAL", message: "This Ticket is closed and can no longer change." } };
       }
@@ -174,6 +179,13 @@ export async function claimTicket(req: Request, res: Response): Promise<void> {
       // it is a different answer from a stale version, and says so.
       if (ticket.ownerId !== null) {
         return { refuse: { status: 409, code: "TICKET_ALREADY_ASSIGNED", message: "Another person already owns this Ticket." } };
+      }
+      // The caller passed the session check when the request arrived, but may
+      // have been deactivated since. Claiming makes them the owner, so they are
+      // re-checked under the same share lock as any other assignment. A caller
+      // who is no longer active has no session to speak of: step 2's 401.
+      if (!(await eligibleOwner(tx, actor.id))) {
+        return { refuse: { status: 401, code: "UNAUTHENTICATED", message: "Your session has ended. Please sign in again." } };
       }
       return { write: { ownerId: actor.id } };
     });

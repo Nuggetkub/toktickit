@@ -414,11 +414,11 @@ accessibility rule unchanged. It adds:
 
 | Model | Change | Fields |
 |---|---|---|
-| `ActionTaken` | New | `id`, `ticketId`, `actionAt`, `description`, `result` (nullable), `followUpRequired`, `followUpNote` (nullable), `attachmentNotes` (nullable), `status`, `assigneeId` (nullable FK `User`), `performedById` (nullable FK `User`), `createdById` (FK `User`), `cancelledById` (nullable FK `User`), `cancellationReason` (nullable), `completedAt` (nullable), `cancelledAt` (nullable), `version` (default 1), `idempotencyKey` (unique), `createdAt`, `updatedAt` |
+| `ActionTaken` | New | `id`, `ticketId`, `actionAt`, `description`, `result` (nullable), `followUpRequired`, `followUpNote` (nullable), `attachmentNotes` (nullable), `status`, `assigneeId` (nullable FK `User`), `performedById` (nullable FK `User`), `createdById` (FK `User`), `cancelledById` (nullable FK `User`), `cancellationReason` (nullable), `completedAt` (nullable), `cancelledAt` (nullable), `version` (default 1), `idempotencyKey` (unique), `requestFingerprint` (nullable), `createdAt`, `updatedAt` |
 | `TicketStatusEvent` | New | `id`, `ticketId`, `fromStatus` (nullable), `toStatus`, `actorId` (FK `User`), `createdAt` |
 | `Ticket`, `User` and every other model | Unchanged | Only the reverse relations are added |
 
-`assigneeId` is nullable only because of BR-17. The API never accepts a null assignee.
+`assigneeId` is nullable only because of BR-17. The API never accepts a null assignee. `requestFingerprint` is a hash of the create request as received. BR-15 compares a replay with it rather than with the row, because an open Action may have been edited since. It is null for rows no API request created, such as the demo seed's.
 
 ### Enum
 
@@ -469,12 +469,17 @@ any two into one column loses exactly the distinction the stakeholder asked for.
 
 ### Migration and backfill
 
-One migration, `lab4_actions_and_history`, additive only (BR-34):
+Two migrations, both additive only (BR-34):
 
-1. Create the `ActionStatus` enum.
-2. Create `ActionTaken` and `TicketStatusEvent` with their foreign keys, indexes and `CHECK`
-   constraints.
-3. Create the index `Ticket(requesterId, currentStatus)`.
+1. `lab4_actions_and_history` (issue #81):
+   1. Create the `ActionStatus` enum.
+   2. Create `ActionTaken` and `TicketStatusEvent` with their foreign keys, indexes and
+      `CHECK` constraints.
+   3. Create the index `Ticket(requesterId, currentStatus)`.
+2. `lab4_action_request_fingerprint` (issue #82) adds the nullable `requestFingerprint`
+   column. It is a migration of its own because the first had already merged. A migration
+   that has been applied is never edited, since a database that ran it would never receive
+   the change.
 
 **Backfill: none, by decision (D-07).** Existing Tickets start with no Actions and no
 history. What that means for behaviour:
@@ -484,10 +489,11 @@ history. What that means for behaviour:
   other.
 - R-4 and "Recently resolved" count only resolutions recorded after the migration.
 
-**Rollback.** The migration adds but never alters, so a reverse script is safe. It drops the
-two tables, the enum and the new index, and nothing that existed in Lab 3 is lost. It lives at
-`server/prisma/rollback/20260925_lab4_actions_and_history.down.sql`. The migration test
-applies the migration to a populated Lab 3 database, runs the rollback, and asserts that the
+**Rollback.** The migrations add but never alter, so one reverse script is safe for both. It
+drops the two tables, taking the second migration's column with them, plus the enum and the new
+index. It also forgets both migration records, and nothing that existed in Lab 3 is lost. It
+lives at `server/prisma/rollback/20260925_lab4_actions_and_history.down.sql`. The migration test
+applies both migrations to a populated Lab 3 database, runs the rollback, and asserts that the
 schema matches Lab 3's `schema.prisma` exactly and every Lab 3 row is intact. A rollback does
 lose all Actions and history recorded since, so a backup is taken first, as in Lab 3.
 

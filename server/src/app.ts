@@ -22,6 +22,7 @@ import {
   listInternalNotes,
 } from "./discussion-route.js";
 import { createUser, editUser, listUsers, setInitialPassword } from "./users-admin-route.js";
+import { cancelAction, completeAction, createAction, editAction, listActions } from "./actions-route.js";
 import multer from "multer";
 import { MAX_BYTES } from "./attachment-rules.js";
 import {
@@ -232,6 +233,24 @@ app.post(
   requireRole("REQUESTER"),
   asyncRoute(indicateResolved),
 );
+
+// ---------------------------------------------------------------------------
+// Lab 4 issue 82 — Actions Taken (docs/lab-04/api-spec.md §2)
+//
+// Reading follows comments: open to every role, narrowed to the caller's own
+// Ticket inside the handler when the caller is a Requester, who then sees every
+// Action and every field (BR-16). Every write is staff-only and carries
+// requireRole, so a Requester is refused at step 4, before the Ticket is looked
+// up, identically for a Ticket that exists and one that does not.
+//
+// There is no DELETE. It is not registered rather than answered with 405, so a
+// delete meets the 404 api-spec §2 specifies, as for comments.
+// ---------------------------------------------------------------------------
+app.get("/api/tickets/:ticketId/actions", ...signedIn, asyncRoute(listActions));
+app.post("/api/tickets/:ticketId/actions", ...staffOnly, asyncRoute(createAction));
+app.patch("/api/tickets/:ticketId/actions/:actionId", ...staffOnly, asyncRoute(editAction));
+app.post("/api/tickets/:ticketId/actions/:actionId/complete", ...staffOnly, asyncRoute(completeAction));
+app.post("/api/tickets/:ticketId/actions/:actionId/cancel", ...staffOnly, asyncRoute(cancelAction));
 
 // Administrator user management (api-spec.md §8, FR-16).
 //

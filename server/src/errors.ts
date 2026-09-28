@@ -49,6 +49,14 @@ export type ErrorCode =
   // someone else to do it, and the last-Administrator refusal means promote
   // somebody before demoting yourself. A shared CONFLICT would make the screen
   // guess which of the three happened.
+  // Lab 4 Actions Taken (docs/lab-04/api-spec.md §8). Named separately for the
+  // same reason as the workflow codes: each asks the screen for a different next
+  // step. Reopen the ticket (ACTION_NOT_ALLOWED), record a new action instead
+  // (ACTION_FINAL), or reload and reapply (ACTION_VERSION_CONFLICT).
+  | "ACTION_NOT_FOUND"
+  | "ACTION_NOT_ALLOWED"
+  | "ACTION_FINAL"
+  | "ACTION_VERSION_CONFLICT"
   | "USER_NOT_FOUND"
   | "EMAIL_ALREADY_EXISTS"
   | "CANNOT_DEACTIVATE_SELF"

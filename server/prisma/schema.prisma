@@ -281,6 +281,11 @@ model ActionTaken {
   version            Int          @default(1)
   // Replay detection for create (BR-15), as on Ticket since Lab 2.
   idempotencyKey     String       @unique
+  // A hash of the create request as it was received. An open Action can be
+  // edited after it is created, so a retry cannot be compared with the row as it
+  // is now; it is compared with this. Null for rows no API request created, such
+  // as the demo seed's.
+  requestFingerprint String?
   // Recorded At, and Last Updated.
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt

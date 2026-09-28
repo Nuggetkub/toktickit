@@ -99,10 +99,14 @@ export const LAB2_MIGRATIONS = [
 
 export const LAB3_MIGRATION = "20260914090000_lab3_user_and_workflow";
 
-export const LAB4_MIGRATION = "20260925090000_lab4_actions_and_history";
+/** The Lab 4 migrations, in order. */
+export const LAB4_MIGRATIONS = [
+  "20260925090000_lab4_actions_and_history",
+  "20260927090000_lab4_action_request_fingerprint",
+] as const;
 
 /** Every migration committed after Lab 3, in order. Add each new one here. */
-export const MIGRATIONS_AFTER_LAB3 = [LAB4_MIGRATION] as const;
+export const MIGRATIONS_AFTER_LAB3 = [...LAB4_MIGRATIONS] as const;
 
 /** Applies a SQL file outside the migrations directory, such as a rollback script. */
 export function executeSqlFile(relativeToServer: string, url: string): void {

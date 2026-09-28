@@ -212,6 +212,15 @@ transcribed.
   and seed tests reuse those helpers with `lab4_migration_test`,
   `lab4_migration_lab3_reference` and `lab4_seed_test`, so the guard now accepts `lab3_*` or
   `lab4_*`. It still refuses `public` and every other name.
+- **Two Lab 3 routes now lock the user they assign** (issue #82, from Earth2509's review of
+  PR #94). Ticket Owner assignment (Lab 3 BR-21) and claim (Lab 3 BR-22) checked the person's
+  eligibility with a plain read. A concurrent deactivation that had updated the user and cleared
+  their open work, but not yet committed, was invisible to that read, so the Ticket was written
+  to someone who could no longer sign in. The same shape existed in the new Action assignment.
+  All three now decide under a share lock on the user's row (`src/operator-lock.ts`). A claim by
+  a caller deactivated mid-request now answers `401 UNAUTHENTICATED`. No Lab 3 test changed:
+  the four forced-interleaving tests that reproduce the races are new, in
+  `server/tests/lab-04/actions-taken.api.test.ts`, and each failed before the fix.
 - **The performance smoke test is not a benchmark.** It runs on the development machine
   against the seed, and it catches an accidental N+1 query or a missing index. It makes no
   claim about production load.
