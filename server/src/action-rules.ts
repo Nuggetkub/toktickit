@@ -130,7 +130,11 @@ function readVersion(raw: unknown, fieldErrors: FieldErrors): number {
 
 /** BR-07 for the status the Action will have. */
 function checkActionAt(actionAt: Date, status: ActionStatus, ticket: TicketContext, now: Date, fieldErrors: FieldErrors): void {
-  if (actionAt.getTime() < ticket.createdAt.getTime()) {
+  // The same clock-skew allowance as for the future: the Ticket's createdAt is
+  // the database's clock, the Action's date the client's, and they differ. Here
+  // the database ran about 144 ms ahead of this machine, which made an Action
+  // dated "now" on a new Ticket look older than the Ticket.
+  if (actionAt.getTime() < ticket.createdAt.getTime() - CLOCK_SKEW_MS) {
     fieldErrors.actionAt = "The action cannot be dated before the ticket was created.";
   } else if (status === "COMPLETED" && actionAt.getTime() > now.getTime() + CLOCK_SKEW_MS) {
     fieldErrors.actionAt = "Completed work cannot be dated in the future.";

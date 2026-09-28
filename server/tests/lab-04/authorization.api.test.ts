@@ -48,6 +48,8 @@ const ENDPOINTS: Endpoint[] = [
   { name: "edit an Action", method: "patch", path: (t, a) => `/api/tickets/${t}/actions/${a}`, body: () => ({ version: 1, description: "Sweep edit." }), admits: ["staff", "admin"] },
   { name: "complete an Action", method: "post", path: (t, a) => `/api/tickets/${t}/actions/${a}/complete`, body: () => ({ version: 1, result: "Sweep result." }), admits: ["staff", "admin"] },
   { name: "cancel an Action", method: "post", path: (t, a) => `/api/tickets/${t}/actions/${a}/cancel`, body: () => ({ version: 1, reason: "Sweep reason." }), admits: ["staff", "admin"] },
+  // Issue #83.
+  { name: "read the status history", method: "get", path: (t) => `/api/tickets/${t}/history`, admits: ["requester", "staff", "admin"] },
 ];
 
 let staffId = 0;
@@ -97,6 +99,7 @@ async function cleanUp() {
   const users = await prisma.user.findMany({ where: { email: { endsWith: DOMAIN } }, select: { id: true } });
   const userIds = users.map((u) => u.id);
   await prisma.actionTaken.deleteMany({ where: { ticket: { requesterId: { in: userIds } } } });
+  await prisma.ticketStatusEvent.deleteMany({ where: { ticket: { requesterId: { in: userIds } } } });
   await prisma.ticket.deleteMany({ where: { requesterId: { in: userIds } } });
   await prisma.session.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });

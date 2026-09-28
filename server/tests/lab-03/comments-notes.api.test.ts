@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { sessionCookieFor, TEST_ORIGIN } from "../support/session.js";
+import { deleteTickets, recordCompletedWork } from "../support/tickets.js";
 
 // API-22, API-23, API-24 — AC-04, AC-17, AC-18, AC-19 (docs/lab-03/tests.md).
 //
@@ -115,7 +116,7 @@ afterAll(async () => {
   // Before the tickets: the foreign key refuses to delete a ticket that still
   // has attachment rows pointing at it.
   await prisma.attachment.deleteMany({ where: { ticket: { categoryId } } });
-  await prisma.ticket.deleteMany({ where: { categoryId } });
+  await deleteTickets({ categoryId });
   const users = await prisma.user.findMany({ where: { email: { endsWith: DOMAIN } }, select: { id: true } });
   const ids = users.map((user) => user.id);
   await prisma.session.deleteMany({ where: { userId: { in: ids } } });
@@ -222,6 +223,9 @@ describe("API-22 — Public Comments", () => {
 
   it("carries the status-change comment issue #51 writes, with statusChangedTo set (BR-30)", async () => {
     const ticket = await newTicket({ status: "OPEN" });
+    // Lab 4 BR-19: resolving needs completed work, so the Ticket carries some
+    // (docs/lab-04/tests.md §7). Nothing this test asserts changes.
+    await recordCompletedWork(ticket.id, staffId);
     const changed = await post(`/api/tickets/${ticket.id}/status`, staff, {
       toStatus: "RESOLVED",
       version: ticket.version,
@@ -614,6 +618,9 @@ describe("API-24 — the Requester's resolution indication", () => {
 
   it("is cleared when IT Staff reopen the ticket (BR-30)", async () => {
     const ticket = await newTicket({ status: "OPEN" });
+    // Lab 4 BR-19: resolving needs completed work, so the Ticket carries some
+    // (docs/lab-04/tests.md §7). Nothing this test asserts changes.
+    await recordCompletedWork(ticket.id, staffId);
     await post(`/api/tickets/${ticket.id}/resolution-indication`, owner, {});
 
     const current = await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id }, select: { version: true } });

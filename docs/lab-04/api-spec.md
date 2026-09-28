@@ -115,7 +115,7 @@ Administrator.
 | Field | Rule |
 |---|---|
 | `status` | `OPEN` or `COMPLETED`. `CANCELLED` is refused: nothing is created cancelled. |
-| `actionAt` | ISO 8601 with offset. Not before the Ticket's creation. If `COMPLETED`, not more than 5 minutes after now. If `OPEN`, not more than 365 days after now (BR-07). |
+| `actionAt` | ISO 8601 with offset. Not more than 5 minutes before the Ticket's creation (clock skew). If `COMPLETED`, not more than 5 minutes after now. If `OPEN`, not more than 365 days after now (BR-07). |
 | `description` | 5–2000 characters after trimming. |
 | `result` | Required for `COMPLETED`: 5–2000 after trimming. Optional for `OPEN`: at most 2000, and empty becomes `null`. |
 | `followUpRequired` | Boolean, required. |
@@ -230,11 +230,14 @@ Every role that can read the Ticket receives the Lab 3 shape plus:
   "openActions": 1,
   "completedActions": 2,
   "latestFollowUpRequired": false,
+  "reopenedSinceWork": false,
   "ready": false
 }
 ```
 
-`ready` is true exactly when BR-19's three conditions hold now. It is advice for the screen.
+`reopenedSinceWork` is true when the Ticket has been reopened (it has a Status Event into
+`REOPENED`) and no Action has been completed since the latest one. `ready` is true exactly
+when BR-19's four conditions hold now. It is advice for the screen.
 The status change re-decides under the lock.
 
 ### `POST /api/tickets/:ticketId/status` — added refusal and cascade
@@ -256,8 +259,9 @@ check, so a Ticket that Lab 3 would refuse is refused for the same reason as bef
 ```
 
 `unmet` lists **every** failed condition, in the order `OPEN_ACTIONS`,
-`NO_COMPLETED_ACTION`, `FOLLOW_UP_REQUIRED`. `NO_COMPLETED_ACTION` and `FOLLOW_UP_REQUIRED`
-are never both present.
+`NO_COMPLETED_ACTION`, `FOLLOW_UP_REQUIRED`, `NO_WORK_SINCE_REOPEN`. `NO_COMPLETED_ACTION`
+and `FOLLOW_UP_REQUIRED` are never both present. `NO_WORK_SINCE_REOPEN` is BR-19's fourth
+condition: the Ticket was reopened and nothing has been completed since.
 
 The route now takes the Ticket row lock before deciding (BR-14). Every successful change
 appends a Status Event in the same transaction (BR-22). Entering `CANCELLED` also cancels

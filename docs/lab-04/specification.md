@@ -184,9 +184,11 @@ Labsheet §4.2, restated so that none of it creeps in:
   of assignment. Anyone else — an inactive user, a Requester or an unknown id — answers
   `400 VALIDATION_FAILED` with a field error on `assigneeId`. This is the same rule as the
   Ticket Owner (Lab 3 BR-21, BR-22). The interface pre-selects the current user.
-- **BR-07** Action Date/Time is an ISO 8601 instant with an offset. It must not be before the
-  Ticket was created. A `COMPLETED` Action's time must not be more than 5 minutes after the
-  server's clock (a small allowance for clock skew). An `OPEN` Action may be up to 365 days
+- **BR-07** Action Date/Time is an ISO 8601 instant with an offset. It must not be more than
+  5 minutes before the Ticket was created, and a `COMPLETED` Action's time must not be more
+  than 5 minutes after the server's clock. The 5 minutes is one allowance for clock skew in
+  both directions: the client, the server and the database each keep their own clock, so an
+  Action dated "now" on a Ticket created a moment ago must not look older than the Ticket. An `OPEN` Action may be up to 365 days
   in the future, because planned work is part of the log.
 - **BR-08** Only an `OPEN` Action can be edited, and only its user fields and assignee.
   Editing, completing or cancelling a final Action answers `409 ACTION_FINAL`. A mistake in
@@ -256,10 +258,14 @@ Labsheet §4.2, restated so that none of it creeps in:
   1. no `OPEN` Action on the Ticket;
   2. at least one `COMPLETED` Action; and
   3. the latest `COMPLETED` Action (by Action Date/Time, then id) does not require
-     follow-up.
+     follow-up; and
+  4. if the Ticket has been reopened, at least one Action was completed (`completedAt`) after
+     its most recent Status Event into `REOPENED` (D-15).
 
   If any condition fails, the answer is `409 RESOLUTION_BLOCKED`, listing every failed
-  condition. Nothing changes. Cancelled Actions count toward none of the three.
+  condition. Nothing changes. Cancelled Actions count toward none of them. Condition 4 reads
+  the status history, so a Ticket reopened before the Lab 4 migration has no such event, and
+  the condition does not apply to it (BR-24).
 - **BR-20** The gate applies only on entering `RESOLVED`. `RESOLVED → CLOSED` has no gate,
   so a Ticket resolved before this migration can still be closed. Cancelling a Ticket
   cancels each of its `OPEN` Actions in the same transaction, with the Ticket's cancellation
@@ -698,3 +704,4 @@ Checked separately from product completion:
 | D-12 | `currentStatus` accepts a list rather than a new `statusGroup` parameter. | Every drill-down, including "active", is then expressible with the existing parameter, and a list names the statuses it means. A group name would hide a definition that could drift from BR-25. |
 | D-13 | Issue #78 is part of Lab 4. | The Requester dashboard's drill-down needs the My Tickets status filter that Lab 3 promised and did not deliver. Folding it in closes that debt and gives the drill-down something to land on. |
 | D-14 | This contract was drafted before I reviewed the peer's Lab 4 contract (`Earth2509/toktickit` PR #61, reviewed 2026-09-25). | It was written independently from the labsheet and this repository's Lab 3 contract. Nothing was adopted from his contract. The review confirmed two choices made here beforehand: the Requester seeing Actions read-only (D-04), and the unassigned count including active-work Tickets (S-1). Anything adopted after his revision will be recorded here, as Lab 3 D-18 did. |
+| D-15 | The resolution gate gains a fourth condition: after a reopen, some Action must have been completed since (BR-19 4). Adopted from my review of the peer's contract (`Earth2509/toktickit` PR #61), and found missing from ours while implementing issue #83. | On his PR #61 I blocked a gate that a reopened Ticket could pass on the work that satisfied it before the reopen, which is exactly when the earlier fix has failed. Our first three conditions have the same hole: the pre-reopen Actions still meet them. Holding his contract to that standard and not ours would be indefensible. The condition uses `completedAt`, when the work was actually finished, against the latest Status Event into `REOPENED`. |

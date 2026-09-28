@@ -53,7 +53,7 @@ behaviour, and each such change is listed in §7 with its reason:
 | ID | Level | AC | Scenario and expected result | Test file | Status |
 |---|---|---|---|---|---|
 | UNIT-01 | Unit | AC-03, AC-05 | Action field rules, transcribed by hand from BR-03 to BR-10: each length boundary on both sides; the follow-up note required when true and refused when false; `result` required only to complete; each `actionAt` bound — before the Ticket, 5 minutes past now for completed, 365 days ahead for open; only `OPEN → COMPLETED` and `OPEN → CANCELLED` allowed, and both final states refuse every operation. Every failing field is reported, not only the first. | `server/tests/lab-04/actions-taken.test.ts` | Planned |
-| UNIT-02 | Unit | AC-11, AC-12 | The gate function returns exactly the unmet conditions in BR-19, in order, for: no Actions; only cancelled; one open; completed with follow-up as the latest; completed with follow-up superseded by a later completed one; two completed sharing an `actionAt` (the id decides); and all satisfied. | `server/tests/lab-04/resolution-gate.test.ts` | Planned |
+| UNIT-02 | Unit | AC-11, AC-12 | The gate function returns exactly the unmet conditions in BR-19, in order, for: no Actions; only cancelled; one open; completed with follow-up as the latest; completed with follow-up superseded by a later completed one; two completed sharing an `actionAt` (the id decides); reopened with no work since, and with work completed since; and all satisfied. | `server/tests/lab-04/resolution-gate.test.ts` | Planned |
 | UNIT-03 | Unit | AC-22 | `currentStatus` parsing: each single status, a list of all eight, and the five active; refused for an unknown member, a repeated member, an empty value, a trailing comma, and a lower-case value. The queue parser keeps accepting every Lab 3 single value unchanged. | `server/tests/lab-04/status-filter.test.ts` | Planned |
 | UNIT-04 | Unit | AC-11, AC-20 | Client helpers: the resolution-needs text built from `resolutionGate` for each combination; a card `query` turned into a `/tickets` or `/queue` URL and parsed back by the list screen into the same filters. | `client/tests/lab-04/dashboard-links.test.ts` | Planned |
 | API-01 | API | AC-01 | IT Staff create a `COMPLETED` Action with valid data: `201`, stored under the path's Ticket, `createdBy` and `performedBy` are the caller, the assignee is as sent, and the Ticket's `updatedAt` moves while its `version` does not. The same as an Administrator. An `OPEN` Action has no performer. | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
@@ -66,7 +66,7 @@ behaviour, and each such change is listed in §7 with its reason:
 | API-08 | API | AC-09 | The owning Requester, IT Staff and an Administrator each read the list, and the Requester's response contains every field. Another Requester gets `404`. Three Actions forced to share one `actionAt` come back in `id` order, newest first. An Action id from a different Ticket returns `404 ACTION_NOT_FOUND`. | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
 | API-09 | API | AC-10 | An Administrator deactivates, then separately demotes, an IT Staff member with two open Actions and one completed Action. The open ones become unassigned in the same transaction, the completed one keeps its `performedBy`, and the response reports `unassignedActionCount` and `unassignedTicketCount`. An edit of an unassigned Action without `assigneeId` is refused on it. | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
 | AUTH-01 | Authorization | AC-09, AC-21 | Every Lab 4 endpoint is called with no session, as each role, and with a password change pending, and returns exactly the status in §8 of the specification. Every Requester write refusal, and every refusal by the wrong dashboard, is identical for an existing and a nonexistent Ticket, since the role check precedes any lookup. The endpoint list is built once and swept, as Lab 3's `authorization.api.test.ts` does. | `server/tests/lab-04/authorization.api.test.ts` | Planned |
-| WF-01 | Workflow | AC-11, AC-12 | Resolving through the API directly, with no client involved, is refused with `409 RESOLUTION_BLOCKED` and the exact `unmet` list for: an open Action; no completed Action; and a latest completed Action with follow-up. The status is unchanged and no Status Event is written. Once the gate is open, the same request succeeds. | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
+| WF-01 | Workflow | AC-11, AC-12 | Resolving through the API directly, with no client involved, is refused with `409 RESOLUTION_BLOCKED` and the exact `unmet` list for: an open Action; no completed Action; a latest completed Action with follow-up; and a Ticket reopened and returned to work with nothing completed since, which succeeds once new work is completed. The status is unchanged and no Status Event is written. Once the gate is open, the same request succeeds. | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
 | WF-02 | Workflow | AC-13 | Two forced interleavings. First, completing the last open Action while another request resolves: the outcome is always a serial order. Second, creating a new open Action while another request resolves: a Ticket never ends `RESOLVED` with an open Action. Break-proved by removing the row lock from the status route. | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
 | WF-03 | Workflow | AC-14 | All 64 status pairs from real Tickets: exactly the BR-18 transitions succeed, with a completed Action present where `RESOLVED` is the target. Every Lab 3 refusal code is returned exactly as before for the same input. The expected matrix is transcribed by hand in the test. | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
 | WF-04 | Workflow | AC-15 | Cancelling a Ticket with two open Actions and one completed Action cancels the two with the Ticket's reason and actor, in the same transaction, and leaves the completed one untouched. | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
@@ -193,10 +193,30 @@ transcribed.
 
 ## 7. Known Limitations and Changed Suites
 
-- **Lab 3 tests that resolve a Ticket must now record a completed Action first** (BR-19).
-  That is a deliberate change in the rule, not a weakening of the test. Each affected test
-  gains the Action as setup, keeps every assertion, and is listed here by name in the pull
-  request that makes the change (issue #83).
+- **Lab 3 tests that resolve a Ticket now record a completed Action first** (BR-19, issue #83).
+  That is a deliberate change in the rule, not a weakening of the test. Each affected test calls
+  `recordCompletedWork()` (`server/tests/support/tickets.ts`) as setup and keeps every
+  assertion:
+  - `staff-ticket-detail.api.test.ts`: the whole matrix (API-20), and "stores the resolution
+    summary";
+  - `comments-notes.api.test.ts`: "carries the status-change comment" and "is cleared when IT
+    Staff reopen".
+- **The Lab 3 staff journey records one completed Action before it resolves** (issue #83).
+  `e2e/lab-03/staff-ticket-flow.spec.ts` resolves through the UI, and the Lab 3 screens have no
+  way to record an Action until #85. `recordCompletedAction()` in `e2e/lab-03/support.ts` posts
+  one through the real Actions API, as the signed-in staff member, from inside the page. With
+  that call removed, the journey fails at "Status changed to Resolved", which shows the gate
+  reaches the UI. With it, all 27 Lab 3 journeys pass.
+- **Four Lab 3 suites delete their Tickets through `deleteTickets()`** (issue #83). Creating a
+  Ticket or changing its status now writes a Status Event (BR-22), and every Lab 4 foreign key
+  is `RESTRICT`, so a plain `ticket.deleteMany` in an `afterAll` was refused. The helper deletes
+  a Ticket's Actions and history first. Touched: `authorization`, `comments-notes`,
+  `staff-queue` and `staff-ticket-detail` in `server/tests/lab-03/`.
+- **The race tests wait for the lock, not for a timer** (issue #83, Earth2509's note on PR
+  #94). `whileHolding()` in `server/tests/support/locks.ts` releases the held row only once
+  Postgres reports that the dispatched request is blocked by that transaction, counted
+  transitively and filtered to the holder's own pid, so parallel test files cannot satisfy it.
+  The #82 tests use it too, and each race test still fails with its lock removed.
 - **Lab 3's `currentStatus` refusal of a list** becomes acceptance (BR-30). No Lab 3 test sent
   a list, so none is expected to change. This is recorded in case one does.
 - **Lab 3 DB-03 now applies every later migration before comparing** (issue #81).

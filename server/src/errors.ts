@@ -57,6 +57,8 @@ export type ErrorCode =
   | "ACTION_NOT_ALLOWED"
   | "ACTION_FINAL"
   | "ACTION_VERSION_CONFLICT"
+  // Lab 4 BR-19: the resolution gate. The error carries `unmet`, every failed condition.
+  | "RESOLUTION_BLOCKED"
   | "USER_NOT_FOUND"
   | "EMAIL_ALREADY_EXISTS"
   | "CANNOT_DEACTIVATE_SELF"

@@ -98,6 +98,36 @@ export async function apiStatus(page: Page, path: string): Promise<number> {
 }
 
 /**
+ * Records one completed Action on a Ticket through the real Actions API, as the
+ * signed-in user, from inside the page, so the browser sends its own session
+ * cookie and trusted Origin exactly as the application does.
+ *
+ * Lab 4's resolution gate (BR-19) refuses to resolve a Ticket with no completed
+ * work, and the Lab 3 screens have no way to record any until issue #85 adds
+ * one. This is the minimum the Lab 3 journey needs to keep testing what it was
+ * written to test (docs/lab-04/tests.md §7). Returns the HTTP status.
+ */
+export async function recordCompletedAction(page: Page, ticketId: number): Promise<number> {
+  return page.evaluate(async ({ origin, id }) => {
+    const me = await (await fetch(`${origin}/api/auth/me`, { credentials: "include" })).json();
+    const response = await fetch(`${origin}/api/tickets/${id}/actions`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify({
+        status: "COMPLETED",
+        actionAt: new Date().toISOString(),
+        description: "Replaced the failed uplink module in the annexe switch.",
+        result: "Payroll reachable again from the annexe.",
+        followUpRequired: false,
+        assigneeId: me.user.id,
+      }),
+    });
+    return response.status;
+  }, { origin: API_ORIGIN, id: ticketId });
+}
+
+/**
  * The password each account holds after its first sign-in of the run.
  *
  * BR-11 refuses a new password equal to the current one, so the mandatory gate

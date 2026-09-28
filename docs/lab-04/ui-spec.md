@@ -222,6 +222,7 @@ BR-18 next statuses (Lab 3 ui-spec §8).
   - "Complete or cancel 1 open action"
   - "Record at least one completed action"
   - "The latest completed action asks for follow-up — record the follow-up work"
+  - "The ticket was reopened — record the work done since"
 
   The list is linked to the control with `aria-describedby`. This is guidance before the
   attempt, not the rule.
