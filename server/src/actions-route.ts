@@ -99,6 +99,16 @@ function candidateAssignee(body: unknown): number | undefined {
 
 const INELIGIBLE = "Choose an active IT Staff member or Administrator.";
 
+/**
+ * The next number in the Ticket history order, shared with TicketStatusEvent.seq.
+ * Taken under the Ticket row lock, so completions and status changes on one
+ * Ticket are numbered in the order they really happened (BR-19 4).
+ */
+async function nextHistorySeq(tx: Prisma.TransactionClient): Promise<bigint> {
+  const [{ seq }] = await tx.$queryRaw<Array<{ seq: bigint }>>`SELECT nextval('"TicketStatusEvent_seq_seq"') AS seq`;
+  return seq;
+}
+
 /** Recording work moves the Ticket's Last Updated, never its version (BR-13, D-11). */
 async function touchTicket(tx: Prisma.TransactionClient, ticketId: number): Promise<void> {
   await tx.ticket.update({ where: { id: ticketId }, data: { updatedAt: new Date() } });
@@ -215,7 +225,7 @@ export async function createAction(req: Request, res: Response): Promise<void> {
           assigneeId: input.assigneeId,
           createdById: user.id,
           // BR-05: an Action created completed was performed by its recorder, now.
-          ...(input.status === "COMPLETED" ? { performedById: user.id, completedAt: now } : {}),
+          ...(input.status === "COMPLETED" ? { performedById: user.id, completedAt: now, completionSeq: await nextHistorySeq(tx) } : {}),
           idempotencyKey,
           requestFingerprint: requestFingerprint(ticketId, user.id, input),
         },
@@ -324,9 +334,10 @@ async function changeAction(
         return { kind: "refused", status: 409, code: "ACTION_FINAL", message: "This action is final. Record a new action to correct it." } satisfies Refusal;
       }
 
+      const completing = decision.data.status === "COMPLETED";
       const written = await tx.actionTaken.updateMany({
         where: { id: actionId, ticketId, version: decision.version, status: "OPEN" },
-        data: { ...decision.data, version: { increment: 1 } },
+        data: { ...decision.data, ...(completing ? { completionSeq: await nextHistorySeq(tx) } : {}), version: { increment: 1 } },
       });
       if (written.count !== 1) {
         const current = await tx.actionTaken.findUnique({ where: { id: actionId }, select: actionSelect });

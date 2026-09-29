@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { sessionCookieFor, TEST_ORIGIN } from "../support/session.js";
+import { ticketRow, whileHolding, type HoldOptions } from "../support/locks.js";
 
 // API-01 to API-09 in docs/lab-04/tests.md (AC-01 to AC-10), against the real
 // database. The claims worth making here are about transactions, locks and
@@ -110,23 +111,10 @@ afterAll(async () => {
  * supertest request: holding the Test object alone sends nothing, which made
  * our first Lab 3 race tests blind (PR #66).
  */
-async function whileLocked<T>(ticketId: number, fire: () => Promise<T>, during: (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => Promise<unknown> = async () => undefined) {
-  let release!: () => void;
-  const held = new Promise<void>((resolve) => (release = resolve));
-  const locker = prisma.$transaction(
-    async (tx) => {
-      await tx.$queryRaw`SELECT "id" FROM "Ticket" WHERE "id" = ${ticketId} FOR UPDATE`;
-      await during(tx);
-      await held;
-    },
-    { timeout: 20_000 },
-  );
-  await new Promise((r) => setTimeout(r, 150));
-  const pending = fire();
-  await new Promise((r) => setTimeout(r, 300));
-  release();
-  await locker;
-  return pending;
+async function whileLocked<T>(ticketId: number, fire: () => Promise<T>, options: HoldOptions = {}) {
+  // Releases only once the request is seen blocked on this lock, never after a
+  // guessed delay (tests/support/locks.ts).
+  return whileHolding(ticketRow(ticketId), fire, options);
 }
 
 describe("API-01 creating an Action (AC-01)", () => {
@@ -279,6 +267,7 @@ describe("API-05 two edits from one version (AC-06)", () => {
         patch(path, cookies.staff, { version: 1, description: "First editor's plan." }).then((r) => r),
         patch(path, cookies.other, { version: 1, description: "Second editor's plan." }).then((r) => r),
       ]),
+      { waiters: 2 },
     );
     const statuses = [a.status, b.status].sort();
     expect(statuses).toEqual([200, 409]);
@@ -369,7 +358,7 @@ describe("API-07 Tickets that are resolved or finished (AC-08, BR-14)", () => {
     const res = await whileLocked(
       ticket.id,
       () => post(`/api/tickets/${ticket.id}/actions`, cookies.staff, body(), randomUUID()).then((r) => r),
-      (tx) => tx.ticket.update({ where: { id: ticket.id }, data: { currentStatus: "CLOSED" } }),
+      { during: (tx) => tx.ticket.update({ where: { id: ticket.id }, data: { currentStatus: "CLOSED" } }) },
     );
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe("TICKET_TERMINAL");
@@ -425,23 +414,11 @@ describe("an assignment cannot race a deactivation (BR-06, BR-17; Earth2509's re
   // assignment passes its check, writes after the cleanup, and leaves open work
   // with an assignee who can no longer sign in.
   async function whileDeactivating<T>(userId: number, fire: () => Promise<T>) {
-    let release!: () => void;
-    const held = new Promise<void>((resolve) => (release = resolve));
-    const admin = prisma.$transaction(
-      async (tx) => {
-        await tx.user.update({ where: { id: userId }, data: { isActive: false } });
-        await tx.actionTaken.updateMany({ where: { assigneeId: userId, status: "OPEN" }, data: { assigneeId: null, version: { increment: 1 } } });
-        await tx.ticket.updateMany({ where: { ownerId: userId, currentStatus: { notIn: ["CLOSED", "CANCELLED"] } }, data: { ownerId: null, version: { increment: 1 } } });
-        await held;
-      },
-      { timeout: 20_000 },
-    );
-    await new Promise((r) => setTimeout(r, 150));
-    const pending = fire();
-    await new Promise((r) => setTimeout(r, 300));
-    release();
-    await admin;
-    return pending;
+    return whileHolding(async (tx) => {
+      await tx.user.update({ where: { id: userId }, data: { isActive: false } });
+      await tx.actionTaken.updateMany({ where: { assigneeId: userId, status: "OPEN" }, data: { assigneeId: null, version: { increment: 1 } } });
+      await tx.ticket.updateMany({ where: { ownerId: userId, currentStatus: { notIn: ["CLOSED", "CANCELLED"] } }, data: { ownerId: null, version: { increment: 1 } } });
+    }, fire);
   }
 
   const newLeaver = async () =>

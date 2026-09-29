@@ -4,6 +4,7 @@ import {
   STAFF,
   createTicket,
   openInQueue,
+  recordCompletedAction,
   signIn,
   signOut,
   uniqueSummary,
@@ -160,6 +161,14 @@ test("a Ticket is claimed, prioritised, worked, indicated, resolved and closed",
   await expect(queueRow).toContainText("Requester says resolved");
   await queueRow.getByRole("link", { name: ticketNumber }).click();
   await expect(page.getByText(`${REQUESTER.fullName} says the problem appears resolved`)).toBeVisible();
+
+  // Lab 4's resolution gate (BR-19) needs completed work first. It is recorded
+  // through the real Actions API, as this staff member, because the Lab 3 screen
+  // has no control for it until issue #85 (docs/lab-04/tests.md §7). The reload
+  // makes the screen read the Ticket as it now is.
+  const ticketId = Number(new URL(page.url()).pathname.split("/").pop());
+  expect(await recordCompletedAction(page, ticketId)).toBe(201);
+  await page.reload();
 
   // Resolving is confirmed and carries evidence (BR-30, BR-31).
   await page.getByLabel(/^Status/).selectOption({ label: "Resolved" });

@@ -23,6 +23,7 @@ import {
 } from "./discussion-route.js";
 import { createUser, editUser, listUsers, setInitialPassword } from "./users-admin-route.js";
 import { cancelAction, completeAction, createAction, editAction, listActions } from "./actions-route.js";
+import { listHistory } from "./history-route.js";
 import multer from "multer";
 import { MAX_BYTES } from "./attachment-rules.js";
 import {
@@ -251,6 +252,11 @@ app.post("/api/tickets/:ticketId/actions", ...staffOnly, asyncRoute(createAction
 app.patch("/api/tickets/:ticketId/actions/:actionId", ...staffOnly, asyncRoute(editAction));
 app.post("/api/tickets/:ticketId/actions/:actionId/complete", ...staffOnly, asyncRoute(completeAction));
 app.post("/api/tickets/:ticketId/actions/:actionId/cancel", ...staffOnly, asyncRoute(cancelAction));
+
+// Lab 4 issue 83 — the status history (api-spec §3). Read-only and open to every
+// role that can read the Ticket; with no write route, any write meets the 404
+// that BR-22's append-only history requires.
+app.get("/api/tickets/:ticketId/history", ...signedIn, asyncRoute(listHistory));
 
 // Administrator user management (api-spec.md §8, FR-16).
 //

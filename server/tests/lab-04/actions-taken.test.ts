@@ -103,9 +103,11 @@ describe("creating an Action (BR-03, BR-04, BR-07, BR-09, BR-10)", () => {
   });
 
   it("bounds the Action Date/Time by the Ticket's creation, the clock and the planning horizon", () => {
-    // Not before the Ticket existed.
-    expect(errors(create({ actionAt: iso(TICKET.createdAt.getTime() - 1) }))).toEqual(["actionAt"]);
-    expect(create({ actionAt: iso(TICKET.createdAt.getTime()) }).kind).toBe("ok");
+    // Not more than five minutes before the Ticket existed: the same clock-skew
+    // allowance as for the future, because the Ticket's time is the database's
+    // clock and the Action's is the client's.
+    expect(create({ actionAt: iso(TICKET.createdAt.getTime() - 5 * MINUTE) }).kind).toBe("ok");
+    expect(errors(create({ actionAt: iso(TICKET.createdAt.getTime() - 5 * MINUTE - 1) }))).toEqual(["actionAt"]);
     // Completed work: at most five minutes past now.
     expect(create({ actionAt: iso(NOW.getTime() + 5 * MINUTE) }).kind).toBe("ok");
     expect(errors(create({ actionAt: iso(NOW.getTime() + 5 * MINUTE + 1) }))).toEqual(["actionAt"]);

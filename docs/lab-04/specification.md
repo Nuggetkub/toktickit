@@ -184,9 +184,11 @@ Labsheet §4.2, restated so that none of it creeps in:
   of assignment. Anyone else — an inactive user, a Requester or an unknown id — answers
   `400 VALIDATION_FAILED` with a field error on `assigneeId`. This is the same rule as the
   Ticket Owner (Lab 3 BR-21, BR-22). The interface pre-selects the current user.
-- **BR-07** Action Date/Time is an ISO 8601 instant with an offset. It must not be before the
-  Ticket was created. A `COMPLETED` Action's time must not be more than 5 minutes after the
-  server's clock (a small allowance for clock skew). An `OPEN` Action may be up to 365 days
+- **BR-07** Action Date/Time is an ISO 8601 instant with an offset. It must not be more than
+  5 minutes before the Ticket was created, and a `COMPLETED` Action's time must not be more
+  than 5 minutes after the server's clock. The 5 minutes is one allowance for clock skew in
+  both directions: the client, the server and the database each keep their own clock, so an
+  Action dated "now" on a Ticket created a moment ago must not look older than the Ticket. An `OPEN` Action may be up to 365 days
   in the future, because planned work is part of the log.
 - **BR-08** Only an `OPEN` Action can be edited, and only its user fields and assignee.
   Editing, completing or cancelling a final Action answers `409 ACTION_FINAL`. A mistake in
@@ -256,10 +258,16 @@ Labsheet §4.2, restated so that none of it creeps in:
   1. no `OPEN` Action on the Ticket;
   2. at least one `COMPLETED` Action; and
   3. the latest `COMPLETED` Action (by Action Date/Time, then id) does not require
-     follow-up.
+     follow-up; and
+  4. if the Ticket has been reopened, at least one Action was completed after its most
+     recent Status Event into `REOPENED` (D-15). "After" is decided by the history order,
+     one database sequence that numbers both Status Events and completions (D-16), never
+     by comparing two timestamps.
 
   If any condition fails, the answer is `409 RESOLUTION_BLOCKED`, listing every failed
-  condition. Nothing changes. Cancelled Actions count toward none of the three.
+  condition. Nothing changes. Cancelled Actions count toward none of them. Condition 4 reads
+  the status history, so a Ticket reopened before the Lab 4 migration has no such event, and
+  the condition does not apply to it (BR-24).
 - **BR-20** The gate applies only on entering `RESOLVED`. `RESOLVED → CLOSED` has no gate,
   so a Ticket resolved before this migration can still be closed. Cancelling a Ticket
   cancels each of its `OPEN` Actions in the same transaction, with the Ticket's cancellation
@@ -371,7 +379,8 @@ Labsheet §4.2, restated so that none of it creeps in:
 
 ### Migration and seed
 
-- **BR-34** The migration only adds: one enum, two tables, their indexes and foreign keys.
+- **BR-34** The migrations only add: one enum, two tables, their indexes and foreign keys,
+  and later columns on those two tables.
   No existing column, value or id changes. Every Ticket that exists at migration time has
   zero Actions and no Status Events.
 - **BR-35** The seed stays idempotent (Lab 3 BR-44). Actions and Status Events are created
@@ -415,8 +424,10 @@ accessibility rule unchanged. It adds:
 | Model | Change | Fields |
 |---|---|---|
 | `ActionTaken` | New | `id`, `ticketId`, `actionAt`, `description`, `result` (nullable), `followUpRequired`, `followUpNote` (nullable), `attachmentNotes` (nullable), `status`, `assigneeId` (nullable FK `User`), `performedById` (nullable FK `User`), `createdById` (FK `User`), `cancelledById` (nullable FK `User`), `cancellationReason` (nullable), `completedAt` (nullable), `cancelledAt` (nullable), `version` (default 1), `idempotencyKey` (unique), `requestFingerprint` (nullable), `createdAt`, `updatedAt` |
-| `TicketStatusEvent` | New | `id`, `ticketId`, `fromStatus` (nullable), `toStatus`, `actorId` (FK `User`), `createdAt` |
+| `TicketStatusEvent` | New | `id`, `ticketId`, `fromStatus` (nullable), `toStatus`, `actorId` (FK `User`), `createdAt`, `seq` (history order, D-16) |
 | `Ticket`, `User` and every other model | Unchanged | Only the reverse relations are added |
+
+`ActionTaken` also gains `completionSeq` (nullable), its place in the history order when it was completed (D-16). Both it and `TicketStatusEvent.seq` come from one sequence, the one PostgreSQL creates for `seq` (`TicketStatusEvent_seq_seq`).
 
 `assigneeId` is nullable only because of BR-17. The API never accepts a null assignee. `requestFingerprint` is a hash of the create request as received. BR-15 compares a replay with it rather than with the row, because an open Action may have been edited since. It is null for rows no API request created, such as the demo seed's.
 
@@ -469,7 +480,7 @@ any two into one column loses exactly the distinction the stakeholder asked for.
 
 ### Migration and backfill
 
-Two migrations, both additive only (BR-34):
+Three migrations, all additive only (BR-34):
 
 1. `lab4_actions_and_history` (issue #81):
    1. Create the `ActionStatus` enum.
@@ -480,6 +491,10 @@ Two migrations, both additive only (BR-34):
    column. It is a migration of its own because the first had already merged. A migration
    that has been applied is never edited, since a database that ran it would never receive
    the change.
+3. `lab4_history_order` (issue #83, D-16) adds `TicketStatusEvent.seq` as a `BIGSERIAL`
+   (existing events are numbered in history order, by `createdAt` then id) and the
+   nullable `ActionTaken.completionSeq`, drawn from the same sequence. Completed Actions
+   from before it have no number and count as completed before any reopen.
 
 **Backfill: none, by decision (D-07).** Existing Tickets start with no Actions and no
 history. What that means for behaviour:
@@ -489,11 +504,11 @@ history. What that means for behaviour:
   other.
 - R-4 and "Recently resolved" count only resolutions recorded after the migration.
 
-**Rollback.** The migrations add but never alter, so one reverse script is safe for both. It
-drops the two tables, taking the second migration's column with them, plus the enum and the new
-index. It also forgets both migration records, and nothing that existed in Lab 3 is lost. It
+**Rollback.** The migrations add but never alter, so one reverse script is safe for all three. It
+drops the two tables, taking the later migrations' columns with them, plus the enum and the new
+index (the sequence belongs to `seq`, so goes with its table). It also forgets all three migration records, and nothing that existed in Lab 3 is lost. It
 lives at `server/prisma/rollback/20260925_lab4_actions_and_history.down.sql`. The migration test
-applies both migrations to a populated Lab 3 database, runs the rollback, and asserts that the
+applies all three migrations to a populated Lab 3 database, runs the rollback, and asserts that the
 schema matches Lab 3's `schema.prisma` exactly and every Lab 3 row is intact. A rollback does
 lose all Actions and history recorded since, so a backup is taken first, as in Lab 3.
 
@@ -698,3 +713,5 @@ Checked separately from product completion:
 | D-12 | `currentStatus` accepts a list rather than a new `statusGroup` parameter. | Every drill-down, including "active", is then expressible with the existing parameter, and a list names the statuses it means. A group name would hide a definition that could drift from BR-25. |
 | D-13 | Issue #78 is part of Lab 4. | The Requester dashboard's drill-down needs the My Tickets status filter that Lab 3 promised and did not deliver. Folding it in closes that debt and gives the drill-down something to land on. |
 | D-14 | This contract was drafted before I reviewed the peer's Lab 4 contract (`Earth2509/toktickit` PR #61, reviewed 2026-09-25). | It was written independently from the labsheet and this repository's Lab 3 contract. Nothing was adopted from his contract. The review confirmed two choices made here beforehand: the Requester seeing Actions read-only (D-04), and the unassigned count including active-work Tickets (S-1). Anything adopted after his revision will be recorded here, as Lab 3 D-18 did. |
+| D-15 | The resolution gate gains a fourth condition: after a reopen, some Action must have been completed since (BR-19 4). Adopted from my review of the peer's contract (`Earth2509/toktickit` PR #61), and found missing from ours while implementing issue #83. | On his PR #61 I blocked a gate that a reopened Ticket could pass on the work that satisfied it before the reopen, which is exactly when the earlier fix has failed. Our first three conditions have the same hole: the pre-reopen Actions still meet them. Holding his contract to that standard and not ours would be indefensible. The condition asks whether any Action was completed after the latest Status Event into `REOPENED`, judged by the history order: `ActionTaken.completionSeq` against `TicketStatusEvent.seq` (D-16). It first compared `completedAt` with the event's `createdAt`, which D-16 replaced. |
+| D-16 | "Completed since the latest reopen" (BR-19 4) is decided by one database sequence, not by timestamps. Found by Earth2509 reviewing our PR #95. | The first version compared `ActionTaken.completedAt`, set by the API server's clock, with `TicketStatusEvent.createdAt`, set by the database's. Those clocks differ (here by about 144 ms), so an Action completed straight after a reopen could read as older than it and block a legitimate resolution, and one completed just before could read as newer and let the old work through. Both writes already happen under the Ticket row lock, so the question is only their order. The sequence behind `TicketStatusEvent.seq` numbers every Status Event by default and every completion as it is written, under that lock, so the order is the order they really happened in, with no clock and no millisecond truncation involved. One clock for both timestamps would also have worked, but would still leave two writes in the same millisecond undecided. |

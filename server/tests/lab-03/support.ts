@@ -103,6 +103,7 @@ export const LAB3_MIGRATION = "20260914090000_lab3_user_and_workflow";
 export const LAB4_MIGRATIONS = [
   "20260925090000_lab4_actions_and_history",
   "20260927090000_lab4_action_request_fingerprint",
+  "20260929090000_lab4_history_order",
 ] as const;
 
 /** Every migration committed after Lab 3, in order. Add each new one here. */

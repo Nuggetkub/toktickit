@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { sessionCookieFor, TEST_ORIGIN } from "../support/session.js";
+import { deleteTickets } from "../support/tickets.js";
 
 // API-15 and API-16 — AC-13 (docs/lab-03/tests.md).
 //
@@ -119,7 +120,7 @@ beforeAll(async () => {
 }, 60000);
 
 afterAll(async () => {
-  await prisma.ticket.deleteMany({ where: { categoryId } });
+  await deleteTickets({ categoryId });
   const users = await prisma.user.findMany({ where: { email: { endsWith: DOMAIN } }, select: { id: true } });
   await prisma.session.deleteMany({ where: { userId: { in: users.map((user) => user.id) } } });
   await prisma.user.deleteMany({ where: { id: { in: users.map((user) => user.id) } } });
@@ -277,7 +278,7 @@ describe("API-15 — sorting follows severity and lifecycle, not the alphabet", 
       // Descending by number, whatever order the database happened to return.
       expect(ordered).toEqual(["TKT-2099-90003", "TKT-2099-90002", "TKT-2099-90001"]);
     } finally {
-      await prisma.ticket.deleteMany({ where: { id: { in: tied.map((ticket) => ticket.id) } } });
+      await deleteTickets({ id: { in: tied.map((ticket) => ticket.id) } });
     }
   });
 });
