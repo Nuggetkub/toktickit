@@ -1,6 +1,7 @@
--- Rollback for the Lab 4 migrations: 20260925090000_lab4_actions_and_history
--- and 20260927090000_lab4_action_request_fingerprint, whose one column lives in
--- the ActionTaken table this drops
+-- Rollback for the Lab 4 migrations: 20260925090000_lab4_actions_and_history,
+-- 20260927090000_lab4_action_request_fingerprint and
+-- 20260929090000_lab4_history_order. The later two add columns to the tables
+-- this drops (the last's sequence belongs to its column, so goes with it)
 -- (docs/lab-04/specification.md §7, "Rollback").
 --
 -- The migration only added objects, so undoing it only removes them. Nothing
@@ -35,7 +36,8 @@ BEGIN
   IF to_regclass('_prisma_migrations') IS NOT NULL THEN
     DELETE FROM _prisma_migrations WHERE migration_name IN (
       '20260925090000_lab4_actions_and_history',
-      '20260927090000_lab4_action_request_fingerprint'
+      '20260927090000_lab4_action_request_fingerprint',
+      '20260929090000_lab4_history_order'
     );
   END IF;
 END $$;

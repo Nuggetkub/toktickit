@@ -9,13 +9,19 @@ export type GateAction = {
   status: ActionStatus;
   actionAt: Date;
   completedAt: Date | null;
+  /** Where the completion falls in the history order; null if unknown (before any reopen). */
+  completionSeq: bigint | null;
   followUpRequired: boolean;
 };
 
 export type GateEvidence = {
   actions: readonly GateAction[];
-  /** The time of the Ticket's most recent Status Event into REOPENED, if any. */
-  latestReopenAt: Date | null;
+  /**
+   * The order number of the Ticket's most recent Status Event into REOPENED, if
+   * any. An order, not a time: the event and the completion come from one
+   * sequence, so no two clocks are ever compared (Earth2509's review of PR #95).
+   */
+  latestReopenSeq: bigint | null;
 };
 
 export type Unmet =
@@ -43,11 +49,11 @@ function latestCompleted(actions: readonly GateAction[]): GateAction | undefined
     }, undefined);
 }
 
-/** BR-19 4: reopened, and nothing completed since the latest reopen. */
+/** BR-19 4: reopened, and nothing completed since the latest reopen, by history order. */
 function reopenedSinceWork(evidence: GateEvidence): boolean {
-  const since = evidence.latestReopenAt;
+  const since = evidence.latestReopenSeq;
   if (since === null) return false;
-  return !evidence.actions.some((a) => a.status === "COMPLETED" && a.completedAt !== null && a.completedAt.getTime() > since.getTime());
+  return !evidence.actions.some((a) => a.status === "COMPLETED" && a.completionSeq !== null && a.completionSeq > since);
 }
 
 /**

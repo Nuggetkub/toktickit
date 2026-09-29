@@ -232,7 +232,9 @@ export async function seedDemoActivity(prisma: PrismaClient, now = new Date()): 
           createdById: creator,
           assigneeId: demo.assignee === null ? null : demo.assignee ? idOf(demo.assignee) : creator,
           // A completed demo Action was done by the person who recorded it, when
-          // they recorded it (BR-05).
+          // they recorded it (BR-05). It takes no place in the history order
+          // (completionSeq, D-16), so it counts as done before any reopen: true
+          // of every demo Action, whose times all precede the demo's last event.
           ...(demo.status === "COMPLETED" ? { performedById: creator, completedAt: when } : {}),
           ...(demo.status === "CANCELLED"
             ? { cancelledById: creator, cancelledAt: when, cancellationReason: demo.cancellationReason! }

@@ -261,7 +261,9 @@ check, so a Ticket that Lab 3 would refuse is refused for the same reason as bef
 `unmet` lists **every** failed condition, in the order `OPEN_ACTIONS`,
 `NO_COMPLETED_ACTION`, `FOLLOW_UP_REQUIRED`, `NO_WORK_SINCE_REOPEN`. `NO_COMPLETED_ACTION`
 and `FOLLOW_UP_REQUIRED` are never both present. `NO_WORK_SINCE_REOPEN` is BR-19's fourth
-condition: the Ticket was reopened and nothing has been completed since.
+condition: the Ticket was reopened and nothing has been completed since. "Since" is by the
+server's history order (specification D-16), not by comparing `completedAt` with the reopen
+event's `createdAt`, which come from different clocks.
 
 The route now takes the Ticket row lock before deciding (BR-14). Every successful change
 appends a Status Event in the same transaction (BR-22). Entering `CANCELLED` also cancels

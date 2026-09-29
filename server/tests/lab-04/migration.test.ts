@@ -54,7 +54,7 @@ afterAll(async () => {
   await dropSchema(REFERENCE);
 });
 
-/** Every Lab 4 migration, in order: the tables, then the request fingerprint. */
+/** Every Lab 4 migration, in order: the tables, the request fingerprint, then the history order. */
 function applyLab4(target: string): void {
   for (const migration of LAB4_MIGRATIONS) applyMigration(migration, target);
 }
@@ -198,6 +198,36 @@ describe("Lab 4 migration against a populated Lab 3 database", () => {
     applyLab4(url);
     expect(schemaMatchesDatamodel(url)).toBe(true);
     expect(await snapshot(prisma)).toEqual(before);
+  }, 180_000);
+
+  it("numbers history already recorded in history order, and later events and completions after it (D-16)", async () => {
+    await buildLab3Database(SCHEMA, url);
+    const prisma = client();
+    await populate(prisma);
+    for (const migration of LAB4_MIGRATIONS.slice(0, -1)) applyMigration(migration, url);
+
+    // Events recorded before the history-order migration, stored out of time
+    // order, as a database that has been written to for a while can hold them.
+    const ticket = await prisma.ticket.findFirstOrThrow({ where: { currentStatus: "REOPENED" } });
+    const staff = await prisma.user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: true } });
+    const at = (hour: number) => `'2026-09-2${hour < 24 ? 6 : 7}T${String(hour % 24).padStart(2, "0")}:00:00Z'`;
+    for (const [from, to, hour] of [["RESOLVED", "REOPENED", 20], ["NEW", "OPEN", 10], ["IN_PROGRESS", "RESOLVED", 14], ["OPEN", "IN_PROGRESS", 12]] as const) {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO "TicketStatusEvent" ("ticketId", "fromStatus", "toStatus", "actorId", "createdAt") VALUES (${ticket.id}, '${from}', '${to}', ${staff.id}, ${at(hour)})`,
+      );
+    }
+
+    applyMigration(LAB4_MIGRATIONS.at(-1)!, url);
+    expect(schemaMatchesDatamodel(url)).toBe(true);
+    const numbered = await prisma.ticketStatusEvent.findMany({ where: { ticketId: ticket.id }, orderBy: { seq: "asc" }, select: { toStatus: true, seq: true } });
+    expect(numbered.map((e) => e.toStatus)).toEqual(["OPEN", "IN_PROGRESS", "RESOLVED", "REOPENED"]);
+    const last = numbered.at(-1)!.seq;
+
+    // What comes next is numbered after all of it, events and completions alike.
+    const [{ seq: completion }] = await prisma.$queryRaw<Array<{ seq: bigint }>>`SELECT nextval('"TicketStatusEvent_seq_seq"') AS seq`;
+    const event = await prisma.ticketStatusEvent.create({ data: { ticketId: ticket.id, fromStatus: "REOPENED", toStatus: "IN_PROGRESS", actorId: staff.id } });
+    expect(completion).toBeGreaterThan(last);
+    expect(event.seq).toBeGreaterThan(completion);
   }, 180_000);
 
   it("refuses, in the database itself, every state the Action rules forbid", async () => {

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import request from "supertest";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { sessionCookieFor, TEST_ORIGIN } from "../support/session.js";
@@ -142,6 +142,68 @@ describe("WF-01 the gate refuses unfinished work, through the API directly (AC-1
 
     await addAction(ticket.id, { description: "Replaced the cable this time." });
     expect((await changeStatus(ticket.id, "RESOLVED")).status).toBe(200);
+  });
+
+  it("measures from the latest reopen, so work before a second reopen does not count", async () => {
+    const ticket = await newTicket();
+    await addAction(ticket.id);
+    expect((await changeStatus(ticket.id, "RESOLVED")).status).toBe(200);
+    expect((await changeStatus(ticket.id, "REOPENED")).status).toBe(200);
+    await addAction(ticket.id, { description: "Replaced the cable after the first reopen." });
+    expect((await changeStatus(ticket.id, "RESOLVED")).status).toBe(200);
+    expect((await changeStatus(ticket.id, "REOPENED")).status).toBe(200);
+    const res = await changeStatus(ticket.id, "RESOLVED");
+    expect(res.status, JSON.stringify(res.body)).toBe(409);
+    expect(res.body.error.unmet).toEqual([{ condition: "NO_WORK_SINCE_REOPEN" }]);
+  });
+});
+
+describe("WF-01 the reopen condition does not depend on whose clock is right (Earth2509's review of PR #95)", () => {
+  // The API runs in this process, so faking only Node's Date shifts the
+  // server's clock while the database keeps its own. That is exactly the skew
+  // the gate must survive: one clock set completedAt, the other the reopen event.
+  const shiftNode = (ms: number) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(Date.now() + ms));
+  };
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("accepts work completed straight after a reopen when Node's clock is behind the database's", async () => {
+    const ticket = await newTicket();
+    await addAction(ticket.id);
+    expect((await changeStatus(ticket.id, "RESOLVED")).status).toBe(200);
+    shiftNode(-60_000);
+    expect((await changeStatus(ticket.id, "REOPENED")).status).toBe(200);
+    await addAction(ticket.id, { description: "Replaced the cable straight after the reopen." });
+    const res = await changeStatus(ticket.id, "RESOLVED");
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+  });
+
+  it("accepts planned work completed straight after a reopen when Node's clock is behind the database's", async () => {
+    // The same as above, through the complete route rather than recording finished work.
+    const ticket = await newTicket();
+    await addAction(ticket.id);
+    expect((await changeStatus(ticket.id, "RESOLVED")).status).toBe(200);
+    shiftNode(-60_000);
+    expect((await changeStatus(ticket.id, "REOPENED")).status).toBe(200);
+    const planned = await addAction(ticket.id, { status: "OPEN", result: null, description: "Replace the cable." });
+    const done = await post(`/api/tickets/${ticket.id}/actions/${planned.id}/complete`, cookies.staff, { version: planned.version, result: "Replaced it." });
+    expect(done.status, JSON.stringify(done.body)).toBe(200);
+    const res = await changeStatus(ticket.id, "RESOLVED");
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+  });
+
+  it("refuses work completed just before a reopen when Node's clock is ahead of the database's", async () => {
+    const ticket = await newTicket();
+    shiftNode(60_000);
+    await addAction(ticket.id);
+    expect((await changeStatus(ticket.id, "RESOLVED")).status).toBe(200);
+    expect((await changeStatus(ticket.id, "REOPENED")).status).toBe(200);
+    const res = await changeStatus(ticket.id, "RESOLVED");
+    expect(res.status, JSON.stringify(res.body)).toBe(409);
+    expect(res.body.error.unmet).toEqual([{ condition: "NO_WORK_SINCE_REOPEN" }]);
   });
 });
 

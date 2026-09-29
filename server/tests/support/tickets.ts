@@ -31,6 +31,7 @@ export async function deleteTickets(where: Prisma.TicketWhereInput): Promise<voi
  */
 export async function recordCompletedWork(ticketId: number, userId: number): Promise<void> {
   const now = new Date();
+  const [{ seq }] = await getPrisma().$queryRaw<Array<{ seq: bigint }>>`SELECT nextval('"TicketStatusEvent_seq_seq"') AS seq`;
   await getPrisma().actionTaken.create({
     data: {
       ticketId,
@@ -43,6 +44,7 @@ export async function recordCompletedWork(ticketId: number, userId: number): Pro
       createdById: userId,
       performedById: userId,
       completedAt: now,
+      completionSeq: seq,
       idempotencyKey: randomUUID(),
     },
   });

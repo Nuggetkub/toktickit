@@ -286,6 +286,12 @@ model ActionTaken {
   // is now; it is compared with this. Null for rows no API request created, such
   // as the demo seed's.
   requestFingerprint String?
+  // Where this Action's completion falls in the Ticket's history, drawn from the
+  // same sequence as TicketStatusEvent.seq when it becomes COMPLETED. BR-19's
+  // "completed since the latest reopen" compares these numbers, never two
+  // clocks (Earth2509's review of PR #95). Null for work completed before this
+  // column existed, which counts as before any reopen.
+  completionSeq      BigInt?
   // Recorded At, and Last Updated.
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
@@ -313,6 +319,10 @@ model TicketStatusEvent {
   toStatus   TicketStatus
   actorId    Int
   createdAt  DateTime      @default(now())
+  // The order of this event in the history. Its sequence,
+  // "TicketStatusEvent_seq_seq", also numbers Action completions (see
+  // ActionTaken.completionSeq), so the two share one order.
+  seq        BigInt        @default(autoincrement())
 
   ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
   actor  User   @relation(fields: [actorId], references: [id], onDelete: Restrict)
