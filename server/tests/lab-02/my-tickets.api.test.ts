@@ -182,10 +182,12 @@ describe("GET /api/tickets — invalid queries are rejected, not ignored", () =>
     expect(res.body.error.fieldErrors).toHaveProperty(field);
   });
 
-  it("rejects a Current Status filter rather than silently ignoring it", async () => {
-    // BR-30: it does not exist in Lab 2. Ignoring it would hand back unfiltered
-    // results to a caller who believes they are filtered.
-    const res = await list(ownerCookie, { currentStatus: "NEW" });
+  it("rejects an unusable Current Status filter rather than silently ignoring it", async () => {
+    // Lab 2 BR-30 refused the filter outright, as it did not exist yet. Lab 4
+    // BR-30 (issue #78) adds it, so a valid status is now honoured (Lab 4 API-14)
+    // and this keeps the Lab 2 guarantee for one that is not: ignoring it would
+    // hand back unfiltered results to a caller who believes they are filtered.
+    const res = await list(ownerCookie, { currentStatus: "DONE" });
     expect(res.status).toBe(400);
     expect(res.body.error.fieldErrors).toHaveProperty("currentStatus");
   });

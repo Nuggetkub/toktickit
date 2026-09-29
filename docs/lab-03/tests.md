@@ -63,7 +63,7 @@ records that replacement.
 | API-11 | API | AC-09 | A state-changing request with no `Origin` or an unlisted one returns `403 ORIGIN_REJECTED` and changes nothing; a CORS preflight from a configured origin is allowed with credentials, and one from any other origin is not. | `server/tests/lab-03/authorization.api.test.ts` | Passed |
 | API-12 | API | AC-09, AC-10 | `GET /api/requesters` returns `404`; categories and related systems return `401` with no session and `200` for every role. | `server/tests/lab-03/authorization.api.test.ts` | Passed |
 | API-13 | API | AC-10 | Every Lab 2 ticket and attachment API test passes under a signed-in Requester instead of the header, including the `404` for another Requester's ticket and attachment. | `server/tests/lab-02/create-ticket.api.test.ts`, `server/tests/lab-02/my-tickets.api.test.ts`, `server/tests/lab-02/ticket-detail.api.test.ts`, `server/tests/lab-02/attachments.api.test.ts` | Passed |
-| API-14 | API | AC-10 | My Tickets filters by each of the eight statuses and rejects any other value with `400`; IT Staff and Administrators can read any ticket and download its active attachments but receive `403` for upload and removal. | `server/tests/lab-03/requester-tickets.api.test.ts` | Planned |
+| API-14 | API | AC-10 | My Tickets filters by each of the eight statuses and rejects any other value with `400`; IT Staff and Administrators can read any ticket and download its active attachments but receive `403` for upload and removal. | `server/tests/lab-03/requester-tickets.api.test.ts` | Planned at the Lab 3 release; delivered by issue #78 in Lab 4, where the file now exists and passes (see below) |
 | DB-01 | Migration | AC-11 | A schema built from the Lab 2 migrations and populated with requesters, tickets and attachments — one soft-removed — is migrated; every id, Ticket Number, `requesterId`, `removedByRequesterId` and stored file checksum is unchanged, IT Priority equals Requested Priority, and each migrated user is a Requester with no password who cannot sign in. | `server/tests/lab-03/migration.test.ts` | Passed |
 | DB-02 | Migration | AC-11 | Two Lab 2 requesters whose emails differ only in case make the migration fail with an explicit message, leaving every table unchanged. | `server/tests/lab-03/migration.test.ts` | Passed |
 | DB-03 | Migration | AC-11 | After the migration, `prisma migrate diff` from the database to `schema.prisma` reports no difference. | `server/tests/lab-03/migration.test.ts` | Passed |
@@ -92,7 +92,7 @@ records that replacement.
 | UI-06 | UI | AC-17, AC-18, AC-19 | Public and internal composers are separate, labelled and keep separate drafts; notes use the private surface; the Requester indication banner shows name and time. | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Passed |
 | UI-07 | UI | AC-04, AC-17, AC-19 | Requester detail shows comments and a composer, the confirmed "Problem Appears Resolved" flow leaves the status badge unchanged, and no internal-notes control is rendered or requested. | `client/tests/lab-03/RequesterDiscussion.test.tsx` | Passed |
 | UI-08 | UI | AC-20, AC-21, AC-22 | User list columns, search and role filter; create and edit panels with field-level errors including duplicate email; set initial password; own Active and Role disabled with the reason; the last-Administrator error shown. | `client/tests/lab-03/UserManagement.test.tsx` | Passed |
-| UI-09 | UI | AC-10 | The Lab 2 Create Ticket, My Tickets and Requester Ticket Detail suites pass with a signed-in Requester in place of the selector; My Tickets offers the status filter. | `client/tests/lab-02/CreateTicket.test.tsx`, `client/tests/lab-02/MyTickets.test.tsx`, `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Planned |
+| UI-09 | UI | AC-10 | The Lab 2 Create Ticket, My Tickets and Requester Ticket Detail suites pass with a signed-in Requester in place of the selector; My Tickets offers the status filter. | `client/tests/lab-02/CreateTicket.test.tsx`, `client/tests/lab-02/MyTickets.test.tsx`, `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Planned at the Lab 3 release; delivered by issue #78 in Lab 4 (see below) |
 | STYLE-01 | UI style | AC-24 | Status, priority and role badges carry text and their specified tone classes; the notes panel uses `--zen-private`; Work panel fields are editable and ticket information read-only; focus rings are present. | `client/tests/lab-03/ZenGreen.lab3.styles.test.tsx` | Planned |
 | E2E-01 | E2E | AC-01, AC-02, AC-05, AC-07 | A first-login account is forced to change its password and then lands on its page; a wrong password and an inactive account show their messages; after logout, a direct URL shows Login and a direct API call with the old cookie returns `401`. | `e2e/lab-03/authentication.spec.ts` | Passed |
 | E2E-02 | E2E | AC-13, AC-14, AC-15, AC-16, AC-17, AC-18, AC-19 | A Requester creates a ticket; IT Staff find it in the queue, claim it, raise IT Priority, move it to In Progress, post a comment and a note; the Requester sees the comment but not the note and indicates resolved; IT Staff see the marker, resolve with a summary, and close. | `e2e/lab-03/staff-ticket-flow.spec.ts` | Passed |
@@ -232,6 +232,24 @@ reached the release; recording that plainly is the point of this section.
 
 The remaining **55** rows are `Passed`, each against a file named in its own row that is
 listed in the captured run.
+
+**Addendum, 2026-09-29 (Lab 4, issue #78).** The rows above are left as the Lab 3 release
+recorded them; this note says what happened next, rather than editing the record to look as if
+it never fell short.
+
+- **API-14.** `server/tests/lab-03/requester-tickets.api.test.ts` now exists. It proves both
+  clauses: each of the eight statuses returns exactly the caller's Tickets in it, against an
+  independent count, and five other values are refused with `400`; and IT Staff and an
+  Administrator read the Ticket, download its active attachment byte for byte, and get `403`
+  for upload and for removal, with the attachment untouched. The server change is Lab 4 BR-30.
+  With the status filter removed from the route, 8 of its 19 tests fail.
+- **UI-09.** My Tickets has a Current Status filter with all eight statuses, and a Status
+  column, as §6 of the Lab 3 ui-spec promised. `client/tests/lab-02/MyTickets.test.tsx` asserts
+  both, and fails when the filter is not sent, not cleared, or not treated as a filter.
+- **STYLE-01** is **not** addressed by this change and stays owed.
+
+These passed on the feature branch. They become `Passed` in the sense this section uses, a
+file run on `main`, only at the Lab 4 release.
 
 ---
 

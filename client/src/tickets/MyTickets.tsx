@@ -10,7 +10,19 @@ import {
   type RequestedPriority,
   type TicketListResponse,
 } from "../api.js";
-import { Badge, Button, Card, EmptyState, ErrorAlert, Field, StatusMessage } from "../components/index.js";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  ErrorAlert,
+  Field,
+  StatusBadge,
+  StatusMessage,
+  TICKET_STATUSES,
+  statusLabel,
+  type TicketStatus,
+} from "../components/index.js";
 import { useAuth } from "../auth/index.js";
 
 type SortChoice =
@@ -26,6 +38,7 @@ type Filters = {
   categoryId: string;
   relatedSystemId: string;
   requestedPriority: "" | RequestedPriority;
+  currentStatus: "" | TicketStatus;
   sort: SortChoice;
 };
 
@@ -34,6 +47,7 @@ const DEFAULTS: Filters = {
   categoryId: "",
   relatedSystemId: "",
   requestedPriority: "",
+  currentStatus: "",
   sort: "ticketDate:desc",
 };
 
@@ -103,6 +117,7 @@ export default function MyTickets() {
         ...(filters.categoryId ? { categoryId: Number(filters.categoryId) } : {}),
         ...(filters.relatedSystemId ? { relatedSystemId: Number(filters.relatedSystemId) } : {}),
         ...(filters.requestedPriority ? { requestedPriority: filters.requestedPriority } : {}),
+        ...(filters.currentStatus ? { currentStatus: filters.currentStatus } : {}),
         sortBy,
         sortOrder,
         page,
@@ -129,6 +144,7 @@ export default function MyTickets() {
     filters.categoryId,
     filters.relatedSystemId,
     filters.requestedPriority,
+    filters.currentStatus,
     sortBy,
     sortOrder,
     page,
@@ -148,13 +164,15 @@ export default function MyTickets() {
     filters.categoryId === DEFAULTS.categoryId &&
     filters.relatedSystemId === DEFAULTS.relatedSystemId &&
     filters.requestedPriority === DEFAULTS.requestedPriority &&
+    filters.currentStatus === DEFAULTS.currentStatus &&
     filters.sort === DEFAULTS.sort;
 
   const hasQuery =
     debouncedSearch !== "" ||
     filters.categoryId !== "" ||
     filters.relatedSystemId !== "" ||
-    filters.requestedPriority !== "";
+    filters.requestedPriority !== "" ||
+    filters.currentStatus !== "";
 
   function clearFilters() {
     setFilters(DEFAULTS);
@@ -229,8 +247,26 @@ export default function MyTickets() {
           )}
         </Field>
 
-        {/* No Current Status filter: every Lab 2 Ticket is NEW, so the control
-            could never change a result set (BR-30). The API rejects it too. */}
+        {/* Lab 2 had no Current Status filter, because every Lab 2 Ticket was NEW.
+            Lab 3 ui-spec §6 promised it and the server refused it until Lab 4
+            BR-30 (issue #78). */}
+        <Field id="currentStatus" label="Current Status">
+          {(control) => (
+            <select
+              {...control}
+              value={filters.currentStatus}
+              onChange={(event) => update({ currentStatus: event.target.value as "" | TicketStatus })}
+            >
+              <option value="">All statuses</option>
+              {TICKET_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {statusLabel(status)}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+
         <Field id="sort" label="Sort">
           {(control) => (
             <select {...control} value={filters.sort} onChange={(event) => update({ sort: event.target.value as SortChoice })}>
@@ -293,6 +329,7 @@ export default function MyTickets() {
                   <th scope="col">Category</th>
                   <th scope="col">Related System</th>
                   <th scope="col">Requested Priority</th>
+                  <th scope="col">Status</th>
                   <th scope="col">Ticket Date</th>
                 </tr>
               </thead>
@@ -309,6 +346,9 @@ export default function MyTickets() {
                     <td data-label="Related System">{ticket.relatedSystem.name}</td>
                     <td data-label="Requested Priority">
                       <Badge tone={PRIORITY_TONE[ticket.requestedPriority]}>{ticket.requestedPriority}</Badge>
+                    </td>
+                    <td data-label="Status">
+                      <StatusBadge status={ticket.currentStatus as TicketStatus} />
                     </td>
                     <td data-label="Ticket Date">{new Date(ticket.ticketDate).toLocaleString()}</td>
                   </tr>

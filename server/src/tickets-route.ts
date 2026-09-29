@@ -333,6 +333,7 @@ export async function listTickets(req: Request, res: Response): Promise<void> {
   // not something the caller can influence.
   const where: Prisma.TicketWhereInput = {
     requesterId: requester.id,
+    ...(query.currentStatus ? { currentStatus: { in: query.currentStatus } } : {}),
     ...(query.categoryId ? { categoryId: query.categoryId } : {}),
     ...(query.relatedSystemId ? { relatedSystemId: query.relatedSystemId } : {}),
     ...(query.requestedPriority ? { requestedPriority: query.requestedPriority } : {}),
