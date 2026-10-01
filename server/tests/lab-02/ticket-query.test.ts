@@ -33,8 +33,12 @@ describe("ticket list query", () => {
     expect(result.fieldErrors).toHaveProperty("page");
   });
 
-  it("rejects a Current Status filter, which Lab 2 does not have", () => {
-    expect(validateTicketListQuery({ currentStatus: "NEW" }).fieldErrors).toHaveProperty("currentStatus");
+  // Lab 2 refused Current Status here, because every Lab 2 Ticket was NEW. Lab 4
+  // BR-30 (issue #78) adds the filter, so the refusal became an acceptance; the
+  // full list rules are UNIT-03 in server/tests/lab-04/status-filter.test.ts.
+  it("accepts a Current Status filter since Lab 4, and still refuses an unknown one", () => {
+    expect(validateTicketListQuery({ currentStatus: "NEW" }).value?.currentStatus).toEqual(["NEW"]);
+    expect(validateTicketListQuery({ currentStatus: "new" }).fieldErrors).toHaveProperty("currentStatus");
   });
 
   it("reports every invalid parameter at once", () => {

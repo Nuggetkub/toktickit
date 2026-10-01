@@ -219,6 +219,21 @@ transcribed.
   The #82 tests use it too, and each race test still fails with its lock removed.
 - **Lab 3's `currentStatus` refusal of a list** becomes acceptance (BR-30). No Lab 3 test sent
   a list, so none is expected to change. This is recorded in case one does.
+- **Two Lab 2 tests that pinned My Tickets' refusal of `currentStatus` now pin its rules**
+  (BR-30, issue #78). Lab 2 refused the filter because every Lab 2 Ticket was `NEW`, and Lab 3
+  left that refusal in place (Lab 3 API-14). Lab 4 adds the filter, so the refusal of a valid
+  status had to go:
+  - `server/tests/lab-02/ticket-query.test.ts` now asserts that `NEW` is accepted as `["NEW"]`
+    and that `new` is still refused;
+  - `server/tests/lab-02/my-tickets.api.test.ts` keeps its guarantee, that an unusable filter is
+    refused rather than ignored, with an unknown status (`DONE`) instead of a valid one;
+  - `client/tests/lab-02/MyTickets.test.tsx` asserted that My Tickets offers **no** Current
+    Status filter. It now asserts the filter, with all eight statuses in words, and the new
+    Status column, and the filter joins the "replaces the rows on screen" table.
+
+  The full rules are UNIT-03 and API-14. Lab 3's API-14 file,
+  `server/tests/lab-03/requester-tickets.api.test.ts`, which Lab 3 named and never wrote, is
+  added too (see the addendum in `docs/lab-03/tests.md`).
 - **Lab 3 DB-03 now applies every later migration before comparing** (issue #81).
   `server/tests/lab-03/migration.test.ts` "leaves a schema that matches schema.prisma" built
   the Lab 2 and Lab 3 migrations and compared the result with `schema.prisma`. Once Lab 4
