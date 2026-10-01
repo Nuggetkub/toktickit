@@ -50,6 +50,10 @@ const ENDPOINTS: Endpoint[] = [
   { name: "cancel an Action", method: "post", path: (t, a) => `/api/tickets/${t}/actions/${a}/cancel`, body: () => ({ version: 1, reason: "Sweep reason." }), admits: ["staff", "admin"] },
   // Issue #83.
   { name: "read the status history", method: "get", path: (t) => `/api/tickets/${t}/history`, admits: ["requester", "staff", "admin"] },
+  // Issue #84. Each dashboard admits one side only (BR-29), and refuses the
+  // other before any query runs.
+  { name: "read the Requester dashboard", method: "get", path: () => "/api/dashboard/requester", admits: ["requester"] },
+  { name: "read the staff dashboard", method: "get", path: () => "/api/dashboard/staff", admits: ["staff", "admin"] },
 ];
 
 let staffId = 0;

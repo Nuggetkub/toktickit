@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ACTIVE_STATUSES, TICKET_STATUSES, parseStatusList } from "../../src/status-filter.js";
 import { validateTicketListQuery } from "../../src/ticket-query.js";
+import { STAFF_STATUSES, validateStaffQueueQuery } from "../../src/staff-queue-query.js";
 
 // UNIT-03 in docs/lab-04/tests.md (AC-22): the `currentStatus` list rules of
 // BR-30. The accepted and refused inputs are transcribed from BR-30 and
@@ -62,5 +63,21 @@ describe("My Tickets reads the list (issue #78)", () => {
 
   it("omits the key entirely when no status filter is sent", () => {
     expect(validateTicketListQuery({}).value).not.toHaveProperty("currentStatus");
+  });
+});
+
+describe("the Ticket Queue reads the list (issue #84)", () => {
+  it.each(STAFF_STATUSES)("keeps accepting the Lab 3 single value %s, as a list of one", (status) => {
+    expect(validateStaffQueueQuery({ currentStatus: status }).value?.currentStatus).toEqual([status]);
+  });
+
+  it("accepts the five active statuses with the other drill-down filters", () => {
+    const value = validateStaffQueueQuery({ currentStatus: ACTIVE_STATUSES.join(","), owner: "unassigned", requesterIndicated: "true" }).value;
+    expect(value).toMatchObject({ currentStatus: [...ACTIVE_STATUSES], owner: "unassigned", requesterIndicated: true });
+  });
+
+  it("refuses a bad list alongside the other errors, every parameter still checked", () => {
+    const result = validateStaffQueueQuery({ currentStatus: "OPEN,OPEN", itPriority: "NOW" });
+    expect(Object.keys(result.fieldErrors ?? {}).sort()).toEqual(["currentStatus", "itPriority"]);
   });
 });
