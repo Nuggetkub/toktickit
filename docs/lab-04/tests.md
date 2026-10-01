@@ -269,4 +269,7 @@ transcribed.
   `server/tests/lab-04/actions-taken.api.test.ts`, and each failed before the fix.
 - **The performance smoke test is not a benchmark.** It runs on the development machine
   against the seed, and it catches an accidental N+1 query or a missing index. It makes no
-  claim about production load.
+  claim about production load. The shared test schema holds no Tickets, so PERF-01 builds a
+  schema of its own (`lab4_perf_test`), migrated and loaded with the demo seed, and points the
+  application at it (issue #84). It fails if that seed did not load, rather than timing an
+  empty database, which its first draft did.
