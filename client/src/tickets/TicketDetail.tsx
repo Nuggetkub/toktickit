@@ -30,6 +30,7 @@ import {
 import { indicationAllowedFrom, isTerminal } from "../ticket-rules.js";
 import { describeSize, describeType, moment } from "./attachment-format.js";
 import { useAuth } from "../auth/index.js";
+import { ActionsTaken } from "../actions/ActionsTaken.js";
 import {
   MAX_FILES,
   PERMITTED_TYPE_LABEL,
@@ -337,6 +338,10 @@ export default function TicketDetail() {
           Back to My Tickets
         </Link>
       </Card>
+
+      {/* Lab 4 ui-spec §4: the same list, read-only. No write control is
+          rendered and none is requested (BR-16). */}
+      <ActionsTaken ticketId={ticket.id} ticketStatus={ticket.currentStatus} canWrite={false} currentUserId={user?.id ?? 0} />
 
       <Card>
         <DiscussionPanel

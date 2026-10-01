@@ -697,3 +697,90 @@ export async function setUserInitialPassword(userId: number, initialPassword: st
     body: JSON.stringify({ initialPassword }),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Lab 4 issue 85 — Actions Taken (api-spec.md §2)
+// ---------------------------------------------------------------------------
+
+export type ActionStatus = "OPEN" | "COMPLETED" | "CANCELLED";
+
+export interface ActionTaken {
+  id: number;
+  ticketId: number;
+  status: ActionStatus;
+  actionAt: string;
+  description: string;
+  result: string | null;
+  followUpRequired: boolean;
+  followUpNote: string | null;
+  attachmentNotes: string | null;
+  /** Null only after the assignee was deactivated or demoted (BR-17). */
+  assignee: UserSummary | null;
+  performedBy: UserSummary | null;
+  completedAt: string | null;
+  cancelledBy: UserSummary | null;
+  cancelledAt: string | null;
+  cancellationReason: string | null;
+  createdBy: UserSummary;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+export interface NewAction {
+  status: "OPEN" | "COMPLETED";
+  actionAt: string;
+  description: string;
+  result: string | null;
+  followUpRequired: boolean;
+  followUpNote: string | null;
+  attachmentNotes: string | null;
+  assigneeId: number;
+}
+
+/** An open Action's editable fields; only the ones that changed are sent. */
+export type ActionEdit = Partial<Omit<NewAction, "status">> & { version: number };
+
+export interface ActionCompletion {
+  version: number;
+  result: string;
+  followUpRequired?: boolean;
+  followUpNote?: string | null;
+  actionAt?: string;
+}
+
+const json = (body: unknown): RequestInit => ({
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
+
+/** `GET /api/tickets/:id/actions` — newest first (BR-11), never paginated. */
+export async function fetchActions(ticketId: number): Promise<ActionTaken[]> {
+  return (await requestJson<{ items: ActionTaken[] }>(`/api/tickets/${ticketId}/actions`)).items;
+}
+
+/**
+ * `POST /api/tickets/:id/actions`. The key is created once per form opening and
+ * re-sent on every retry, so a retried create returns the first Action instead
+ * of making a second (BR-15).
+ */
+export async function createAction(ticketId: number, action: NewAction, idempotencyKey: string): Promise<ActionTaken> {
+  const init = json(action);
+  return requestJson<ActionTaken>(`/api/tickets/${ticketId}/actions`, {
+    ...init,
+    headers: { ...(init.headers as Record<string, string>), "Idempotency-Key": idempotencyKey },
+  });
+}
+
+export async function editAction(ticketId: number, actionId: number, edit: ActionEdit): Promise<ActionTaken> {
+  return requestJson<ActionTaken>(`/api/tickets/${ticketId}/actions/${actionId}`, { ...json(edit), method: "PATCH" });
+}
+
+export async function completeAction(ticketId: number, actionId: number, completion: ActionCompletion): Promise<ActionTaken> {
+  return requestJson<ActionTaken>(`/api/tickets/${ticketId}/actions/${actionId}/complete`, json(completion));
+}
+
+export async function cancelAction(ticketId: number, actionId: number, version: number, reason: string): Promise<ActionTaken> {
+  return requestJson<ActionTaken>(`/api/tickets/${ticketId}/actions/${actionId}/cancel`, json({ version, reason }));
+}
