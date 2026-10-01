@@ -72,8 +72,8 @@ behaviour, and each such change is listed in §7 with its reason:
 | WF-04 | Workflow | AC-15 | Cancelling a Ticket with two open Actions and one completed Action cancels the two with the Ticket's reason and actor, in the same transaction, and leaves the completed one untouched. | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
 | WF-05 | Workflow | AC-16 | Create, then four transitions, produce five Status Events: from none to `NEW`, then each change, with actor and time from the server. Events forced to share a `createdAt` come back in `id` order. `POST`, `PATCH`, `PUT` and `DELETE` on the history path return `404`. A pre-migration Ticket reports `recordedFromCreation: false`. | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
 | WF-06 | Workflow | AC-17 | A Requester's indication on a Ticket with no completed Action leaves the status unchanged, and `resolutionGate.ready` stays false. Resolving is still refused. | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
-| API-10 | API | AC-02, AC-19 | For two Requesters with different Tickets, each R-card equals an independent count over that Requester's rows only. Each list contains only their Tickets, in BR-26's order and cap, and a canary Ticket of the other Requester appears nowhere in the response. The seeded Requester with no Tickets gets every value `0` and every list `[]`. | `server/tests/lab-04/requester-dashboard.api.test.ts` | Planned |
-| API-11 | API | AC-18, AC-19 | Every S-card and every breakdown row equals an independent count. `byStatus` sums to the Ticket total. Lists follow BR-27's content, order and caps, and S-3 includes no Action on a non-active Ticket. A Status Event just inside and just outside the 168-hour window is counted and not counted respectively. A staff member with no work gets `0` on S-2 and S-3. | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
+| API-10 | API | AC-02, AC-19 | For two Requesters with different Tickets, each R-card equals an independent count over that Requester's rows only. Each list contains only their Tickets, in BR-26's order and cap, and a canary Ticket of the other Requester appears nowhere in the response. A Status Event one minute inside and one minute outside the 168-hour window is counted and not counted respectively, and a Ticket resolved twice counts once, at its later resolution. A Requester with no Tickets gets every value `0` and every list `[]`. | `server/tests/lab-04/requester-dashboard.api.test.ts` | Planned |
+| API-11 | API | AC-18, AC-19 | Every S-card and every breakdown row equals an independent count. `byStatus` sums to the Ticket total. Lists follow BR-27's content, order and caps, and S-3 includes no Action on a non-active Ticket. A staff member with no work gets `0` on S-2 and S-3. | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
 | API-12 | API | AC-20 | For every card and breakdown row on both dashboards, the card's own `query` sent to `/api/tickets` or `/api/staff/tickets` as the same user returns `totalItems` equal to its `value`. | `server/tests/lab-04/requester-dashboard.api.test.ts`, `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
 | API-13 | API | AC-21 | An Administrator's staff dashboard includes `users`, whose counts match the User table. An IT Staff member's does not include the key at all. A Requester gets `403` from the staff endpoint, and staff get `403` from the Requester endpoint. Any query parameter returns `400`. | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
 | API-14 | API | AC-22 | My Tickets and the Queue each filter by a list of statuses and return only those. A single status behaves as in Lab 3. An unknown or repeated member returns `400` naming `currentStatus`. My Tickets no longer answers "arrives in Lab 3" (issue #78). | `server/tests/lab-04/status-filter.api.test.ts` | Planned |
@@ -234,6 +234,17 @@ transcribed.
   The full rules are UNIT-03 and API-14. Lab 3's API-14 file,
   `server/tests/lab-03/requester-tickets.api.test.ts`, which Lab 3 named and never wrote, is
   added too (see the addendum in `docs/lab-03/tests.md`).
+- **One Lab 3 queue unit assertion now expects a list of one** (BR-30, issue #84).
+  `server/tests/lab-03/staff-queue-query.test.ts` "accepts currentStatus=%s" read the parsed
+  value as a single string. The queue now takes a list, so the parsed value is `[status]`; what
+  the queue returns for a single status is unchanged, and every `staff-queue.api.test.ts` test
+  passes untouched.
+- **The dashboards' single snapshot is not proven by a test** (BR-25, issue #84). Each response
+  is read in one read-only `REPEATABLE READ` transaction so its cards and lists cannot disagree.
+  No test can place a write between two reads inside one request, so removing the transaction
+  leaves every dashboard test green. The cards' equality with independent counts (API-10,
+  API-11) and with their drill-downs (API-12) is proven; their mutual consistency under
+  concurrent writes is by construction only.
 - **Lab 3 DB-03 now applies every later migration before comparing** (issue #81).
   `server/tests/lab-03/migration.test.ts` "leaves a schema that matches schema.prisma" built
   the Lab 2 and Lab 3 migrations and compared the result with `schema.prisma`. Once Lab 4
@@ -258,4 +269,7 @@ transcribed.
   `server/tests/lab-04/actions-taken.api.test.ts`, and each failed before the fix.
 - **The performance smoke test is not a benchmark.** It runs on the development machine
   against the seed, and it catches an accidental N+1 query or a missing index. It makes no
-  claim about production load.
+  claim about production load. The shared test schema holds no Tickets, so PERF-01 builds a
+  schema of its own (`lab4_perf_test`), migrated and loaded with the demo seed, and points the
+  application at it (issue #84). It fails if that seed did not load, rather than timing an
+  empty database, which its first draft did.

@@ -24,6 +24,7 @@ import {
 import { createUser, editUser, listUsers, setInitialPassword } from "./users-admin-route.js";
 import { cancelAction, completeAction, createAction, editAction, listActions } from "./actions-route.js";
 import { listHistory } from "./history-route.js";
+import { requesterDashboard, staffDashboard } from "./dashboard-route.js";
 import multer from "multer";
 import { MAX_BYTES } from "./attachment-rules.js";
 import {
@@ -257,6 +258,12 @@ app.post("/api/tickets/:ticketId/actions/:actionId/cancel", ...staffOnly, asyncR
 // role that can read the Ticket; with no write route, any write meets the 404
 // that BR-22's append-only history requires.
 app.get("/api/tickets/:ticketId/history", ...signedIn, asyncRoute(listHistory));
+
+// Lab 4 issue 84 — the dashboards (api-spec §6). Each role is refused by
+// requireRole before any query runs (BR-29); the Administrator's user-account
+// counts are added inside the staff handler (BR-28).
+app.get("/api/dashboard/requester", ...signedIn, requireRole("REQUESTER"), asyncRoute(requesterDashboard));
+app.get("/api/dashboard/staff", ...signedIn, requireRole("IT_STAFF", "ADMINISTRATOR"), asyncRoute(staffDashboard));
 
 // Administrator user management (api-spec.md §8, FR-16).
 //

@@ -7,15 +7,18 @@ import { sessionCookieFor } from "../support/session.js";
 import { deleteTickets } from "../support/tickets.js";
 
 // API-14 in docs/lab-04/tests.md (AC-22), against the real database: the
-// `currentStatus` list filter of BR-30. This file holds the My Tickets half
-// (issue #78); the Ticket Queue half arrives with the dashboards (issue #84).
+// `currentStatus` list filter of BR-30, on My Tickets (issue #78) and on the
+// Ticket Queue (issue #84).
 
 const prisma = getPrisma();
 const DOMAIN = "@status-filter-lab4.local";
 const STATUSES = ["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "RESOLVED", "CLOSED", "REOPENED", "CANCELLED"] as const;
 const ACTIVE = "NEW,OPEN,IN_PROGRESS,WAITING_FOR_REQUESTER,REOPENED";
-const ids = { owner: 0, other: 0 };
-const cookies = { owner: "", other: "" };
+const ids = { owner: 0, other: 0, staff: 0 };
+const cookies = { owner: "", other: "", staff: "" };
+// The owner's name is unique to this run, so the shared queue can be confined
+// to this file's Tickets with its requester-name search.
+const TAG = `Statusfilter${randomUUID().slice(0, 8)}`;
 // The owner's Ticket id for each status, and the other Requester's, which must never appear.
 const mine = new Map<string, number>();
 const canaries = new Set<number>();
@@ -57,12 +60,14 @@ beforeAll(async () => {
   ]);
   categoryId = category.id;
   relatedSystemId = system.id;
-  const make = async (fullName: string) =>
-    (await prisma.user.create({ data: { fullName, email: `${randomUUID().slice(0, 8)}${DOMAIN}`, role: "REQUESTER" } })).id;
-  ids.owner = await make("Nadia Rahman");
+  const make = async (fullName: string, role: "REQUESTER" | "IT_STAFF" = "REQUESTER") =>
+    (await prisma.user.create({ data: { fullName, email: `${randomUUID().slice(0, 8)}${DOMAIN}`, role } })).id;
+  ids.owner = await make(`Nadia ${TAG}`);
   ids.other = await make("Somchai Pattana");
+  ids.staff = await make("Grace Okafor", "IT_STAFF");
   cookies.owner = await sessionCookieFor(ids.owner);
   cookies.other = await sessionCookieFor(ids.other);
+  cookies.staff = await sessionCookieFor(ids.staff);
   for (const status of STATUSES) {
     mine.set(status, await ticket(ids.owner, status));
     canaries.add(await ticket(ids.other, status));
@@ -131,5 +136,48 @@ describe("API-14 My Tickets filters by one or more statuses (BR-30, issue #78)",
     const res = await myTickets(cookies.owner, { currentStatus: "DONE" });
     expect(res.body.error.fieldErrors.currentStatus).not.toMatch(/Lab 3/);
     expect(res.body.error.fieldErrors.currentStatus).toMatch(/comma-separated list/);
+  });
+});
+
+const queue = (query: Record<string, string>) =>
+  request(app).get("/api/staff/tickets").query({ pageSize: "50", ...query }).set("Cookie", cookies.staff);
+
+describe("API-14 the Ticket Queue filters by one or more statuses (BR-30, issue #84)", () => {
+  it.each(STATUSES)("a single currentStatus=%s still behaves as in Lab 3", async (status) => {
+    const res = await queue({ currentStatus: status, search: TAG });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(idsOf(res.body)).toEqual(expected(status));
+  });
+
+  it("the five active statuses return those five of this Requester's Tickets", async () => {
+    const res = await queue({ currentStatus: ACTIVE, search: TAG });
+    expect(idsOf(res.body)).toEqual(expected("NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "REOPENED"));
+  });
+
+  it("across the whole queue, a list matches an independent count of Tickets in those statuses", async () => {
+    const res = await queue({ currentStatus: "RESOLVED,CLOSED,CANCELLED" });
+    const stored = await prisma.ticket.count({ where: { currentStatus: { in: ["RESOLVED", "CLOSED", "CANCELLED"] } } });
+    expect(res.body.totalItems).toBe(stored);
+    expect(res.body.items.every((item: { currentStatus: string }) => ["RESOLVED", "CLOSED", "CANCELLED"].includes(item.currentStatus))).toBe(true);
+  });
+
+  it("combines with owner and the Requester indication, as the dashboard drill-downs do", async () => {
+    const res = await queue({ currentStatus: ACTIVE, owner: "unassigned", search: TAG });
+    // None of this file's Tickets has an owner, so the active five are all unassigned.
+    expect(idsOf(res.body)).toEqual(expected("NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "REOPENED"));
+    const indicated = await queue({ currentStatus: ACTIVE, requesterIndicated: "true", search: TAG });
+    expect(indicated.body.totalItems).toBe(0);
+  });
+
+  it.each([
+    ["an unknown member", "OPEN,DONE"],
+    ["a repeated member", "OPEN,OPEN"],
+    ["an empty value", ""],
+    ["a trailing comma", "OPEN,"],
+    ["a lower-case member", "open"],
+  ])("refuses %s with 400 naming currentStatus", async (_label, value) => {
+    const res = await queue({ currentStatus: value });
+    expect(res.status).toBe(400);
+    expect(Object.keys(res.body.error.fieldErrors)).toEqual(["currentStatus"]);
   });
 });
