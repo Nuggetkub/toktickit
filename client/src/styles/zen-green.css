@@ -1174,3 +1174,12 @@ body {
 .zen-actions-table td {
   overflow-wrap: anywhere;
 }
+
+/* Lab 4 issue 86 - the status history (ui-spec.md section 5) */
+.zen-timeline {
+  display: grid;
+  gap: var(--zen-space-2);
+  margin: var(--zen-space-3) 0 0;
+  padding-left: var(--zen-space-4);
+  overflow-wrap: anywhere;
+}

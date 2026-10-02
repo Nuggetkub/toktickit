@@ -130,6 +130,8 @@ export class ApiError extends Error {
     readonly status?: number,
     /** Seconds from `Retry-After`, so a throttled sign-in can say how long. */
     readonly retryAfterSeconds?: number,
+    /** `RESOLUTION_BLOCKED`'s unmet conditions (Lab 4 api-spec §4), when the server sends them. */
+    readonly unmet?: UnmetCondition[],
   ) {
     super(message);
     this.name = "ApiError";
@@ -137,7 +139,7 @@ export class ApiError extends Error {
 }
 
 type ErrorEnvelope = {
-  error?: { code?: string; message?: string; fieldErrors?: Record<string, string> };
+  error?: { code?: string; message?: string; fieldErrors?: Record<string, string>; unmet?: UnmetCondition[] };
 };
 
 /**
@@ -162,6 +164,7 @@ async function toApiError(response: Response): Promise<ApiError> {
     envelope?.error?.fieldErrors,
     response.status,
     Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
+    envelope?.error?.unmet,
   );
 }
 
@@ -433,6 +436,8 @@ export interface TicketDetail extends CreatedTicket {
   requesterResolvedAt: string | null;
   /** Carried back on every workflow write, which is how BR-24 detects a stale edit. */
   version: number;
+  /** Lab 4 BR-19, as advice for the screen; the status change re-decides under the lock. */
+  resolutionGate?: ResolutionGate;
 }
 
 export async function fetchTicket(ticketId: number): Promise<TicketDetail> {
@@ -783,4 +788,41 @@ export async function completeAction(ticketId: number, actionId: number, complet
 
 export async function cancelAction(ticketId: number, actionId: number, version: number, reason: string): Promise<ActionTaken> {
   return requestJson<ActionTaken>(`/api/tickets/${ticketId}/actions/${actionId}/cancel`, json({ version, reason }));
+}
+
+// ---------------------------------------------------------------------------
+// Lab 4 issue 86 — resolution feedback and status history (api-spec.md §3, §4)
+// ---------------------------------------------------------------------------
+
+export interface ResolutionGate {
+  openActions: number;
+  completedActions: number;
+  latestFollowUpRequired: boolean;
+  reopenedSinceWork: boolean;
+  ready: boolean;
+}
+
+export type UnmetCondition =
+  | { condition: "OPEN_ACTIONS"; count: number }
+  | { condition: "NO_COMPLETED_ACTION" }
+  | { condition: "FOLLOW_UP_REQUIRED"; actionId: number }
+  | { condition: "NO_WORK_SINCE_REOPEN" };
+
+export interface StatusEvent {
+  id: number;
+  fromStatus: string | null;
+  toStatus: string;
+  actor: UserSummary;
+  createdAt: string;
+}
+
+export interface StatusHistory {
+  items: StatusEvent[];
+  /** False for a Ticket from before the history began (BR-24). */
+  recordedFromCreation: boolean;
+}
+
+/** `GET /api/tickets/:id/history` — oldest first (BR-23). */
+export async function fetchHistory(ticketId: number): Promise<StatusHistory> {
+  return requestJson<StatusHistory>(`/api/tickets/${ticketId}/history`);
 }

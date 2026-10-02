@@ -117,6 +117,10 @@ function mockApi(handlers: Record<string, Handler> = {}, asUser: unknown = USER)
     if (url.pathname === "/api/tickets/42/actions") {
       return { ok: true, status: 200, json: async () => ({ items: [] }), headers: new Headers() };
     }
+    // Lab 4 issue #86 added the History disclosure, answered the same way.
+    if (url.pathname === "/api/tickets/42/history") {
+      return { ok: true, status: 200, json: async () => ({ items: [], recordedFromCreation: true }), headers: new Headers() };
+    }
     throw new Error(`Unexpected request: ${method} ${url.pathname}`);
   });
 

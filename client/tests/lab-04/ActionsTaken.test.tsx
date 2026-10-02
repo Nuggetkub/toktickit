@@ -446,3 +446,59 @@ describe("UI-02 the assignee list can be retried without losing the form", () =>
     expect(writes(calls)[0].body).toEqual({ version: 4, description: "Work item 1 today", assigneeId: COLLEAGUE.id });
   });
 });
+
+// On the real IT Staff Ticket Detail, not the section alone: after an Action
+// is saved the screen re-reads the Ticket, and that must not blank the page,
+// or the section remounts and the "Action recorded" status is lost unseen.
+describe("UI-01 on the IT Staff Ticket Detail screen", () => {
+  it("keeps the section, and its success message, through the Ticket re-read after a save", async () => {
+    const staffTicket = {
+      id: 42, ticketNumber: "TKT-2026-00042", ticketDate: "2026-09-14T09:14:22.518Z",
+      requester: { id: 3, fullName: "Nadia Rahman", role: "REQUESTER" }, category: { id: 2, name: "Network" },
+      relatedSystem: { id: 5, name: "Campus Wi-Fi" }, summary: "Cannot connect", description: "Authentication failure.",
+      requestedPriority: "HIGH", itPriority: "URGENT", currentStatus: "IN_PROGRESS", owner: ME,
+      resolutionSummary: null, requesterResolvedAt: null, version: 4, attachments: [],
+      createdAt: "2026-09-14T09:14:22.518Z", updatedAt: "2026-09-14T10:02:51.004Z",
+    };
+    let ticketReads = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
+      const url = new URL(String(input), "http://localhost");
+      const method = init?.method ?? "GET";
+      const answer = (status: number, body: unknown) => ({ ok: status < 400, status, json: async () => body, headers: new Headers() });
+      if (url.pathname === "/api/auth/me") return answer(200, { user: { ...ME, email: "grace@toktickit.local", mustChangePassword: false } });
+      if (url.pathname === "/api/tickets/42") {
+        ticketReads += 1;
+        // A re-read takes network time, as it does in a browser; an instant
+        // answer lets React batch the loading and ready states into one render
+        // and hide the blanked page this test exists to catch.
+        if (ticketReads > 1) await new Promise((resolve) => setTimeout(resolve, 100));
+        return answer(200, staffTicket);
+      }
+      if (url.pathname === "/api/tickets/42/comments" || url.pathname === "/api/tickets/42/internal-notes") return answer(200, []);
+      if (url.pathname === "/api/staff/assignees") return answer(200, ASSIGNEES);
+      if (method === "GET" && url.pathname === "/api/tickets/42/actions") return answer(200, { items: [] });
+      if (method === "GET" && url.pathname === "/api/tickets/42/history") return answer(200, { items: [], recordedFromCreation: true });
+      if (method === "POST" && url.pathname === "/api/tickets/42/actions") return answer(201, action(9));
+      if (url.pathname === "/api/categories" || url.pathname === "/api/related-systems") return answer(200, []);
+      throw new Error(`Unexpected request: ${method} ${url.pathname}`);
+    }));
+    const { MemoryRouter } = await import("react-router-dom");
+    const { default: App } = await import("../../src/App");
+    render(<MemoryRouter initialEntries={["/queue/42"]}><App /></MemoryRouter>);
+    await screen.findByRole("heading", { name: "Ticket TKT-2026-00042" });
+
+    await userEvent.click(await screen.findByRole("button", { name: "Add action" }));
+    await userEvent.type(screen.getByLabelText(/Description/), "Replaced the access point.");
+    await userEvent.type(screen.getByLabelText(/^Result/), "Signal restored.");
+    const reads = ticketReads;
+    await userEvent.click(screen.getByRole("button", { name: "Save action" }));
+
+    // The Ticket is re-read (the resolution guidance depends on it)...
+    await waitFor(() => expect(ticketReads).toBe(reads + 1));
+    // ...without the page going back to "Loading", so the message is still there.
+    expect(await screen.findByText("Action recorded")).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByText("Action recorded")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ticket TKT-2026-00042" })).toBeInTheDocument();
+  });
+});
