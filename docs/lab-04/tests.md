@@ -252,6 +252,10 @@ transcribed.
   Each mock now answers `GET /api/tickets/42/actions` with an empty list, as Lab 3 did for the
   comments panel. No assertion changed: before the line was added, they failed only because the
   section's own "could not be loaded" alert appeared beside the alert under test.
+  Issue #86 added the History disclosure, so the same two mocks also answer
+  `GET /api/tickets/42/history` with an empty history. History is collapsed by default, so
+  without that line the request was refused silently and every test still passed; it was added
+  rather than left as a hidden failure.
 - **Lab 3 DB-03 now applies every later migration before comparing** (issue #81).
   `server/tests/lab-03/migration.test.ts` "leaves a schema that matches schema.prisma" built
   the Lab 2 and Lab 3 migrations and compared the result with `schema.prisma`. Once Lab 4

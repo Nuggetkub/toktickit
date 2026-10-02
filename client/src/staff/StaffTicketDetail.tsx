@@ -47,6 +47,8 @@ import { describeSize, describeType, moment } from "../tickets/attachment-format
 import { saveBlob } from "../tickets/save-file.js";
 import { useAuth } from "../auth/index.js";
 import { ActionsTaken } from "../actions/ActionsTaken.js";
+import { StatusHistory } from "../workflow/StatusHistory.js";
+import { cancellationWarning, resolutionNeeds, unmetLines } from "../workflow/resolution.js";
 
 // The IT Staff Ticket Detail (ui-spec.md §8).
 //
@@ -104,6 +106,11 @@ export default function StaffTicketDetail() {
   const [priorityError, setPriorityError] = useState("");
   const [statusError, setStatusError] = useState("");
   const [dialogError, setDialogError] = useState("");
+  // RESOLUTION_BLOCKED's unmet conditions, shown inside the dialog (Lab 4 ui-spec §5).
+  const [blocked, setBlocked] = useState<string[]>([]);
+  // Bumped after a status change, or a refusal that shows the screen was stale,
+  // so the Actions list and the history re-read without a page reload.
+  const [workToken, setWorkToken] = useState(0);
   const [attachmentError, setAttachmentError] = useState("");
 
   useEffect(() => {
@@ -177,6 +184,7 @@ export default function StaffTicketDetail() {
     setPriorityError("");
     setStatusError("");
     setDialogError("");
+    setBlocked([]);
   }
 
   /**
@@ -268,10 +276,23 @@ export default function StaffTicketDetail() {
       adopt(updated);
       setPending(null);
       setNotice(`Status changed to ${statusLabel(to)}`);
+      // Cancelling cascades to open Actions (BR-20), and every change adds a
+      // history entry (BR-22): both re-read now, with no page reload.
+      setWorkToken((token) => token + 1);
       // The summary or reason is posted as a Public Comment in the same
       // transaction (BR-30), so the thread is stale the moment this succeeds.
       setComments(await fetchComments(ticket.id));
     } catch (error) {
+      // The screen was stale: the server re-decided the gate under its lock and
+      // refused (Lab 4 BR-19). Its list is shown in the dialog, which stays open
+      // with the summary as typed, and the gate and Actions re-read behind it.
+      if (error instanceof ApiError && error.code === "RESOLUTION_BLOCKED") {
+        setBlocked(unmetLines(error.unmet ?? []));
+        setDialogError("");
+        refreshTicket();
+        setWorkToken((token) => token + 1);
+        return;
+      }
       // Inside the dialog while it is open, beneath the control once it is not.
       refuse(error, pending ? setDialogError : setStatusError, "The status could not be changed.");
     } finally {
@@ -363,6 +384,11 @@ export default function StaffTicketDetail() {
   const available = nextStatuses(status);
   const activeAttachments = ticket.attachments.filter((file) => file.removedAt === null);
   const pendingField = pending ? evidenceRequiredFor(pending) : null;
+  // Advice before the attempt (Lab 4 ui-spec §5); the server re-decides.
+  const gate = ticket.resolutionGate;
+  const needs = gate && available.includes("RESOLVED") ? resolutionNeeds(gate) : [];
+  const resolveClosed = needs.length > 0;
+  const cancelWarning = pending === "CANCELLED" ? cancellationWarning(gate) : null;
 
   return (
     <>
@@ -494,21 +520,34 @@ export default function StaffTicketDetail() {
               {(control) => (
                 <select
                   {...control}
+                  aria-describedby={[control["aria-describedby"], resolveClosed ? "work-status-needs" : null].filter(Boolean).join(" ") || undefined}
                   value={statusChoice}
                   disabled={frozen || available.length === 0}
                   onChange={(event) => setStatusChoice(event.target.value as "" | TicketStatus)}
                 >
                   <option value="">Choose a new status</option>
                   {/* Only BR-29's next statuses: the rest would be refused, and
-                      a choice that cannot succeed is not a choice. */}
+                      a choice that cannot succeed is not a choice. Resolved stays
+                      listed but disabled while the gate is closed (Lab 4 ui-spec
+                      §5), so the reader sees why rather than wondering where it went. */}
                   {available.map((next) => (
-                    <option key={next} value={next}>
+                    <option key={next} value={next} disabled={next === "RESOLVED" && resolveClosed}>
                       {statusLabel(next)}
                     </option>
                   ))}
                 </select>
               )}
             </Field>
+            {resolveClosed && (
+              <div id="work-status-needs" className="zen-field__hint">
+                <p>Resolution needs:</p>
+                <ul>
+                  {needs.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {/* BR-28 named before it is broken, rather than as a 409 afterwards. */}
             {!ticket.owner && statusChoice && ownerRequiredToEnter(statusChoice) && (
               <p className="zen-field__hint">Assign an owner before moving this ticket to {statusLabel(statusChoice)}.</p>
@@ -533,7 +572,10 @@ export default function StaffTicketDetail() {
         canWrite
         currentUserId={user?.id ?? 0}
         onChanged={refreshTicket}
+        refreshToken={workToken}
       />
+
+      <StatusHistory ticketId={ticket.id} refreshToken={workToken} />
 
       <Card>
         <div className="zen-tabs" role="tablist" aria-label="Ticket discussion">
@@ -666,13 +708,27 @@ export default function StaffTicketDetail() {
             pendingField === "resolutionSummary"
               ? "The requester is told the problem is resolved, and your summary is posted to them as a public comment."
               : pendingField === "reason"
-                ? "Your reason is posted to the requester as a public comment."
+                ? `Your reason is posted to the requester as a public comment.${cancelWarning ? ` ${cancelWarning}` : ""}`
                 : "The requester sees the new status on their ticket."
           }
           confirmLabel={`Change status to ${statusLabel(pending)}`}
           busy={statusBusy}
           busyLabel="Changing status…"
           error={dialogError}
+          // The server's refusal as a list, inside the dialog; the typed
+          // summary stays in the field (Lab 4 ui-spec §5).
+          children={
+            blocked.length > 0 ? (
+              <div className="zen-alert" role="alert">
+                <p>This ticket cannot be resolved yet. Resolution needs:</p>
+                <ul>
+                  {blocked.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : undefined
+          }
           field={
             pendingField
               ? {
@@ -686,6 +742,7 @@ export default function StaffTicketDetail() {
           onCancel={() => {
             setPending(null);
             setDialogError("");
+            setBlocked([]);
           }}
         />
       )}

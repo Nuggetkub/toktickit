@@ -32,6 +32,8 @@ type ActionsTakenProps = {
   currentUserId: number;
   /** After any successful write, so the Ticket and its resolution guidance refresh. */
   onChanged?: () => void;
+  /** Changes when the Ticket changed elsewhere on the screen, so the list re-reads (ui-spec §5). */
+  refreshToken?: number;
 };
 
 type Dialog =
@@ -41,7 +43,7 @@ type Dialog =
 const TERMINAL = new Set(["CLOSED", "CANCELLED"]);
 const FIVE_MINUTES = 5 * 60 * 1000;
 
-export function ActionsTaken({ ticketId, ticketStatus, canWrite, currentUserId, onChanged }: ActionsTakenProps) {
+export function ActionsTaken({ ticketId, ticketStatus, canWrite, currentUserId, onChanged, refreshToken = 0 }: ActionsTakenProps) {
   const [actions, setActions] = useState<ActionTaken[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [reloadToken, setReloadToken] = useState(0);
@@ -74,7 +76,7 @@ export function ActionsTaken({ ticketId, ticketStatus, canWrite, currentUserId, 
     return () => {
       active = false;
     };
-  }, [ticketId, reloadToken]);
+  }, [ticketId, reloadToken, refreshToken]);
 
   useEffect(() => {
     // The assignee list is a staff endpoint; a Requester never requests it.

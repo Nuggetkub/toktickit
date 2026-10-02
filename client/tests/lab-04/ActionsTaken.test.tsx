@@ -477,6 +477,7 @@ describe("UI-01 on the IT Staff Ticket Detail screen", () => {
       if (url.pathname === "/api/tickets/42/comments" || url.pathname === "/api/tickets/42/internal-notes") return answer(200, []);
       if (url.pathname === "/api/staff/assignees") return answer(200, ASSIGNEES);
       if (method === "GET" && url.pathname === "/api/tickets/42/actions") return answer(200, { items: [] });
+      if (method === "GET" && url.pathname === "/api/tickets/42/history") return answer(200, { items: [], recordedFromCreation: true });
       if (method === "POST" && url.pathname === "/api/tickets/42/actions") return answer(201, action(9));
       if (url.pathname === "/api/categories" || url.pathname === "/api/related-systems") return answer(200, []);
       throw new Error(`Unexpected request: ${method} ${url.pathname}`);

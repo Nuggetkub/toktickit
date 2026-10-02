@@ -31,6 +31,7 @@ import { indicationAllowedFrom, isTerminal } from "../ticket-rules.js";
 import { describeSize, describeType, moment } from "./attachment-format.js";
 import { useAuth } from "../auth/index.js";
 import { ActionsTaken } from "../actions/ActionsTaken.js";
+import { StatusHistory } from "../workflow/StatusHistory.js";
 import {
   MAX_FILES,
   PERMITTED_TYPE_LABEL,
@@ -342,6 +343,9 @@ export default function TicketDetail() {
       {/* Lab 4 ui-spec §4: the same list, read-only. No write control is
           rendered and none is requested (BR-16). */}
       <ActionsTaken ticketId={ticket.id} ticketStatus={ticket.currentStatus} canWrite={false} currentUserId={user?.id ?? 0} />
+
+      {/* Lab 4 ui-spec §5: the history is on both Ticket Detail screens. */}
+      <StatusHistory ticketId={ticket.id} />
 
       <Card>
         <DiscussionPanel

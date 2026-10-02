@@ -118,6 +118,8 @@ function mockApi(
     // Lab 4 issue #85 added the Actions taken section; an empty list keeps
     // every Lab 3 assertion about what this screen shows unchanged.
     if (url.pathname === "/api/tickets/42/actions") return answer(200, { items: [] });
+    // Lab 4 issue #86 added the History disclosure, answered the same way.
+    if (url.pathname === "/api/tickets/42/history") return answer(200, { items: [], recordedFromCreation: true });
     if (url.pathname === "/api/categories" || url.pathname === "/api/related-systems") return answer(200, []);
     throw new Error(`Unexpected request: ${method} ${url.pathname}`);
   });
