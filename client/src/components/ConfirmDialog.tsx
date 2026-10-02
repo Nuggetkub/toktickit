@@ -23,6 +23,14 @@ type ConfirmDialogProps = {
   busyLabel?: string;
   /** A refusal from the server, shown inside the dialog rather than behind it. */
   error?: string;
+  /**
+   * Further controls below the field, such as Completing an Action's follow-up
+   * fields (Lab 4 ui-spec §4). They sit inside the dialog, so the focus trap,
+   * which looks for controls on every Tab, includes them.
+   */
+  children?: ReactNode;
+  /** Blocks Confirm while those further controls hold an answer the server would refuse. */
+  confirmDisabled?: boolean;
   onConfirm: (value: string) => void;
   onCancel: () => void;
 };
@@ -50,6 +58,8 @@ export function ConfirmDialog({
   busy = false,
   busyLabel,
   error,
+  children,
+  confirmDisabled = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -137,6 +147,8 @@ export function ConfirmDialog({
             why closing it was necessary. */}
         {error && !field && <p className="zen-field__error" role="alert">{error}</p>}
 
+        {children}
+
         <div className="zen-modal__actions">
           <Button
             busy={busy}
@@ -144,7 +156,7 @@ export function ConfirmDialog({
             // Disabled until the answer is one the server would accept, on the
             // same reasoning as the attachment removal dialog: a button certain
             // to fail is a slower way of showing an error.
-            disabled={lengthIsWrong}
+            disabled={lengthIsWrong || confirmDisabled}
             onClick={() => onConfirm(trimmed)}
           >
             {confirmLabel}

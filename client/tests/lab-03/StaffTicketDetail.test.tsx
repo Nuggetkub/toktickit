@@ -115,6 +115,9 @@ function mockApi(
     if (url.pathname === "/api/tickets/42/comments") return answer(200, seed.comments ?? []);
     if (url.pathname === "/api/tickets/42/internal-notes") return answer(200, seed.notes ?? []);
     if (url.pathname === "/api/staff/assignees") return answer(200, ASSIGNEES);
+    // Lab 4 issue #85 added the Actions taken section; an empty list keeps
+    // every Lab 3 assertion about what this screen shows unchanged.
+    if (url.pathname === "/api/tickets/42/actions") return answer(200, { items: [] });
     if (url.pathname === "/api/categories" || url.pathname === "/api/related-systems") return answer(200, []);
     throw new Error(`Unexpected request: ${method} ${url.pathname}`);
   });

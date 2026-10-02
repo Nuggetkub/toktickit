@@ -45,6 +45,8 @@ import {
 } from "../ticket-rules.js";
 import { describeSize, describeType, moment } from "../tickets/attachment-format.js";
 import { saveBlob } from "../tickets/save-file.js";
+import { useAuth } from "../auth/index.js";
+import { ActionsTaken } from "../actions/ActionsTaken.js";
 
 // The IT Staff Ticket Detail (ui-spec.md §8).
 //
@@ -66,6 +68,7 @@ export default function StaffTicketDetail() {
   const location = useLocation();
   const queueReturn = (location.state as { queue?: QueueReturn } | null)?.queue ?? null;
 
+  const { user } = useAuth();
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "notFound" | "failed">("loading");
   const [reloadToken, setReloadToken] = useState(0);
@@ -506,6 +509,15 @@ export default function StaffTicketDetail() {
           </section>
         </div>
       </Card>
+
+      {/* Lab 4 ui-spec §4: after the facts and Work panel, before the discussion. */}
+      <ActionsTaken
+        ticketId={ticket.id}
+        ticketStatus={ticket.currentStatus}
+        canWrite
+        currentUserId={user?.id ?? 0}
+        onChanged={() => setReloadToken((token) => token + 1)}
+      />
 
       <Card>
         <div className="zen-tabs" role="tablist" aria-label="Ticket discussion">

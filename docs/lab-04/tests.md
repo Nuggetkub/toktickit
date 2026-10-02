@@ -246,6 +246,12 @@ transcribed.
   a new Ticket while the request waits there, and releases. The reads after the pause must
   still exclude that Ticket. With the transaction removed, or its isolation lowered to
   `READ COMMITTED`, both tests fail.
+- **Two earlier-lab screen suites answer one more request** (issue #85). Both Ticket Detail
+  screens now load the Actions taken section, and `client/tests/lab-02/RequesterTicketDetail.test.tsx`
+  and `client/tests/lab-03/StaffTicketDetail.test.tsx` refuse any request they do not know.
+  Each mock now answers `GET /api/tickets/42/actions` with an empty list, as Lab 3 did for the
+  comments panel. No assertion changed: before the line was added, they failed only because the
+  section's own "could not be loaded" alert appeared beside the alert under test.
 - **Lab 3 DB-03 now applies every later migration before comparing** (issue #81).
   `server/tests/lab-03/migration.test.ts` "leaves a schema that matches schema.prisma" built
   the Lab 2 and Lab 3 migrations and compared the result with `schema.prisma`. Once Lab 4
