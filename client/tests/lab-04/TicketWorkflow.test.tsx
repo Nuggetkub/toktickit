@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -228,5 +228,154 @@ describe("UI-04 the History disclosure", () => {
     render(<MemoryRouter initialEntries={["/tickets/42"]}><App /></MemoryRouter>);
     await userEvent.click(await screen.findByRole("button", { name: "History (3)" }));
     expect(screen.getByText(/Nadia Rahman created this ticket as/)).toBeInTheDocument();
+  });
+});
+
+// Earth2509's review of PR #100: the in-place Ticket re-read after an Action
+// write must say when it failed, offer Retry, and never let an older or
+// another Ticket's response replace what the screen already shows.
+describe("UI-03 the in-place Ticket re-read after an Action write", () => {
+  type Pending = { resolve: (body: unknown) => void; reject: (status: number) => void };
+
+  const openAction = {
+    id: 1, ticketId: 42, status: "OPEN", actionAt: "2026-09-20T09:00:00.000Z", description: "Replace the access point.",
+    result: null, followUpRequired: false, followUpNote: null, attachmentNotes: null,
+    assignee: { id: 7, fullName: "Grace Okafor", role: "IT_STAFF" }, performedBy: null, completedAt: null,
+    cancelledBy: null, cancelledAt: null, cancellationReason: null, createdBy: { id: 7, fullName: "Grace Okafor", role: "IT_STAFF" },
+    createdAt: "2026-09-20T09:05:00.000Z", updatedAt: "2026-09-20T09:05:00.000Z", version: 1,
+  };
+  const CLOSED_GATE = { openActions: 1, completedActions: 0, latestFollowUpRequired: false, reopenedSinceWork: false, ready: false };
+
+  /**
+   * Ticket reads are answered from a script, one entry per read: a body, a
+   * failing status, or "defer" to hold the answer until the test releases it.
+   */
+  function screenApi(script: Record<number, Array<unknown | "defer" | { fail: number }>>, statusReply?: unknown, actions: unknown[] = [openAction]) {
+    const reads: Record<number, number> = {};
+    const held: Pending[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
+      const url = new URL(String(input), "http://localhost");
+      const method = init?.method ?? "GET";
+      const answer = (status: number, body: unknown) => ({ ok: status < 400, status, json: async () => body, headers: new Headers() });
+      const ticketMatch = url.pathname.match(/^\/api\/tickets\/(\d+)$/);
+      if (url.pathname === "/api/auth/me") return answer(200, { user: STAFF });
+      if (ticketMatch && method === "GET") {
+        const id = Number(ticketMatch[1]);
+        reads[id] = (reads[id] ?? 0) + 1;
+        const steps = script[id];
+        const step = steps[Math.min(reads[id], steps.length) - 1];
+        if (step === "defer") {
+          return new Promise((resolve) => {
+            held.push({ resolve: (body) => resolve(answer(200, body)), reject: (status) => resolve(answer(status, { error: { code: "DEPENDENCY_UNAVAILABLE", message: "Unavailable." } })) });
+          });
+        }
+        if (step && typeof step === "object" && "fail" in (step as object)) {
+          return answer((step as { fail: number }).fail, { error: { code: "DEPENDENCY_UNAVAILABLE", message: "Unavailable." } });
+        }
+        return answer(200, step);
+      }
+      if (method === "POST" && /\/actions\/\d+\/complete$/.test(url.pathname)) return answer(200, { ...openAction, status: "COMPLETED", result: "Replaced it.", version: 2 });
+      if (method === "POST" && url.pathname === "/api/tickets/42/status") return answer(200, statusReply);
+      if (/\/api\/tickets\/\d+\/history$/.test(url.pathname)) return answer(200, HISTORY);
+      if (/\/api\/tickets\/\d+\/actions$/.test(url.pathname)) return answer(200, { items: url.pathname.includes("/42/") ? actions : [] });
+      if (/\/api\/tickets\/\d+\/(comments|internal-notes|attachments)$/.test(url.pathname)) return answer(200, []);
+      if (url.pathname === "/api/staff/assignees") return answer(200, [{ id: 7, fullName: "Grace Okafor", role: "IT_STAFF" }]);
+      if (url.pathname === "/api/categories" || url.pathname === "/api/related-systems") return answer(200, []);
+      throw new Error(`Unexpected request: ${method} ${url.pathname}`);
+    }));
+    return { reads, held };
+  }
+
+  async function completeTheOpenAction(rowIndex = 1) {
+    const row = within(await screen.findByRole("table")).getAllByRole("row")[rowIndex];
+    await userEvent.click(within(row).getByRole("button", { name: "Complete" }));
+    const dialog = screen.getByRole("dialog", { name: "Complete action" });
+    await userEvent.type(within(dialog).getByLabelText(/Result/), "Replaced it, signal strong.");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Complete action" }));
+    expect(await screen.findByText("Action completed")).toBeInTheDocument();
+  }
+
+  const resolvedOption = () => within(statusSelect()).getByRole("option", { name: "Resolved" }) as HTMLOptionElement;
+
+  it("says when the re-read failed, offers Retry in place, and keeps the success message", async () => {
+    screenApi({ 42: [ticket({ resolutionGate: CLOSED_GATE }), { fail: 503 }, ticket({ resolutionGate: READY })] });
+    await renderStaff();
+    expect(resolvedOption().disabled).toBe(true);
+    await completeTheOpenAction();
+
+    const alert = await screen.findByText("This ticket could not be refreshed, so what it shows may be out of date.");
+    expect(resolvedOption().disabled).toBe(true);
+    await userEvent.click(within(alert.closest("[role=alert]") as HTMLElement).getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(resolvedOption().disabled).toBe(false));
+    expect(screen.queryByText("This ticket could not be refreshed, so what it shows may be out of date.")).not.toBeInTheDocument();
+    expect(screen.getByText("Action completed")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ticket TKT-2026-00042" })).toBeInTheDocument();
+  });
+
+  it("ignores an older re-read that answers after a status change has landed", async () => {
+    const { held } = screenApi(
+      { 42: [ticket({ resolutionGate: READY }), "defer"] },
+      ticket({ currentStatus: "WAITING_FOR_REQUESTER", version: 5 }),
+    );
+    await renderStaff();
+    await completeTheOpenAction();
+    await waitFor(() => expect(held).toHaveLength(1));
+
+    await userEvent.selectOptions(statusSelect(), "WAITING_FOR_REQUESTER");
+    await userEvent.click(screen.getByRole("button", { name: "Change status" }));
+    expect(await screen.findByText("Status changed to Waiting for Requester")).toBeInTheDocument();
+
+    // The re-read started before the change answers now, with version 4.
+    held[0].resolve(ticket({ currentStatus: "IN_PROGRESS", version: 4, resolutionGate: READY }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(offered()).toEqual(NEXT.WAITING_FOR_REQUESTER);
+  });
+
+  it("ignores an earlier re-read that answers after a later one, though the version is the same", async () => {
+    // Two Actions completed in turn: each write re-reads the Ticket, and an
+    // Action write changes the gate without changing the Ticket's version.
+    const second = { ...openAction, id: 2, description: "Check the switch." };
+    const { held } = screenApi(
+      { 42: [ticket({ resolutionGate: { ...CLOSED_GATE, openActions: 2 } }), "defer", ticket({ resolutionGate: READY })] },
+      undefined,
+      [openAction, second],
+    );
+    await renderStaff();
+    await completeTheOpenAction(1);
+    await waitFor(() => expect(held).toHaveLength(1));
+    await completeTheOpenAction(2);
+    await waitFor(() => expect(resolvedOption().disabled).toBe(false));
+
+    // The first re-read, from before the second write, answers last.
+    held[0].resolve(ticket({ resolutionGate: { ...CLOSED_GATE, openActions: 1, completedActions: 1 } }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(resolvedOption().disabled).toBe(false);
+    expect(document.getElementById("work-status-needs")).toBeNull();
+  });
+
+  it("ignores a re-read that answers after the screen has moved to another Ticket", async () => {
+    const { held } = screenApi({
+      42: [ticket({ resolutionGate: READY }), "defer"],
+      43: [ticket({ id: 43, ticketNumber: "TKT-2026-00043", currentStatus: "OPEN", resolutionGate: READY })],
+    });
+    let go!: (to: string) => void;
+    const { useNavigate } = await import("react-router-dom");
+    function Driver() {
+      go = useNavigate();
+      return null;
+    }
+    render(<MemoryRouter initialEntries={["/queue/42"]}><Driver /><App /></MemoryRouter>);
+    await screen.findByRole("heading", { name: "Ticket TKT-2026-00042" });
+    await completeTheOpenAction();
+    await waitFor(() => expect(held).toHaveLength(1));
+
+    await act(async () => go("/queue/43"));
+    await screen.findByRole("heading", { name: "Ticket TKT-2026-00043" });
+
+    held[0].resolve(ticket({ resolutionGate: READY }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByRole("heading", { name: "Ticket TKT-2026-00043" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Ticket TKT-2026-00042" })).not.toBeInTheDocument();
   });
 });

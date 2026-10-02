@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ApiError,
@@ -66,6 +66,10 @@ type QueueReturn = { filters: unknown; page: number };
 
 export default function StaffTicketDetail() {
   const { ticketId = "" } = useParams();
+  // The Ticket this screen is about right now, read by in-place re-reads when
+  // they answer, so one that set out for another Ticket is dropped.
+  const routeTicketId = useRef(ticketId);
+  routeTicketId.current = ticketId;
   const navigate = useNavigate();
   const location = useLocation();
   const queueReturn = (location.state as { queue?: QueueReturn } | null)?.queue ?? null;
@@ -153,8 +157,15 @@ export default function StaffTicketDetail() {
     };
   }, [ticketId, reloadToken]);
 
+  // The version last adopted, and the number of the latest in-place re-read:
+  // only the latest re-read may be adopted, and never over a newer version.
+  const adoptedVersion = useRef(0);
+  const refreshSeq = useRef(0);
+  const [refreshFailed, setRefreshFailed] = useState(false);
+
   /** Every write answers with the ticket, so the screen redraws from the server. */
   function adopt(updated: TicketDetail) {
+    adoptedVersion.current = updated.version;
     setTicket(updated);
     setOwnerChoice(updated.owner ? String(updated.owner.id) : "");
     setPriorityChoice(updated.itPriority);
@@ -171,10 +182,24 @@ export default function StaffTicketDetail() {
    */
   function refreshTicket() {
     if (!ticket) return;
-    fetchTicket(ticket.id)
-      .then(adopt)
+    // Earth2509's review of PR #100. Re-reads can overlap and answer out of
+    // order, so each takes a number and only the latest may land. An Action
+    // write changes the gate without changing the Ticket's version, which is
+    // why the number is needed as well as the version check.
+    const seq = ++refreshSeq.current;
+    const requestedId = ticket.id;
+    setRefreshFailed(false);
+    fetchTicket(requestedId)
+      .then((loaded) => {
+        if (seq !== refreshSeq.current) return; // a later re-read is on its way
+        if (String(loaded.id) !== routeTicketId.current) return; // the screen moved to another Ticket
+        if (loaded.version < adoptedVersion.current) return; // a status write already landed something newer
+        adopt(loaded);
+      })
       .catch(() => {
-        // The screen keeps what it has; the next change re-reads again.
+        // The write itself succeeded; only the re-read failed. Say so beside
+        // the work, with a Retry, and keep everything on screen.
+        if (seq === refreshSeq.current && String(requestedId) === routeTicketId.current) setRefreshFailed(true);
       });
   }
 
@@ -564,6 +589,12 @@ export default function StaffTicketDetail() {
           </section>
         </div>
       </Card>
+
+      {refreshFailed && (
+        <ErrorAlert onRetry={refreshTicket} retryLabel="Retry">
+          This ticket could not be refreshed, so what it shows may be out of date.
+        </ErrorAlert>
+      )}
 
       {/* Lab 4 ui-spec §4: after the facts and Work panel, before the discussion. */}
       <ActionsTaken
