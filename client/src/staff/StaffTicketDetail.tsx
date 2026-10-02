@@ -155,6 +155,22 @@ export default function StaffTicketDetail() {
     setConflict(false);
   }
 
+  /**
+   * Re-reads the Ticket in place, after a change made elsewhere on the screen
+   * (an Action written in the Actions section). Unlike a reload it never shows
+   * "Loading", which would replace the screen and remount every section,
+   * discarding what they hold — the Actions section's "Action recorded" among
+   * them. A failure leaves the current Ticket showing.
+   */
+  function refreshTicket() {
+    if (!ticket) return;
+    fetchTicket(ticket.id)
+      .then(adopt)
+      .catch(() => {
+        // The screen keeps what it has; the next change re-reads again.
+      });
+  }
+
   function clearMessages() {
     setNotice("");
     setOwnerError("");
@@ -516,7 +532,7 @@ export default function StaffTicketDetail() {
         ticketStatus={ticket.currentStatus}
         canWrite
         currentUserId={user?.id ?? 0}
-        onChanged={() => setReloadToken((token) => token + 1)}
+        onChanged={refreshTicket}
       />
 
       <Card>
