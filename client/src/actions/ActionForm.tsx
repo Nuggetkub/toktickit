@@ -24,11 +24,13 @@ export type FormOutcome =
   /** The Action changed or became final elsewhere: the list should reload. */
   | { kind: "stale" };
 
+export type AssigneeList = { people: UserSummary[]; state: "loading" | "ready" | "failed"; retry: () => void };
+
 type ActionFormProps = {
   mode: "create" | "edit";
-  /** The Action being edited, in edit mode. */
+  /** The Action being edited, in edit mode; a newer version arriving here is rebased onto. */
   action?: ActionTaken;
-  assignees: UserSummary[];
+  assignees: AssigneeList;
   currentUserId: number;
   /** Sends the draft. In create mode `idempotencyKey` is the one key this form opening uses. */
   submit: (draft: ActionDraft, idempotencyKey: string) => Promise<ActionTaken>;
@@ -66,11 +68,29 @@ function initialDraft(mode: "create" | "edit", action: ActionTaken | undefined, 
   };
 }
 
+/** How a stored value reads in a "changed to" note. */
+function shown(field: keyof ActionDraft, draft: ActionDraft, people: UserSummary[]): string {
+  if (field === "assigneeId") return people.find((p) => String(p.id) === draft.assigneeId)?.fullName ?? "nobody";
+  if (field === "followUpRequired") return draft.followUpRequired ? "Follow-up required" : "No follow-up";
+  if (field === "actionAt") return draft.actionAt ? new Date(draft.actionAt).toLocaleString() : "no time";
+  const value = draft[field];
+  return typeof value === "string" && value.trim() ? value.trim() : "empty";
+}
+
 const NETWORK_MESSAGE = "The action could not be saved. Check your connection, then retry; everything you entered is kept.";
 
 export function ActionForm({ mode, action, assignees, currentUserId, submit, onSaved, onReload, onClose }: ActionFormProps) {
   const id = useId();
   const [draft, setDraft] = useState<ActionDraft>(() => initialDraft(mode, action, currentUserId));
+  // What the draft was opened against (edit mode). Earth2509's review of PR #99:
+  // after a conflict and Reload, comparing the old draft with the new record
+  // would send fields this user never touched and revert another user's change
+  // under a valid version. The baseline tells edited fields from untouched ones.
+  const [baseline, setBaseline] = useState<{ version: number; draft: ActionDraft } | null>(() =>
+    mode === "edit" && action ? { version: action.version, draft: initialDraft(mode, action, currentUserId) } : null,
+  );
+  const [changedElsewhere, setChangedElsewhere] = useState<DraftErrors>({});
+  const [rebased, setRebased] = useState(false);
   const [errors, setErrors] = useState<DraftErrors>({});
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<{ message: string; kind: "conflict" | "refused" | "network" } | null>(null);
@@ -85,6 +105,31 @@ export function ActionForm({ mode, action, assignees, currentUserId, submit, onS
     const first = FIELD_ORDER.find((field) => errors[field]);
     if (first) form.current?.querySelector<HTMLElement>(`[data-field="${first}"]`)?.focus();
   }, [errors]);
+
+  // A newer version of the Action arrived (Reload, or any refresh of the list):
+  // untouched fields take its values, edited fields keep this user's, and where
+  // both changed the same field the note beneath it says what will be replaced.
+  useEffect(() => {
+    if (mode !== "edit" || !action || !baseline || action.version === baseline.version) return;
+    const latest = initialDraft("edit", action, currentUserId);
+    const notes: DraftErrors = {};
+    const next = { ...draft };
+    for (const field of FIELD_ORDER) {
+      const edited = draft[field] !== baseline.draft[field];
+      if (!edited) (next as Record<string, unknown>)[field] = latest[field];
+      else if (latest[field] !== baseline.draft[field]) {
+        notes[field] = `Someone else changed this to “${shown(field, latest, assignees.people)}”. Saving keeps your value.`;
+      }
+    }
+    setDraft(next);
+    setChangedElsewhere(notes);
+    setBaseline({ version: action.version, draft: latest });
+    setFailure(null);
+    setRebased(true);
+    // Only a new version of the Action triggers this; the draft is read as it
+    // stands at that moment, not followed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [action?.version]);
 
   const fieldId = (name: keyof ActionDraft) => `${id}-${name}`;
   const update = (patch: Partial<ActionDraft>) => setDraft((current) => ({ ...current, ...patch }));
@@ -144,29 +189,41 @@ export function ActionForm({ mode, action, assignees, currentUserId, submit, onS
         </fieldset>
       )}
 
-      <Field id={fieldId("actionAt")} label="Action date/time" required error={errors.actionAt}>
+      {rebased && (
+        <p className="zen-status" role="status">
+          This action was reloaded at its latest version. Fields you had not changed now show the latest values; your changes are kept.
+        </p>
+      )}
+
+      <Field id={fieldId("actionAt")} label="Action date/time" required error={errors.actionAt} hint={changedElsewhere.actionAt}>
         {(control) => (
           <input {...control} data-field="actionAt" type="datetime-local" value={draft.actionAt} onChange={(event) => update({ actionAt: event.target.value })} />
         )}
       </Field>
 
-      <Field id={fieldId("description")} label="Description" required error={errors.description} wide>
+      <Field id={fieldId("description")} label="Description" required error={errors.description} hint={changedElsewhere.description} wide>
         {(control) => (
           <textarea {...control} data-field="description" rows={3} value={draft.description} onChange={(event) => update({ description: event.target.value })} />
         )}
       </Field>
 
-      <Field id={fieldId("result")} label="Result" required={completed} error={errors.result} hint={completed ? undefined : "Optional for planned work."} wide>
+      <Field id={fieldId("result")} label="Result" required={completed} error={errors.result} hint={changedElsewhere.result ?? (completed ? undefined : "Optional for planned work.")} wide>
         {(control) => (
           <textarea {...control} data-field="result" rows={2} value={draft.result} onChange={(event) => update({ result: event.target.value })} />
         )}
       </Field>
 
-      <Field id={fieldId("assigneeId")} label="Assignee" required error={errors.assigneeId}>
+      <Field
+        id={fieldId("assigneeId")}
+        label="Assignee"
+        required
+        error={errors.assigneeId}
+        hint={changedElsewhere.assigneeId ?? (assignees.state === "loading" ? "Loading the people who can be assigned…" : undefined)}
+      >
         {(control) => (
           <select {...control} data-field="assigneeId" value={draft.assigneeId} onChange={(event) => update({ assigneeId: event.target.value })}>
             <option value="">Choose an assignee</option>
-            {assignees.map((person) => (
+            {assignees.people.map((person) => (
               <option key={person.id} value={person.id}>
                 {person.fullName}
               </option>
@@ -174,6 +231,16 @@ export function ActionForm({ mode, action, assignees, currentUserId, submit, onS
           </select>
         )}
       </Field>
+      {/* Earth2509's review of PR #99: a failed lookup must be retryable without
+          losing the form, or an Unassigned Action can never be given anyone. */}
+      {assignees.state === "failed" && (
+        <div className="zen-alert" role="alert">
+          <p>The list of assignees could not be loaded.</p>
+          <Button variant="secondary" onClick={assignees.retry}>
+            Retry loading assignees
+          </Button>
+        </div>
+      )}
 
       <div className="zen-field">
         <label className="zen-checkbox">
@@ -187,17 +254,18 @@ export function ActionForm({ mode, action, assignees, currentUserId, submit, onS
           />{" "}
           Follow-up required
         </label>
+        {changedElsewhere.followUpRequired && <p className="zen-field__hint">{changedElsewhere.followUpRequired}</p>}
       </div>
 
       {draft.followUpRequired && (
-        <Field id={fieldId("followUpNote")} label="Follow-up note" required error={errors.followUpNote} wide>
+        <Field id={fieldId("followUpNote")} label="Follow-up note" required error={errors.followUpNote} hint={changedElsewhere.followUpNote} wide>
           {(control) => (
             <textarea {...control} data-field="followUpNote" rows={2} value={draft.followUpNote} onChange={(event) => update({ followUpNote: event.target.value })} />
           )}
         </Field>
       )}
 
-      <Field id={fieldId("attachmentNotes")} label="Attachment notes — refers to files in the Attachments tab" error={errors.attachmentNotes} wide>
+      <Field id={fieldId("attachmentNotes")} label="Attachment notes — refers to files in the Attachments tab" error={errors.attachmentNotes} hint={changedElsewhere.attachmentNotes} wide>
         {(control) => (
           <textarea {...control} data-field="attachmentNotes" rows={2} value={draft.attachmentNotes} onChange={(event) => update({ attachmentNotes: event.target.value })} />
         )}

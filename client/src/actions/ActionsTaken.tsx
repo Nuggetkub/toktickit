@@ -46,6 +46,8 @@ export function ActionsTaken({ ticketId, ticketStatus, canWrite, currentUserId, 
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [reloadToken, setReloadToken] = useState(0);
   const [assignees, setAssignees] = useState<UserSummary[]>([]);
+  const [assigneeState, setAssigneeState] = useState<"loading" | "ready" | "failed">("loading");
+  const [assigneeToken, setAssigneeToken] = useState(0);
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
@@ -78,17 +80,24 @@ export function ActionsTaken({ ticketId, ticketStatus, canWrite, currentUserId, 
     // The assignee list is a staff endpoint; a Requester never requests it.
     if (!canWrite) return;
     let active = true;
+    setAssigneeState("loading");
     fetchAssignees()
       .then((people) => {
-        if (active) setAssignees(people);
+        if (!active) return;
+        setAssignees(people);
+        setAssigneeState("ready");
       })
       .catch(() => {
-        // The form still opens; its Assignee field then says what to choose.
+        // Shown beside the Assignee field with its own Retry, which keeps
+        // whatever the form holds (Earth2509's review of PR #99).
+        if (active) setAssigneeState("failed");
       });
     return () => {
       active = false;
     };
-  }, [canWrite]);
+  }, [canWrite, assigneeToken]);
+
+  const assigneeList = { people: assignees, state: assigneeState, retry: () => setAssigneeToken((token) => token + 1) };
 
   const reload = () => setReloadToken((token) => token + 1);
 
@@ -142,7 +151,7 @@ export function ActionsTaken({ ticketId, ticketStatus, canWrite, currentUserId, 
       {writable && adding && (
         <ActionForm
           mode="create"
-          assignees={assignees}
+          assignees={assigneeList}
           currentUserId={currentUserId}
           submit={(draft, key) => createAction(ticketId, draftToNewAction(draft), key)}
           onSaved={() => saved("Action recorded")}
@@ -219,7 +228,7 @@ export function ActionsTaken({ ticketId, ticketStatus, canWrite, currentUserId, 
                           <ActionForm
                             mode="edit"
                             action={action}
-                            assignees={assignees}
+                            assignees={assigneeList}
                             currentUserId={currentUserId}
                             submit={(draft) => submitEdit(action, draft)}
                             onSaved={() => saved("Action updated")}

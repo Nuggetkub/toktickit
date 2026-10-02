@@ -29,9 +29,10 @@ type Reply = { status: number; body: unknown } | Error;
  * Answers the Actions list and the assignees, records every request, and lets
  * a test script the replies to writes, one per call, in order.
  */
-function mockApi(list: ActionTaken[], writes: Reply[] = []) {
+function mockApi(list: ActionTaken[], writes: Reply[] = [], assigneeReplies: Reply[] = []) {
   const calls: Call[] = [];
   const queue = [...writes];
+  const assigneeQueue = [...assigneeReplies];
   let items = list;
   vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
     const url = new URL(String(input), "http://localhost");
@@ -40,7 +41,12 @@ function mockApi(list: ActionTaken[], writes: Reply[] = []) {
     calls.push({ method, path: url.pathname, body: init?.body ? JSON.parse(String(init.body)) : undefined, key: headers.get("Idempotency-Key") });
     const answer = (status: number, body: unknown) => ({ ok: status < 400, status, json: async () => body, headers: new Headers() });
     if (method === "GET" && url.pathname === "/api/tickets/42/actions") return answer(200, { items });
-    if (method === "GET" && url.pathname === "/api/staff/assignees") return answer(200, ASSIGNEES);
+    if (method === "GET" && url.pathname === "/api/staff/assignees") {
+      // Scripted replies first, if a test gave any; then the eligible staff.
+      const scripted = assigneeQueue.shift();
+      if (scripted instanceof Error) throw scripted;
+      return scripted ? answer(scripted.status, scripted.body) : answer(200, ASSIGNEES);
+    }
     const next = queue.shift();
     if (!next) throw new Error(`Unexpected request: ${method} ${url.pathname}`);
     if (next instanceof Error) throw next;
@@ -356,5 +362,87 @@ describe("UI-02 conflicts, failures and duplicate submits", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save action" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("This action is final.");
     await waitFor(() => expect(gets(calls, "/api/tickets/42/actions")).toBe(before + 1));
+  });
+});
+
+// Earth2509's review of PR #99, finding 1: after a conflict and Reload, a field
+// the user never touched must not be sent, or it silently reverts the other
+// user's change with a valid new version.
+describe("UI-02 a reload after a conflict keeps the other user's changes", () => {
+  async function editDescription(row: HTMLElement, text: string) {
+    await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
+    const description = screen.getByLabelText(/Description/);
+    await userEvent.clear(description);
+    await userEvent.type(description, text);
+  }
+
+  it("sends only what this user changed, against the new version, so a reassignment made meanwhile survives", async () => {
+    const { calls, setList } = mockApi([action(1, { version: 1, assignee: ME })], [
+      { status: 409, body: { error: { code: "ACTION_VERSION_CONFLICT", message: "Stale." } } },
+      { status: 200, body: action(1, { version: 3, assignee: COLLEAGUE, description: "Replaced the access point, again." }) },
+    ]);
+    renderSection();
+    await editDescription(within(await screen.findByRole("table")).getAllByRole("row")[1], "Replaced the access point, again.");
+    await userEvent.click(screen.getByRole("button", { name: "Save action" }));
+    await screen.findByText("Someone else changed this action. Reload to see the latest version.");
+
+    // Meanwhile the other user reassigned it to a colleague: version 2.
+    setList([action(1, { version: 2, assignee: COLLEAGUE })]);
+    await userEvent.click(screen.getByRole("button", { name: "Reload" }));
+    await waitFor(() => expect(screen.getByLabelText(/Assignee/)).toHaveValue(String(COLLEAGUE.id)));
+    expect(screen.getByLabelText(/Description/)).toHaveValue("Replaced the access point, again.");
+
+    await userEvent.click(screen.getByRole("button", { name: "Save action" }));
+    expect(await screen.findByText("Action updated")).toBeInTheDocument();
+    const patches = writes(calls).filter((c) => c.method === "PATCH");
+    expect(patches).toHaveLength(2);
+    expect(patches[1].body).toEqual({ version: 2, description: "Replaced the access point, again." });
+  });
+
+  it("when the other user changed the same field, keeps this user's value and says what it replaces", async () => {
+    const { calls, setList } = mockApi([action(1, { version: 1 })], [
+      { status: 409, body: { error: { code: "ACTION_VERSION_CONFLICT", message: "Stale." } } },
+      { status: 200, body: action(1, { version: 3 }) },
+    ]);
+    renderSection();
+    await editDescription(within(await screen.findByRole("table")).getAllByRole("row")[1], "Mine: reseated the cable.");
+    await userEvent.click(screen.getByRole("button", { name: "Save action" }));
+    await screen.findByText("Someone else changed this action. Reload to see the latest version.");
+
+    setList([action(1, { version: 2, description: "Theirs: rebooted the switch." })]);
+    await userEvent.click(screen.getByRole("button", { name: "Reload" }));
+    expect(await screen.findByText(/Someone else changed this to “Theirs: rebooted the switch\.”/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Description/)).toHaveValue("Mine: reseated the cable.");
+
+    await userEvent.click(screen.getByRole("button", { name: "Save action" }));
+    expect(await screen.findByText("Action updated")).toBeInTheDocument();
+    expect(writes(calls).filter((c) => c.method === "PATCH")[1].body).toEqual({ version: 2, description: "Mine: reseated the cable." });
+  });
+});
+
+// Earth2509's review of PR #99, finding 2: a failed assignee lookup needs a
+// Retry that keeps the form, or an Unassigned Action cannot be given anyone.
+describe("UI-02 the assignee list can be retried without losing the form", () => {
+  it("shows the failure beside Assignee, retries on request, and the chosen assignee is saved", async () => {
+    const { calls } = mockApi(
+      [action(1, { assignee: null, version: 4 })],
+      [{ status: 200, body: action(1, { assignee: COLLEAGUE, version: 5 }) }],
+      [{ status: 503, body: { error: { code: "DEPENDENCY_UNAVAILABLE", message: "Unavailable." } } }],
+    );
+    renderSection();
+    const row = within(await screen.findByRole("table")).getAllByRole("row")[1];
+    await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
+    const description = screen.getByLabelText(/Description/);
+    await userEvent.type(description, " today");
+
+    expect(await screen.findByText("The list of assignees could not be loaded.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Retry loading assignees" }));
+    await userEvent.selectOptions(await screen.findByLabelText(/Assignee/), String(COLLEAGUE.id));
+    expect(screen.getByLabelText(/Description/)).toHaveValue("Work item 1 today");
+    expect(gets(calls, "/api/staff/assignees")).toBe(2);
+
+    await userEvent.click(screen.getByRole("button", { name: "Save action" }));
+    expect(await screen.findByText("Action updated")).toBeInTheDocument();
+    expect(writes(calls)[0].body).toEqual({ version: 4, description: "Work item 1 today", assigneeId: COLLEAGUE.id });
   });
 });
