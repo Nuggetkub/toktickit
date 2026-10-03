@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import {
   REQUESTER,
   STAFF,
+  openMyTickets,
   openQueue,
   createTicket,
   openInQueue,
@@ -132,6 +133,7 @@ test("a Ticket is claimed, prioritised, worked, indicated, resolved and closed",
 
   // ---- The Requester sees one of them, and says it looks fixed -----------
   await signIn(page, REQUESTER);
+  await openMyTickets(page);
   await page.getByLabel(/^Search/).fill(ticketNumber);
   await page.getByRole("link", { name: ticketNumber }).click();
   await expect(page.getByRole("heading", { name: `Ticket ${ticketNumber}` })).toBeVisible();

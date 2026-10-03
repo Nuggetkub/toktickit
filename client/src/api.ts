@@ -881,3 +881,39 @@ export interface StaffDashboardData {
 export async function fetchStaffDashboard(): Promise<StaffDashboardData> {
   return requestJson<StaffDashboardData>("/api/dashboard/staff");
 }
+
+// ---------------------------------------------------------------------------
+// Lab 4 issue 88 — the Requester dashboard (api-spec.md §6)
+// ---------------------------------------------------------------------------
+
+export interface RequesterTicketCard {
+  id: number;
+  ticketNumber: string;
+  summary: string;
+  currentStatus: string;
+  requestedPriority: RequestedPriority;
+  updatedAt: string;
+  /** Recently resolved only: the time of the latest resolution. */
+  resolvedAt?: string;
+}
+
+export interface RequesterDashboardData {
+  generatedAt: string;
+  windowStart: string;
+  cards: {
+    activeTickets: DashboardCard;
+    waitingForMe: DashboardCard;
+    resolvedAwaitingClosure: DashboardCard;
+    resolvedLast7Days: DashboardCard;
+  };
+  lists: {
+    needsAttention: { total: number; items: RequesterTicketCard[] };
+    recentlyUpdated: { total: number; items: RequesterTicketCard[] };
+    recentlyResolved: { total: number; items: RequesterTicketCard[] };
+  };
+}
+
+/** `GET /api/dashboard/requester` — the caller's own Tickets only; it takes no parameters. */
+export async function fetchRequesterDashboard(): Promise<RequesterDashboardData> {
+  return requestJson<RequesterDashboardData>("/api/dashboard/requester");
+}

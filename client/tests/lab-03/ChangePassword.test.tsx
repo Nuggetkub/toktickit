@@ -39,6 +39,16 @@ function mockApi(change: Answer | (() => Answer), user: unknown = PENDING) {
       return answer(typeof change === "function" ? change() : change);
     }
     if (target.endsWith("/api/auth/logout")) return answer({ status: 204 });
+    // Lab 4 issue #88: Requesters now land on the Dashboard (Lab 4 ui-spec §2).
+    if (target.includes("/api/dashboard/requester")) {
+      const card = (value: number) => ({ value, query: null });
+      const empty = { total: 0, items: [] };
+      return answer({ status: 200, body: {
+        generatedAt: "2026-10-03T08:00:00.000Z", windowStart: "2026-09-26T08:00:00.000Z",
+        cards: { activeTickets: card(0), waitingForMe: card(0), resolvedAwaitingClosure: card(0), resolvedLast7Days: card(0) },
+        lists: { needsAttention: empty, recentlyUpdated: empty, recentlyResolved: empty },
+      } });
+    }
     if (target.includes("/api/tickets")) {
       return answer({ status: 200, body: { items: [], page: 1, pageSize: 10, totalItems: 0, totalPages: 1 } });
     }
@@ -145,7 +155,8 @@ describe("Change Password — saving", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Save new password" }));
 
-    expect(await screen.findByRole("heading", { name: "My Tickets" })).toBeInTheDocument();
+    // A Requester's landing page is the Dashboard since Lab 4 issue #88.
+    expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
     const save = calls.find((call) => call.url.endsWith("/api/auth/change-password"))!;
     expect(JSON.parse(String(save.init!.body))).toEqual({
       currentPassword: "Lab3-Demo-Only!2026",
