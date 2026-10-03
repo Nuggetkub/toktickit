@@ -42,6 +42,11 @@ type SortChoice =
   | "currentStatus:asc"
   | "ticketNumber:desc";
 
+/** Every value the Sort control offers, so a link's sort can be checked against them. */
+const SORT_CHOICES: readonly SortChoice[] = [
+  "ticketDate:desc", "ticketDate:asc", "updatedAt:desc", "updatedAt:asc", "itPriority:desc", "itPriority:asc", "currentStatus:asc", "ticketNumber:desc",
+];
+
 type Filters = {
   search: string;
   /** A single status, or "ACTIVE" for the five active statuses (Lab 4 ui-spec §2). */
@@ -95,6 +100,14 @@ export function filtersFromUrl(search: string): { filters: Filters; asWritten: P
   if (owner !== null) {
     if (owner === "me" || owner === "unassigned" || /^[1-9]\d*$/.test(owner)) filters.owner = owner;
     else asWritten.owner = owner;
+  }
+  // A link may also carry its order (Recently updated's View all). Only a sort
+  // the Sort control offers is taken; anything else leaves the default.
+  const sortBy = params.get("sortBy");
+  const sortOrder = params.get("sortOrder");
+  if (sortBy !== null && sortOrder !== null) {
+    const choice = `${sortBy}:${sortOrder}`;
+    if ((SORT_CHOICES as readonly string[]).includes(choice)) filters.sort = choice as SortChoice;
   }
   const indicated = params.get("requesterIndicated");
   if (indicated !== null) {
@@ -253,11 +266,16 @@ export default function StaffTicketQueue() {
       ...asWritten,
     };
     for (const key of LINK_KEYS) if (sent[key] !== undefined) params.set(key, sent[key]!);
+    if (filters.sort !== DEFAULTS.sort) {
+      const [by, order] = filters.sort.split(":");
+      params.set("sortBy", by);
+      params.set("sortOrder", order);
+    }
     const search = params.toString() ? `?${params.toString()}` : "";
     if (search !== location.search) navigate({ pathname: location.pathname, search }, { replace: true, state: location.state });
     // Only the filters drive this; reading the location is how it avoids a loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.currentStatus, filters.itPriority, filters.owner, filters.requesterIndicated, asWritten]);
+  }, [filters.currentStatus, filters.itPriority, filters.owner, filters.requesterIndicated, filters.sort, asWritten]);
 
   function clearFilters() {
     setAsWritten((current) => (Object.keys(current).length > 0 ? {} : current));

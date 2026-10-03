@@ -116,37 +116,8 @@ export default function StaffDashboard() {
 
       {state === "ready" && data && (
         <div className="zen-dashboard__panels">
-          <div className="zen-dashboard__lists">
-            <Card title="My open actions">
-              <section id="my-open-actions" aria-label="My open actions">
-                <ListTotal shown={data.lists.myOpenActions.items.length} total={data.lists.myOpenActions.total} />
-                {data.lists.myOpenActions.items.length === 0 ? (
-                  <p className="zen-field__hint">You have no open actions.</p>
-                ) : (
-                  <ul className="zen-dashboard__rows">
-                    {data.lists.myOpenActions.items.map((item) => {
-                      const overdue = new Date(item.actionAt).getTime() < Date.now();
-                      return (
-                        <li key={item.actionId} className={overdue ? "zen-dashboard__row zen-dashboard__row--overdue" : "zen-dashboard__row"}>
-                          <Link to={`/queue/${item.ticketId}#action-${item.actionId}`}>
-                            <span>{moment(item.actionAt)}</span>
-                            {overdue && <span className="zen-badge zen-badge--status-waiting">Overdue</span>}
-                            <strong>{item.ticketNumber}</strong> {item.summary}
-                            <span className="zen-field__hint">{item.description.split("\n")[0]}</span>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </section>
-            </Card>
-
-            <TicketPanel title="Urgent active tickets" empty="No urgent active tickets."
-              list={data.lists.urgentActive} viewAll={linkFor("/queue", { itPriority: "URGENT", currentStatus: ACTIVE_STATUS_LIST })} />
-            <TicketPanel title="Recently updated" empty="No tickets yet." list={data.lists.recentlyUpdated} viewAll="/queue" />
-          </div>
-
+          {/* DOM order is the keyboard order of ui-spec §7: cards, then breakdowns,
+              then panels. The grid still places the lists in the wider left column. */}
           <div className="zen-dashboard__breakdowns">
             <Card title="Tickets by status">
               <ul className="zen-dashboard__rows">
@@ -194,6 +165,37 @@ export default function StaffDashboard() {
                 </ul>
               </Card>
             )}
+          </div>
+
+          <div className="zen-dashboard__lists">
+            <Card title="My open actions">
+              <section id="my-open-actions" aria-label="My open actions">
+                <ListTotal shown={data.lists.myOpenActions.items.length} total={data.lists.myOpenActions.total} />
+                {data.lists.myOpenActions.items.length === 0 ? (
+                  <p className="zen-field__hint">You have no open actions.</p>
+                ) : (
+                  <ul className="zen-dashboard__rows">
+                    {data.lists.myOpenActions.items.map((item) => {
+                      const overdue = new Date(item.actionAt).getTime() < Date.now();
+                      return (
+                        <li key={item.actionId} className={overdue ? "zen-dashboard__row zen-dashboard__row--overdue" : "zen-dashboard__row"}>
+                          <Link to={`/queue/${item.ticketId}#action-${item.actionId}`}>
+                            <span>{moment(item.actionAt)}</span>
+                            {overdue && <span className="zen-badge zen-badge--status-waiting">Overdue</span>}
+                            <strong>{item.ticketNumber}</strong> {item.summary}
+                            <span className="zen-field__hint">{item.description.split("\n")[0]}</span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+            </Card>
+
+            <TicketPanel title="Urgent active tickets" empty="No urgent active tickets."
+              list={data.lists.urgentActive} viewAll={linkFor("/queue", { itPriority: "URGENT", currentStatus: ACTIVE_STATUS_LIST })} />
+            <TicketPanel title="Recently updated" empty="No tickets yet." list={data.lists.recentlyUpdated} viewAll={linkFor("/queue", { sortBy: "updatedAt", sortOrder: "desc" })} />
           </div>
         </div>
       )}

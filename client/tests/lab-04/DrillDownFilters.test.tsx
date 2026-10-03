@@ -122,6 +122,27 @@ describe("UI-07 the Ticket Queue reads a link's filters from the URL", () => {
   });
 });
 
+describe("UI-07 the Ticket Queue reads a link's sort (follow-up to the #101 review)", () => {
+  it("takes a sort the control offers, and the URL follows later sort changes", async () => {
+    const { queueCalls } = mockApi(STAFF);
+    renderAt(["/queue?sortBy=updatedAt&sortOrder=desc"]);
+    await screen.findByRole("heading", { name: "Ticket Queue" });
+    await waitFor(() => expect(queueCalls.length).toBeGreaterThan(0));
+    expect([queueCalls[0].get("sortBy"), queueCalls[0].get("sortOrder")]).toEqual(["updatedAt", "desc"]);
+    expect(screen.getByLabelText("Sort")).toHaveValue("updatedAt:desc");
+    await userEvent.selectOptions(screen.getByLabelText("Sort"), "itPriority:desc");
+    await waitFor(() => expect(location.search).toBe("?sortBy=itPriority&sortOrder=desc"));
+  });
+
+  it("ignores a sort the control does not offer, keeping the default order", async () => {
+    const { queueCalls } = mockApi(STAFF);
+    renderAt(["/queue?sortBy=summary&sortOrder=sideways"]);
+    await screen.findByRole("heading", { name: "Ticket Queue" });
+    await waitFor(() => expect(queueCalls.length).toBeGreaterThan(0));
+    expect([queueCalls[0].get("sortBy"), queueCalls[0].get("sortOrder")]).toEqual(["ticketDate", "desc"]);
+  });
+});
+
 describe("UI-07 User Management reads the role from the URL", () => {
   it("requests the role a dashboard row links to, and shows it", async () => {
     const { userCalls } = mockApi(ADMIN);
