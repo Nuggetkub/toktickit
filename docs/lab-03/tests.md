@@ -93,7 +93,7 @@ records that replacement.
 | UI-07 | UI | AC-04, AC-17, AC-19 | Requester detail shows comments and a composer, the confirmed "Problem Appears Resolved" flow leaves the status badge unchanged, and no internal-notes control is rendered or requested. | `client/tests/lab-03/RequesterDiscussion.test.tsx` | Passed |
 | UI-08 | UI | AC-20, AC-21, AC-22 | User list columns, search and role filter; create and edit panels with field-level errors including duplicate email; set initial password; own Active and Role disabled with the reason; the last-Administrator error shown. | `client/tests/lab-03/UserManagement.test.tsx` | Passed |
 | UI-09 | UI | AC-10 | The Lab 2 Create Ticket, My Tickets and Requester Ticket Detail suites pass with a signed-in Requester in place of the selector; My Tickets offers the status filter. | `client/tests/lab-02/CreateTicket.test.tsx`, `client/tests/lab-02/MyTickets.test.tsx`, `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Planned at the Lab 3 release; delivered by issue #78 in Lab 4 (see below) |
-| STYLE-01 | UI style | AC-24 | Status, priority and role badges carry text and their specified tone classes; the notes panel uses `--zen-private`; Work panel fields are editable and ticket information read-only; focus rings are present. | `client/tests/lab-03/ZenGreen.lab3.styles.test.tsx` | Planned |
+| STYLE-01 | UI style | AC-24 | Status, priority and role badges carry text and their specified tone classes; the notes panel uses `--zen-private`; Work panel fields are editable and ticket information read-only; focus rings are present. | `client/tests/lab-03/ZenGreen.lab3.styles.test.tsx` | Planned at the Lab 3 release; delivered by issue #78 in Lab 4 (see below) |
 | E2E-01 | E2E | AC-01, AC-02, AC-05, AC-07 | A first-login account is forced to change its password and then lands on its page; a wrong password and an inactive account show their messages; after logout, a direct URL shows Login and a direct API call with the old cookie returns `401`. | `e2e/lab-03/authentication.spec.ts` | Passed |
 | E2E-02 | E2E | AC-13, AC-14, AC-15, AC-16, AC-17, AC-18, AC-19 | A Requester creates a ticket; IT Staff find it in the queue, claim it, raise IT Priority, move it to In Progress, post a comment and a note; the Requester sees the comment but not the note and indicates resolved; IT Staff see the marker, resolve with a summary, and close. | `e2e/lab-03/staff-ticket-flow.spec.ts` | Passed |
 | E2E-03 | E2E | AC-20, AC-21, AC-22, AC-23 | An Administrator searches, filters by role, creates an IT Staff user; that user must change the password at first sign-in; the Administrator deactivates them and their sign-in is then refused; own deactivation is prevented; IT Staff are shown Forbidden on Users. | `e2e/lab-03/user-administration.spec.ts` | Passed |
@@ -246,7 +246,14 @@ it never fell short.
 - **UI-09.** My Tickets has a Current Status filter with all eight statuses, and a Status
   column, as §6 of the Lab 3 ui-spec promised. `client/tests/lab-02/MyTickets.test.tsx` asserts
   both, and fails when the filter is not sent, not cleared, or not treated as a filter.
-- **STYLE-01** is **not** addressed by this change and stays owed.
+- **STYLE-01** was owed after that change, and was delivered by a second #78 change:
+  `client/tests/lab-03/ZenGreen.lab3.styles.test.tsx` now exists. It renders every status,
+  role and priority badge and checks its words and tone class, and compares each tone class's
+  rule in the stylesheet with the tables in §1 of the Lab 3 ui-spec. It checks that
+  `--zen-private` is `#FFF7E8` and is used by the Internal Notes panel alone, under the spec's
+  heading, that the focus ring is drawn and never removed, and, on the real IT Staff Ticket
+  Detail, that the ticket information is read-only while the Work panel's controls are
+  editable. Each of 8 deliberate breaks, one tone, label or surface at a time, fails it.
 
 These passed on the feature branch. They become `Passed` in the sense this section uses, a
 file run on `main`, only at the Lab 4 release.
