@@ -5,6 +5,7 @@ import { AuthProvider, ChangePassword, Login, RequireAuth, landingPath, useAuth 
 import UserManagement from "./admin/UserManagement.js";
 import StaffTicketDetail from "./staff/StaffTicketDetail.js";
 import StaffTicketQueue from "./staff/StaffTicketQueue.js";
+import StaffDashboard from "./dashboard/StaffDashboard.js";
 import CreateTicket from "./tickets/CreateTicket.js";
 import MyTickets from "./tickets/MyTickets.js";
 import TicketDetail from "./tickets/TicketDetail.js";
@@ -33,7 +34,11 @@ function navigationFor(role: string, navigate: (path: string) => void): NavItem[
   // Administrator is offered Users, which issue #55 adds. IT Staff must not see
   // the control at all — the server refuses them at step 4, and offering a
   // button that is certain to be refused is not a courtesy.
-  const items: NavItem[] = [{ key: "/queue", label: "Ticket Queue", onSelect: () => navigate("/queue") }];
+  // Lab 4 ui-spec §2: Dashboard comes first. The Requester's arrives with #88.
+  const items: NavItem[] = [
+    { key: "/dashboard", label: "Dashboard", onSelect: () => navigate("/dashboard") },
+    { key: "/queue", label: "Ticket Queue", onSelect: () => navigate("/queue") },
+  ];
   if (role === "ADMINISTRATOR") {
     items.push({ key: "/users", label: "Users", onSelect: () => navigate("/users") });
   }
@@ -89,6 +94,18 @@ function Shell() {
             // would be refused.
             <RequireAuth>
               <TicketDetail />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/dashboard"
+          element={
+            // Lab 4 ui-spec §2: one route for every role, the version chosen by
+            // role. This issue adds the staff version (#87); the Requester's
+            // follows in #88, and until then a Requester is refused here.
+            <RequireAuth roles={["IT_STAFF", "ADMINISTRATOR"]}>
+              <StaffDashboard />
             </RequireAuth>
           }
         />

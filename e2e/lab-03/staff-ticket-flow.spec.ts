@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import {
   REQUESTER,
   STAFF,
+  openQueue,
   createTicket,
   openInQueue,
   recordCompletedAction,
@@ -28,6 +29,7 @@ test("the queue finds a Ticket by number, by status and by owner", async ({ page
   await signOut(page);
 
   await signIn(page, STAFF);
+  await openQueue(page);
   const row = page.getByRole("row").filter({ hasText: ticketNumber });
 
   await page.getByLabel(/^Search/).fill(ticketNumber);
@@ -156,6 +158,7 @@ test("a Ticket is claimed, prioritised, worked, indicated, resolved and closed",
 
   // ---- IT Staff see the marker, resolve and close (AC-19, AC-16) ---------
   await signIn(page, STAFF);
+  await openQueue(page);
   await page.getByLabel(/^Search/).fill(ticketNumber);
   const queueRow = page.getByRole("row").filter({ hasText: ticketNumber });
   await expect(queueRow).toContainText("Requester says resolved");

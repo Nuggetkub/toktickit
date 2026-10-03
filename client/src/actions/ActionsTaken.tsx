@@ -103,6 +103,15 @@ export function ActionsTaken({ ticketId, ticketStatus, canWrite, currentUserId, 
 
   const reload = () => setReloadToken((token) => token + 1);
 
+  // Arriving from the Dashboard's "My open actions" (ui-spec §3), the address
+  // names the Action; the list loads after the page, so the browser cannot
+  // scroll there by itself.
+  useEffect(() => {
+    if (state !== "ready") return;
+    const target = window.location.hash.startsWith("#action-") ? document.getElementById(window.location.hash.slice(1)) : null;
+    target?.scrollIntoView?.({ block: "center" });
+  }, [state]);
+
   function saved(message: string) {
     setNotice(message);
     setAdding(false);
@@ -187,7 +196,7 @@ export function ActionsTaken({ ticketId, ticketStatus, canWrite, currentUserId, 
                 const detailsId = `action-${action.id}-details`;
                 return (
                   <Fragment key={action.id}>
-                    <tr>
+                    <tr id={`action-${action.id}`}>
                       <td data-label="Action date/time">{moment(action.actionAt)}</td>
                       <td data-label="Description">
                         {action.description}

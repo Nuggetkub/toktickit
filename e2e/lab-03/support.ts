@@ -26,7 +26,8 @@ export const OTHER_REQUESTER = {
 export const STAFF = {
   email: "grace.okafor@toktickit.local",
   fullName: "Grace Okafor",
-  landing: "Ticket Queue",
+  // Lab 4 issue #87: IT Staff land on the Dashboard (Lab 4 ui-spec §2).
+  landing: "Dashboard",
 } as const;
 
 export const ADMINISTRATOR = {
@@ -289,7 +290,18 @@ export async function createTicket(page: Page, draft: TicketDraft): Promise<stri
 }
 
 /** Opens a Ticket from the IT Staff queue by its number. */
+/**
+ * Opens the Ticket Queue from the navigation. Lab 4 issue #87 moved the IT
+ * Staff landing page to the Dashboard, so a journey that works from the queue
+ * now goes there first, as a person would.
+ */
+export async function openQueue(page: Page): Promise<void> {
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Ticket Queue" }).click();
+  await expect(page.getByRole("heading", { name: "Ticket Queue" })).toBeVisible();
+}
+
 export async function openInQueue(page: Page, ticketNumber: string): Promise<void> {
+  if (!(await page.getByRole("heading", { name: "Ticket Queue" }).isVisible())) await openQueue(page);
   await page.getByLabel(/^Search/).fill(ticketNumber);
   const row = page.getByRole("row").filter({ hasText: ticketNumber });
   await expect(row).toHaveCount(1);

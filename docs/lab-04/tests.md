@@ -256,6 +256,15 @@ transcribed.
   `GET /api/tickets/42/history` with an empty history. History is collapsed by default, so
   without that line the request was refused silently and every test still passed; it was added
   rather than left as a hidden failure.
+- **IT Staff now land on the Dashboard, so a Lab 3 shell test and the staff journeys start
+  there** (issue #87, Lab 4 ui-spec §2). `client/tests/lab-03/AppShell.test.tsx` asserted that
+  IT Staff land on the Ticket Queue. It now asserts the Dashboard, with Dashboard first and
+  Ticket Queue second in the navigation, and its real claim, that no Requester screen is offered
+  to IT Staff, is unchanged; its mock answers the staff dashboard. In the Lab 3 browser suite,
+  `STAFF.landing` is "Dashboard", a new `openQueue()` helper in `e2e/lab-03/support.ts` opens the
+  queue from the navigation where a journey works from it (and `openInQueue()` uses it when not
+  already there), and the two assertions of the old landing heading name the Dashboard. Before
+  the change 11 of the 27 journeys failed on the landing alone; after it all 27 pass.
 - **Lab 3 DB-03 now applies every later migration before comparing** (issue #81).
   `server/tests/lab-03/migration.test.ts` "leaves a schema that matches schema.prisma" built
   the Lab 2 and Lab 3 migrations and compared the result with `schema.prisma`. Once Lab 4

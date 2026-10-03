@@ -72,8 +72,9 @@ test("an Administrator searches, filters by role, and creates an IT Staff accoun
   await page.getByLabel(/^Confirm new password/).fill(SESSION_PASSWORD);
   await page.getByRole("button", { name: "Save new password" }).click();
 
-  // And they land on the queue their new role grants, not a Requester screen.
-  await expect(page.getByRole("heading", { name: "Ticket Queue" })).toBeVisible();
+  // And they land on the start screen their new role grants, not a Requester
+  // screen: the Dashboard since Lab 4 issue #87 (Lab 4 ui-spec §2).
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   await signOut(page);
 
   // AC-22 — deactivation is immediate and is reported in the words BR-07 fixes.

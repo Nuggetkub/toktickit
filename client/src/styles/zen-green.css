@@ -1183,3 +1183,119 @@ body {
   padding-left: var(--zen-space-4);
   overflow-wrap: anywhere;
 }
+
+/* ---------------------------------------------------------------------------
+   Lab 4 issue 87 - the dashboards (ui-spec.md sections 1 and 3)
+   --------------------------------------------------------------------------- */
+
+.zen-dashboard {
+  display: grid;
+  gap: var(--zen-space-4);
+}
+
+.zen-dashboard__updated {
+  margin: 0 0 var(--zen-space-3);
+  color: var(--zen-text-muted);
+}
+
+.zen-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--zen-space-3);
+}
+
+.zen-metric {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zen-space-1);
+  min-height: 7rem;
+  padding: var(--zen-space-4);
+  border: 1px solid var(--zen-border);
+  border-radius: var(--zen-radius);
+  background: var(--zen-surface);
+  color: inherit;
+  text-decoration: none;
+}
+
+.zen-metric:hover {
+  border-color: var(--zen-primary);
+}
+
+.zen-metric--placeholder {
+  background: var(--zen-readonly);
+}
+
+.zen-metric__label {
+  font-weight: 600;
+}
+
+/* A value never truncates (ui-spec section 7). */
+.zen-metric__value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.zen-metric__explanation {
+  color: var(--zen-text-muted);
+  font-size: 0.9rem;
+}
+
+.zen-dashboard__panels {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--zen-space-4);
+  align-items: start;
+}
+
+.zen-dashboard__lists,
+.zen-dashboard__breakdowns {
+  display: grid;
+  gap: var(--zen-space-4);
+  min-width: 0;
+}
+
+.zen-dashboard__rows {
+  display: grid;
+  gap: var(--zen-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.zen-dashboard__rows a {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--zen-space-2);
+  min-height: 44px;
+  color: inherit;
+  overflow-wrap: anywhere;
+}
+
+.zen-dashboard__count {
+  margin-left: auto;
+  font-weight: 700;
+}
+
+.zen-dashboard__row--overdue {
+  border-left: 3px solid var(--zen-warning);
+  padding-left: var(--zen-space-2);
+}
+
+@media (max-width: 991px) {
+  .zen-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .zen-dashboard__panels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .zen-metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

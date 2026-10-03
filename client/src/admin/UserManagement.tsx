@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   ApiError,
   USER_NAME_MAX,
@@ -74,10 +75,21 @@ export default function UserManagement() {
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState<"" | Role>("");
+  const location = useLocation();
+  const navigate = useNavigate();
+  // Lab 4 ui-spec §2: the Administrator dashboard's User accounts rows link here
+  // with `?role=`. A role this screen knows becomes the filter; anything else is
+  // sent as written, so the server refuses it and the reader is told.
+  const [linkRole] = useState(() => new URLSearchParams(location.search).get("role"));
+  const [roleFilter, setRoleFilter] = useState<"" | Role>(() =>
+    linkRole && (USER_ROLES as readonly string[]).includes(linkRole) ? (linkRole as Role) : "",
+  );
+  const [roleAsWritten, setRoleAsWritten] = useState<string | null>(() =>
+    linkRole !== null && !(USER_ROLES as readonly string[]).includes(linkRole) ? linkRole : null,
+  );
 
   const [users, setUsers] = useState<AdminUser[]>([]);
-  const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
+  const [state, setState] = useState<"loading" | "ready" | "failed" | "invalidLink">("loading");
   const [reloadToken, setReloadToken] = useState(0);
 
   const [mode, setMode] = useState<PanelMode | null>(null);
@@ -98,11 +110,18 @@ export default function UserManagement() {
 
   useEffect(() => {
     let active = true;
+    // An empty `?role=` could not be sent at all, so it is refused here rather
+    // than quietly listing every role.
+    if (roleAsWritten === "") {
+      setState("invalidLink");
+      return;
+    }
     setState("loading");
 
     fetchAdminUsers({
       ...(debouncedSearch ? { search: debouncedSearch } : {}),
       ...(roleFilter ? { role: roleFilter } : {}),
+      ...(roleAsWritten !== null ? { role: roleAsWritten as Role } : {}),
     })
       .then((loaded) => {
         // A slow reply to an abandoned query must never overwrite a newer one.
@@ -110,14 +129,29 @@ export default function UserManagement() {
         setUsers(loaded);
         setState("ready");
       })
-      .catch(() => {
-        if (active) setState("failed");
+      .catch((error: unknown) => {
+        if (!active) return;
+        setState(error instanceof ApiError && error.status === 400 && roleAsWritten !== null ? "invalidLink" : "failed");
       });
 
     return () => {
       active = false;
     };
-  }, [debouncedSearch, roleFilter, reloadToken]);
+  }, [debouncedSearch, roleFilter, roleAsWritten, reloadToken]);
+
+  // The URL follows the Role filter, replacing rather than pushing (ui-spec §2).
+  useEffect(() => {
+    const role = roleAsWritten ?? roleFilter;
+    const search = role || roleAsWritten === "" ? `?${new URLSearchParams({ role }).toString()}` : "";
+    if (search !== location.search) navigate({ pathname: location.pathname, search }, { replace: true, state: location.state });
+    // Only the filter drives this; reading the location is how it avoids a loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roleFilter, roleAsWritten]);
+
+  function chooseRole(role: "" | Role) {
+    setRoleAsWritten(null);
+    setRoleFilter(role);
+  }
 
   function openCreate() {
     setMode({ kind: "create" });
@@ -274,7 +308,7 @@ export default function UserManagement() {
 
         <Field id="user-role-filter" label="Role">
           {(control) => (
-            <select {...control} value={roleFilter} onChange={(event) => setRoleFilter(event.target.value as "" | Role)}>
+            <select {...control} value={roleFilter} onChange={(event) => chooseRole(event.target.value as "" | Role)}>
               <option value="">All roles</option>
               {USER_ROLES.map((role) => (
                 <option key={role} value={role}>
@@ -297,6 +331,12 @@ export default function UserManagement() {
           {state === "failed" && (
             <ErrorAlert onRetry={() => setReloadToken((token) => token + 1)}>
               The user list could not be loaded.
+            </ErrorAlert>
+          )}
+
+          {state === "invalidLink" && (
+            <ErrorAlert onRetry={() => chooseRole("")} retryLabel="Clear filters">
+              This link&apos;s filter is not valid.
             </ErrorAlert>
           )}
 

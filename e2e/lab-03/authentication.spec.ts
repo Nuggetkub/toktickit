@@ -56,7 +56,8 @@ test("each role lands on its own start screen", async ({ page }) => {
   // screen — landing them on a queue they share with IT Staff meant the one
   // screen that is theirs was the one they had to go looking for.
   await signIn(page, STAFF);
-  await expect(page.getByRole("heading", { name: "Ticket Queue" })).toBeVisible();
+  // Lab 4 issue #87: IT Staff now start at the Dashboard (Lab 4 ui-spec §2).
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Users" })).toHaveCount(0);
   await signOut(page);
 });

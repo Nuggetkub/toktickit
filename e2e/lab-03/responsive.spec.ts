@@ -5,6 +5,7 @@ import {
   DEVELOPMENT_PASSWORD,
   REQUESTER,
   STAFF,
+  openQueue,
   VIEWPORTS,
   capture,
   createTicket,
@@ -85,7 +86,8 @@ for (const viewport of VIEWPORTS) {
 
       // ---- The two IT Staff screens -------------------------------------
       await signIn(page, STAFF);
-      await expect(page.getByRole("heading", { name: "Ticket Queue" })).toBeVisible();
+      // Lab 4 issue #87: staff land on the Dashboard, so the queue is opened.
+      await openQueue(page);
       // The queue is the widest thing in the application: seven columns that
       // become one card per row below 767px.
       await expect(page.getByRole("row").filter({ hasText: ticketNumber })).toHaveCount(1);
