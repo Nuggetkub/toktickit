@@ -1245,8 +1245,19 @@ body {
 .zen-dashboard__panels {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  grid-template-areas: "lists side";
   gap: var(--zen-space-4);
   align-items: start;
+}
+
+/* The breakdowns come first in the DOM, for the keyboard order of ui-spec
+   section 7; the areas keep the lists in the wider left column. */
+.zen-dashboard__lists {
+  grid-area: lists;
+}
+
+.zen-dashboard__breakdowns {
+  grid-area: side;
 }
 
 .zen-dashboard__lists,
@@ -1291,6 +1302,7 @@ body {
 
   .zen-dashboard__panels {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "side" "lists";
   }
 }
 

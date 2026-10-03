@@ -53,7 +53,7 @@ filters **from the URL**. This is new: in Lab 3 they read only router state.
 | Screen | URL parameters read | Control shown |
 |---|---|---|
 | My Tickets `/tickets` | `currentStatus` | The Status filter gains **Active tickets** (the five active statuses) above the eight single statuses |
-| Ticket Queue `/queue` | `currentStatus`, `itPriority`, `owner`, `requesterIndicated` | Same **Active tickets** option in Status; Owner and the checkbox as in Lab 3 |
+| Ticket Queue `/queue` | `currentStatus`, `itPriority`, `owner`, `requesterIndicated`, and `sortBy` with `sortOrder` | Same **Active tickets** option in Status; Owner and the checkbox as in Lab 3; the Sort control, so Recently updated's **View all** keeps the panel's order. A sort the control does not offer is ignored rather than refused, since an order cannot make a list wrong |
 | User Management `/users` | `role` | The existing Role filter |
 
 - A URL value the screen cannot represent is not silently dropped. The list shows the

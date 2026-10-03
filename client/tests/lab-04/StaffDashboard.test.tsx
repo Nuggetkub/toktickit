@@ -271,3 +271,30 @@ describe("UI-05 the navigation marks the Dashboard as the current page", () => {
     expect(items[0]).toHaveAttribute("aria-current", "page");
   });
 });
+
+// Earth2509's non-blocking follow-ups on PR #101.
+describe("UI-05 follow-ups from the #101 review", () => {
+  it("Recently updated's View all opens the queue in the panel's order, last updated first", async () => {
+    const { calls } = mockApi(STAFF, [ok()]);
+    await renderDashboard();
+    const recent = (await screen.findByRole("heading", { name: "Recently updated" })).closest("section")!;
+    const viewAll = within(recent).getByRole("link", { name: "View all" });
+    expect(viewAll).toHaveAttribute("href", "/queue?sortBy=updatedAt&sortOrder=desc");
+    await userEvent.click(viewAll);
+    await screen.findByRole("heading", { name: "Ticket Queue" });
+    await waitFor(() => expect(calls.some((c) => c.startsWith("/api/staff/tickets?") && c.includes("sortBy=updatedAt") && c.includes("sortOrder=desc"))).toBe(true));
+    expect(screen.getByLabelText("Sort")).toHaveValue("updatedAt:desc");
+  });
+
+  it("puts the links in the keyboard order of ui-spec §7: cards, then breakdowns, then panels", async () => {
+    mockApi(STAFF, [ok()]);
+    await renderDashboard();
+    const lastCard = await screen.findByRole("link", { name: "Requester says resolved: 0 tickets" });
+    const firstBreakdown = screen.getByRole("link", { name: "New: 1 ticket" });
+    const lastBreakdown = screen.getByRole("link", { name: "Active, IT Priority LOW: 3 tickets" });
+    const firstPanelRow = within(screen.getByRole("region", { name: "My open actions" })).getAllByRole("link")[0];
+    const follows = (a: Element, b: Element) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(follows(lastCard, firstBreakdown)).toBe(true);
+    expect(follows(lastBreakdown, firstPanelRow)).toBe(true);
+  });
+});
