@@ -106,7 +106,9 @@ export default function RequesterDashboard() {
         )}
       </Card>
 
-      {state === "ready" && data && !noTicketsAtAll && (
+      {/* The panels stay for a Requester with no tickets too: the Resolved in the
+          last 7 days card links to #recently-resolved, which must exist (ui-spec §6). */}
+      {state === "ready" && data && (
         <div className="zen-dashboard__lists">
           <TicketPanel id="needs-attention" title="Needs your attention" empty="Nothing needs your attention." list={data.lists.needsAttention} when="updated" />
           <TicketPanel id="recently-updated" title="Recently updated" empty="None of your tickets has been updated yet." list={data.lists.recentlyUpdated} when="updated" viewAll="/tickets" />

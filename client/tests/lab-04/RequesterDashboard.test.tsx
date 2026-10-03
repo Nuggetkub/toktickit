@@ -143,6 +143,16 @@ describe("UI-06 the states", () => {
     expect(await screen.findByRole("link", { name: "My active tickets: 0 tickets" })).toBeInTheDocument();
     expect(screen.getByText("You have not submitted any tickets yet.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Create Ticket" })).toHaveAttribute("href", "/create");
+
+    // Earth2509's review of #102: the R-4 card's same-page target must exist
+    // here too, and say what is empty, beside the welcome and Create Ticket.
+    expect(screen.getByRole("link", { name: "Resolved in the last 7 days: 0 tickets" })).toHaveAttribute("href", "#recently-resolved");
+    const target = document.getElementById("recently-resolved");
+    expect(target).not.toBeNull();
+    expect(target).toBe(screen.getByRole("region", { name: "Recently resolved" }));
+    expect(within(target!).getByText("No ticket was resolved in the last 7 days.")).toBeInTheDocument();
+    expect(screen.getByText("Nothing needs your attention.")).toBeInTheDocument();
+    expect(screen.getByText("None of your tickets has been updated yet.")).toBeInTheDocument();
   });
 
   it("loading: says so before any number", async () => {
