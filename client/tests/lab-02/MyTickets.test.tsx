@@ -197,7 +197,8 @@ describe("My Tickets — searching and filtering", () => {
 
     const select = screen.getByLabelText("Current Status");
     expect(within(select).getAllByRole("option").map((option) => option.textContent)).toEqual([
-      "All statuses", "New", "Open", "In Progress", "Waiting for Requester", "Resolved", "Closed", "Reopened", "Cancelled",
+      // "Active tickets" (the five active statuses) added by Lab 4 issue #88.
+      "All statuses", "Active tickets", "New", "Open", "In Progress", "Waiting for Requester", "Resolved", "Closed", "Reopened", "Cancelled",
     ]);
     expect(listUrls.at(-1)!.searchParams.has("currentStatus")).toBe(false);
 

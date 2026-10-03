@@ -14,13 +14,15 @@ import path from "node:path";
 export const REQUESTER = {
   email: "nadia.rahman@toktickit.local",
   fullName: "Nadia Rahman",
-  landing: "My Tickets",
+  // Lab 4 issue #88: Requesters land on the Dashboard (Lab 4 ui-spec §2).
+  landing: "Dashboard",
 } as const;
 
 export const OTHER_REQUESTER = {
   email: "somchai.pattana@toktickit.local",
   fullName: "Somchai Pattana",
-  landing: "My Tickets",
+  // Lab 4 issue #88: Requesters land on the Dashboard (Lab 4 ui-spec §2).
+  landing: "Dashboard",
 } as const;
 
 export const STAFF = {
@@ -55,7 +57,8 @@ export const INACTIVE_REQUESTER = {
 export const ROTATION_REQUESTER = {
   email: "marisa.chen@toktickit.local",
   fullName: "Marisa Chen",
-  landing: "My Tickets",
+  // Lab 4 issue #88: Requesters land on the Dashboard (Lab 4 ui-spec §2).
+  landing: "Dashboard",
 } as const;
 
 /**
@@ -70,7 +73,8 @@ export const ROTATION_REQUESTER = {
 export const CAPTURE_REQUESTER = {
   email: "tobias.lindqvist@toktickit.local",
   fullName: "Tobias Lindqvist",
-  landing: "My Tickets",
+  // Lab 4 issue #88: Requesters land on the Dashboard (Lab 4 ui-spec §2).
+  landing: "Dashboard",
 } as const;
 
 export type Account = { email: string; fullName: string; landing: string };
@@ -298,6 +302,16 @@ export async function createTicket(page: Page, draft: TicketDraft): Promise<stri
 export async function openQueue(page: Page): Promise<void> {
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Ticket Queue" }).click();
   await expect(page.getByRole("heading", { name: "Ticket Queue" })).toBeVisible();
+}
+
+/**
+ * Opens My Tickets from the navigation. Lab 4 issue #88 moved the Requester
+ * landing page to the Dashboard, so a journey that works from My Tickets now
+ * goes there first, as a person would.
+ */
+export async function openMyTickets(page: Page): Promise<void> {
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "My Tickets" }).click();
+  await expect(page.getByRole("heading", { name: "My Tickets" })).toBeVisible();
 }
 
 export async function openInQueue(page: Page, ticketNumber: string): Promise<void> {

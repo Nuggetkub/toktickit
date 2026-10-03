@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   REQUESTED_PRIORITIES,
   fetchCategories,
@@ -24,6 +24,8 @@ import {
   type TicketStatus,
 } from "../components/index.js";
 import { useAuth } from "../auth/index.js";
+import { ApiError } from "../api.js";
+import { ACTIVE_STATUS_LIST } from "../dashboard/dashboard-links.js";
 
 type SortChoice =
   | "ticketDate:desc"
@@ -38,7 +40,8 @@ type Filters = {
   categoryId: string;
   relatedSystemId: string;
   requestedPriority: "" | RequestedPriority;
-  currentStatus: "" | TicketStatus;
+  /** A single status, or "ACTIVE" for the five active statuses (Lab 4 ui-spec §2). */
+  currentStatus: "" | TicketStatus | "ACTIVE";
   sort: SortChoice;
 };
 
@@ -69,7 +72,23 @@ export default function MyTickets() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [filters, setFilters] = useState<Filters>(DEFAULTS);
+  const location = useLocation();
+  // Lab 4 ui-spec §2: a Requester dashboard card links here with `currentStatus`
+  // in the URL. A value the control can show becomes the filter; anything else
+  // is sent as written, so the server refuses it and the reader is told.
+  const [linkStatus] = useState(() => new URLSearchParams(location.search).get("currentStatus"));
+  const [filters, setFilters] = useState<Filters>(() => ({
+    ...DEFAULTS,
+    currentStatus:
+      linkStatus === ACTIVE_STATUS_LIST
+        ? "ACTIVE"
+        : linkStatus !== null && (TICKET_STATUSES as readonly string[]).includes(linkStatus)
+          ? (linkStatus as TicketStatus)
+          : "",
+  }));
+  const [statusAsWritten, setStatusAsWritten] = useState<string | null>(() =>
+    linkStatus !== null && linkStatus !== ACTIVE_STATUS_LIST && !(TICKET_STATUSES as readonly string[]).includes(linkStatus) ? linkStatus : null,
+  );
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
 
@@ -77,7 +96,7 @@ export default function MyTickets() {
   const [relatedSystems, setRelatedSystems] = useState<RelatedSystem[]>([]);
 
   const [results, setResults] = useState<TicketListResponse | null>(null);
-  const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
+  const [state, setState] = useState<"loading" | "ready" | "failed" | "invalidLink">("loading");
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
@@ -109,6 +128,12 @@ export default function MyTickets() {
   useEffect(() => {
     if (!user) return;
     let active = true;
+    // An empty `?currentStatus=` could not be sent at all (empty parameters are
+    // left out), so it would quietly list everything. It is refused here.
+    if (statusAsWritten === "") {
+      setState("invalidLink");
+      return;
+    }
     setState("loading");
 
     fetchTickets(
@@ -117,7 +142,8 @@ export default function MyTickets() {
         ...(filters.categoryId ? { categoryId: Number(filters.categoryId) } : {}),
         ...(filters.relatedSystemId ? { relatedSystemId: Number(filters.relatedSystemId) } : {}),
         ...(filters.requestedPriority ? { requestedPriority: filters.requestedPriority } : {}),
-        ...(filters.currentStatus ? { currentStatus: filters.currentStatus } : {}),
+        ...(filters.currentStatus ? { currentStatus: filters.currentStatus === "ACTIVE" ? ACTIVE_STATUS_LIST : filters.currentStatus } : {}),
+        ...(statusAsWritten !== null ? { currentStatus: statusAsWritten } : {}),
         sortBy,
         sortOrder,
         page,
@@ -131,14 +157,16 @@ export default function MyTickets() {
         setResults(response);
         setState("ready");
       })
-      .catch(() => {
-        if (active) setState("failed");
+      .catch((error: unknown) => {
+        if (!active) return;
+        setState(error instanceof ApiError && error.status === 400 && statusAsWritten !== null ? "invalidLink" : "failed");
       });
 
     return () => {
       active = false;
     };
   }, [
+    statusAsWritten,
     user,
     debouncedSearch,
     filters.categoryId,
@@ -153,8 +181,19 @@ export default function MyTickets() {
 
   function update(patch: Partial<Filters>) {
     setFilters((current) => ({ ...current, ...patch }));
+    setStatusAsWritten(null);
     setPage(1);
   }
+
+  // The URL follows the status filter, replacing rather than pushing, so Back
+  // returns to the dashboard rather than stepping through every change.
+  useEffect(() => {
+    const sent = statusAsWritten ?? (filters.currentStatus === "ACTIVE" ? ACTIVE_STATUS_LIST : filters.currentStatus);
+    const search = sent || statusAsWritten === "" ? `?${new URLSearchParams({ currentStatus: sent }).toString()}` : "";
+    if (search !== location.search) navigate({ pathname: location.pathname, search }, { replace: true, state: location.state });
+    // Only the filter drives this; reading the location is how it avoids a loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.currentStatus, statusAsWritten]);
 
   // Every control the button resets counts towards whether it is enabled. If
   // `sort` is cleared by it, changing only `sort` has to enable it — otherwise
@@ -165,16 +204,19 @@ export default function MyTickets() {
     filters.relatedSystemId === DEFAULTS.relatedSystemId &&
     filters.requestedPriority === DEFAULTS.requestedPriority &&
     filters.currentStatus === DEFAULTS.currentStatus &&
-    filters.sort === DEFAULTS.sort;
+    filters.sort === DEFAULTS.sort &&
+    statusAsWritten === null;
 
   const hasQuery =
     debouncedSearch !== "" ||
     filters.categoryId !== "" ||
     filters.relatedSystemId !== "" ||
     filters.requestedPriority !== "" ||
-    filters.currentStatus !== "";
+    filters.currentStatus !== "" ||
+    statusAsWritten !== null;
 
   function clearFilters() {
+    setStatusAsWritten(null);
     setFilters(DEFAULTS);
     setDebouncedSearch("");
     setPage(1);
@@ -255,9 +297,10 @@ export default function MyTickets() {
             <select
               {...control}
               value={filters.currentStatus}
-              onChange={(event) => update({ currentStatus: event.target.value as "" | TicketStatus })}
+              onChange={(event) => update({ currentStatus: event.target.value as Filters["currentStatus"] })}
             >
               <option value="">All statuses</option>
+              <option value="ACTIVE">Active tickets</option>
               {TICKET_STATUSES.map((status) => (
                 <option key={status} value={status}>
                   {statusLabel(status)}
@@ -296,6 +339,12 @@ export default function MyTickets() {
       {state === "failed" && (
         <ErrorAlert onRetry={() => setReloadToken((token) => token + 1)}>
           Your Tickets could not be loaded.
+        </ErrorAlert>
+      )}
+
+      {state === "invalidLink" && (
+        <ErrorAlert onRetry={clearFilters} retryLabel="Clear filters">
+          This link&apos;s filter is not valid.
         </ErrorAlert>
       )}
 

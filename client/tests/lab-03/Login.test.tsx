@@ -44,6 +44,16 @@ function mockApi(login: Answer | (() => Answer | Error), me: Answer = { status: 
       return answer(result);
     }
     // My Tickets loads after a successful sign-in; it is not what is under test.
+    // Lab 4 issue #88: Requesters now land on the Dashboard (Lab 4 ui-spec §2).
+    if (target.includes("/api/dashboard/requester")) {
+      const card = (value: number) => ({ value, query: null });
+      const empty = { total: 0, items: [] };
+      return answer({ status: 200, body: {
+        generatedAt: "2026-10-03T08:00:00.000Z", windowStart: "2026-09-26T08:00:00.000Z",
+        cards: { activeTickets: card(0), waitingForMe: card(0), resolvedAwaitingClosure: card(0), resolvedLast7Days: card(0) },
+        lists: { needsAttention: empty, recentlyUpdated: empty, recentlyResolved: empty },
+      } });
+    }
     if (target.includes("/api/tickets")) {
       return answer({ status: 200, body: { items: [], page: 1, pageSize: 10, totalItems: 0, totalPages: 1 } });
     }
@@ -169,12 +179,14 @@ describe("Login — each refusal reads as the contract says", () => {
 });
 
 describe("Login — success", () => {
-  it("sends the credentials with the session cookie enabled and lands on My Tickets", async () => {
+  // UPDATED IN LAB 4 (Issue #88): a Requester now lands on the Dashboard
+  // (Lab 4 ui-spec §2). What is sent, and how, is unchanged.
+  it("sends the credentials with the session cookie enabled and lands on the Dashboard", async () => {
     const { calls } = mockApi({ status: 200, body: { user: REQUESTER } });
     await renderLogin();
     await signIn();
 
-    expect(await screen.findByRole("heading", { name: "My Tickets" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
 
     const login = calls.find((call) => call.url.endsWith("/api/auth/login"))!;
     // Without credentials the cookie never leaves the browser and every later
@@ -215,7 +227,8 @@ describe("Login — success", () => {
     await userEvent.click(button);
     release();
 
-    await waitFor(() => expect(screen.queryByRole("heading", { name: "My Tickets" })).toBeInTheDocument());
+    // The landing screen is the Dashboard since Lab 4 issue #88.
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Dashboard" })).toBeInTheDocument());
   });
 });
 
