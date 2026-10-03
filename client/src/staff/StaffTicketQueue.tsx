@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
+  ApiError,
   REQUESTED_PRIORITIES,
   fetchAssignees,
   fetchCategories,
@@ -23,6 +24,7 @@ import {
   statusLabel,
   type TicketStatus,
 } from "../components/index.js";
+import { ACTIVE_STATUS_LIST } from "../dashboard/dashboard-links.js";
 
 // The shared IT Staff queue (ui-spec.md §7).
 //
@@ -42,7 +44,8 @@ type SortChoice =
 
 type Filters = {
   search: string;
-  currentStatus: "" | TicketStatus;
+  /** A single status, or "ACTIVE" for the five active statuses (Lab 4 ui-spec §2). */
+  currentStatus: "" | TicketStatus | "ACTIVE";
   itPriority: "" | RequestedPriority;
   categoryId: string;
   owner: string;
@@ -61,6 +64,48 @@ const DEFAULTS: Filters = {
 };
 
 const PAGE_SIZE = 10;
+
+/** The four filters a dashboard link may carry (Lab 4 ui-spec §2). */
+const LINK_KEYS = ["currentStatus", "itPriority", "owner", "requesterIndicated"] as const;
+type LinkKey = (typeof LINK_KEYS)[number];
+
+/**
+ * Reads a dashboard link's filters from the URL. Whatever the controls can
+ * show becomes a filter; anything they cannot is kept aside and sent exactly as
+ * written, so the server refuses it and the reader is told, rather than the
+ * value being dropped and an unfiltered queue passing for a filtered one.
+ */
+export function filtersFromUrl(search: string): { filters: Filters; asWritten: Partial<Record<LinkKey, string>> } {
+  const params = new URLSearchParams(search);
+  const filters: Filters = { ...DEFAULTS };
+  const asWritten: Partial<Record<LinkKey, string>> = {};
+
+  const status = params.get("currentStatus");
+  if (status !== null) {
+    if (status === ACTIVE_STATUS_LIST) filters.currentStatus = "ACTIVE";
+    else if ((TICKET_STATUSES as readonly string[]).includes(status)) filters.currentStatus = status as TicketStatus;
+    else asWritten.currentStatus = status;
+  }
+  const priority = params.get("itPriority");
+  if (priority !== null) {
+    if ((REQUESTED_PRIORITIES as readonly string[]).includes(priority)) filters.itPriority = priority as RequestedPriority;
+    else asWritten.itPriority = priority;
+  }
+  const owner = params.get("owner");
+  if (owner !== null) {
+    if (owner === "me" || owner === "unassigned" || /^[1-9]\d*$/.test(owner)) filters.owner = owner;
+    else asWritten.owner = owner;
+  }
+  const indicated = params.get("requesterIndicated");
+  if (indicated !== null) {
+    if (indicated === "true") filters.requesterIndicated = true;
+    else asWritten.requesterIndicated = indicated;
+  }
+  return { filters, asWritten };
+}
+
+/** The status parameter as sent: "ACTIVE" stands for the five active statuses. */
+const statusParam = (value: Filters["currentStatus"]) => (value === "ACTIVE" ? ACTIVE_STATUS_LIST : value);
 
 // Typing is not a request. Without this every keystroke is a round trip and the
 // table is rebuilt under the reader's hands.
@@ -87,8 +132,14 @@ export default function StaffTicketQueue() {
   // ticket is the difference between a queue someone works from and one they
   // avoid.
   const restored = (location.state as { queue?: { filters: Filters; page: number } } | null)?.queue ?? null;
+  // Lab 4 ui-spec §2: a dashboard link carries its filters in the URL. The
+  // Lab 3 restore through router state takes precedence when both exist.
+  const [fromLink] = useState(() => (restored ? null : filtersFromUrl(location.search)));
 
-  const [filters, setFilters] = useState<Filters>(restored?.filters ?? DEFAULTS);
+  const [filters, setFilters] = useState<Filters>(restored?.filters ?? fromLink?.filters ?? DEFAULTS);
+  // Link values the controls cannot show, sent as written until the reader
+  // changes a filter themselves.
+  const [asWritten, setAsWritten] = useState<Partial<Record<LinkKey, string>>>(fromLink?.asWritten ?? {});
   const [debouncedSearch, setDebouncedSearch] = useState(restored?.filters.search.trim() ?? "");
   const [page, setPage] = useState(restored?.page ?? 1);
 
@@ -96,7 +147,7 @@ export default function StaffTicketQueue() {
   const [assignees, setAssignees] = useState<UserSummary[]>([]);
 
   const [results, setResults] = useState<StaffQueueResponse | null>(null);
-  const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
+  const [state, setState] = useState<"loading" | "ready" | "failed" | "invalidLink">("loading");
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
@@ -127,15 +178,22 @@ export default function StaffTicketQueue() {
 
   useEffect(() => {
     let active = true;
+    // An empty value from a link could not even be sent (empty parameters are
+    // left out), so it would quietly become "no filter". It is refused here.
+    if (Object.values(asWritten).some((value) => value === "")) {
+      setState("invalidLink");
+      return;
+    }
     setState("loading");
 
     fetchStaffQueue({
       ...(debouncedSearch ? { search: debouncedSearch } : {}),
-      ...(filters.currentStatus ? { currentStatus: filters.currentStatus } : {}),
+      ...(filters.currentStatus ? { currentStatus: statusParam(filters.currentStatus) } : {}),
       ...(filters.itPriority ? { itPriority: filters.itPriority } : {}),
       ...(filters.categoryId ? { categoryId: Number(filters.categoryId) } : {}),
       ...(filters.owner ? { owner: filters.owner } : {}),
-      ...(filters.requesterIndicated ? { requesterIndicated: "true" as const } : {}),
+      ...(filters.requesterIndicated ? { requesterIndicated: "true" } : {}),
+      ...asWritten,
       sortBy,
       sortOrder,
       page,
@@ -148,14 +206,18 @@ export default function StaffTicketQueue() {
         setResults(response);
         setState("ready");
       })
-      .catch(() => {
-        if (active) setState("failed");
+      .catch((error: unknown) => {
+        if (!active) return;
+        // A 400 here is the query being refused, which only a link can cause:
+        // every control offers values the server accepts.
+        setState(error instanceof ApiError && error.status === 400 ? "invalidLink" : "failed");
       });
 
     return () => {
       active = false;
     };
   }, [
+    asWritten,
     debouncedSearch,
     filters.currentStatus,
     filters.itPriority,
@@ -173,10 +235,32 @@ export default function StaffTicketQueue() {
   // table for a query that matched.
   function update(patch: Partial<Filters>) {
     setFilters((current) => ({ ...current, ...patch }));
+    // Keep the same object when nothing is held, or every keystroke in Search
+    // would look like a change and re-fetch, defeating the debounce.
+    setAsWritten((current) => (Object.keys(current).length > 0 ? {} : current));
     setPage(1);
   }
 
+  // The URL follows the drill-down filters, replacing rather than pushing, so
+  // Back returns to the dashboard instead of stepping through every change.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    const sent: Partial<Record<LinkKey, string>> = {
+      ...(filters.currentStatus ? { currentStatus: statusParam(filters.currentStatus) } : {}),
+      ...(filters.itPriority ? { itPriority: filters.itPriority } : {}),
+      ...(filters.owner ? { owner: filters.owner } : {}),
+      ...(filters.requesterIndicated ? { requesterIndicated: "true" } : {}),
+      ...asWritten,
+    };
+    for (const key of LINK_KEYS) if (sent[key] !== undefined) params.set(key, sent[key]!);
+    const search = params.toString() ? `?${params.toString()}` : "";
+    if (search !== location.search) navigate({ pathname: location.pathname, search }, { replace: true, state: location.state });
+    // Only the filters drive this; reading the location is how it avoids a loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.currentStatus, filters.itPriority, filters.owner, filters.requesterIndicated, asWritten]);
+
   function clearFilters() {
+    setAsWritten((current) => (Object.keys(current).length > 0 ? {} : current));
     setFilters(DEFAULTS);
     setDebouncedSearch("");
     setPage(1);
@@ -189,7 +273,8 @@ export default function StaffTicketQueue() {
     filters.categoryId === DEFAULTS.categoryId &&
     filters.owner === DEFAULTS.owner &&
     filters.requesterIndicated === DEFAULTS.requesterIndicated &&
-    filters.sort === DEFAULTS.sort;
+    filters.sort === DEFAULTS.sort &&
+    Object.keys(asWritten).length === 0;
 
   const hasQuery =
     debouncedSearch !== "" ||
@@ -197,7 +282,8 @@ export default function StaffTicketQueue() {
     filters.itPriority !== "" ||
     filters.categoryId !== "" ||
     filters.owner !== "" ||
-    filters.requesterIndicated;
+    filters.requesterIndicated ||
+    Object.keys(asWritten).length > 0;
 
   const first = results && results.totalItems > 0 ? (results.page - 1) * results.pageSize + 1 : 0;
   const last = results ? first + results.items.length - 1 : 0;
@@ -222,9 +308,10 @@ export default function StaffTicketQueue() {
             <select
               {...control}
               value={filters.currentStatus}
-              onChange={(event) => update({ currentStatus: event.target.value as "" | TicketStatus })}
+              onChange={(event) => update({ currentStatus: event.target.value as Filters["currentStatus"] })}
             >
               <option value="">Any status</option>
+              <option value="ACTIVE">Active tickets</option>
               {TICKET_STATUSES.map((status) => (
                 <option key={status} value={status}>
                   {statusLabel(status)}
@@ -320,6 +407,12 @@ export default function StaffTicketQueue() {
       {state === "failed" && (
         <ErrorAlert onRetry={() => setReloadToken((token) => token + 1)}>
           The Ticket Queue could not be loaded.
+        </ErrorAlert>
+      )}
+
+      {state === "invalidLink" && (
+        <ErrorAlert onRetry={clearFilters} retryLabel="Clear filters">
+          This link&apos;s filter is not valid.
         </ErrorAlert>
       )}
 

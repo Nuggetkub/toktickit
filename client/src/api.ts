@@ -365,11 +365,12 @@ export interface StaffQueueResponse {
 export interface StaffQueueParams {
   search?: string;
   currentStatus?: string;
-  itPriority?: RequestedPriority;
+  /** A priority, or a value from a dashboard link sent as written for the server to judge. */
+  itPriority?: string;
   categoryId?: number;
   /** `me`, `unassigned`, or a user id. */
   owner?: string;
-  requesterIndicated?: "true";
+  requesterIndicated?: string;
   sortBy?: "ticketDate" | "updatedAt" | "ticketNumber" | "itPriority" | "requestedPriority" | "currentStatus";
   sortOrder?: "asc" | "desc";
   page?: number;
@@ -825,4 +826,58 @@ export interface StatusHistory {
 /** `GET /api/tickets/:id/history` — oldest first (BR-23). */
 export async function fetchHistory(ticketId: number): Promise<StatusHistory> {
   return requestJson<StatusHistory>(`/api/tickets/${ticketId}/history`);
+}
+
+// ---------------------------------------------------------------------------
+// Lab 4 issue 87 — the IT Staff and Administrator dashboard (api-spec.md §6)
+// ---------------------------------------------------------------------------
+
+/** A card or breakdown row: its value, and the exact list query its link opens (or null). */
+export interface DashboardCard {
+  value: number;
+  query: Record<string, string> | null;
+}
+
+export interface StaffTicketCard {
+  id: number;
+  ticketNumber: string;
+  summary: string;
+  currentStatus: string;
+  itPriority: RequestedPriority;
+  owner: UserSummary | null;
+  updatedAt: string;
+}
+
+export interface MyOpenAction {
+  actionId: number;
+  ticketId: number;
+  ticketNumber: string;
+  summary: string;
+  actionAt: string;
+  description: string;
+}
+
+export interface StaffDashboardData {
+  generatedAt: string;
+  windowStart: string;
+  cards: {
+    unassignedActive: DashboardCard;
+    myActive: DashboardCard;
+    myOpenActions: DashboardCard;
+    requesterIndicated: DashboardCard;
+  };
+  byStatus: Record<string, DashboardCard>;
+  activeByItPriority: Record<string, DashboardCard>;
+  lists: {
+    myOpenActions: { total: number; items: MyOpenAction[] };
+    urgentActive: { total: number; items: StaffTicketCard[] };
+    recentlyUpdated: { total: number; items: StaffTicketCard[] };
+  };
+  /** Present for an Administrator only (BR-28). */
+  users?: Record<string, { active: number; inactive: number; query: { role: string } }>;
+}
+
+/** `GET /api/dashboard/staff` — IT Staff and Administrators; it takes no parameters. */
+export async function fetchStaffDashboard(): Promise<StaffDashboardData> {
+  return requestJson<StaffDashboardData>("/api/dashboard/staff");
 }

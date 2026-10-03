@@ -119,5 +119,7 @@ export function useAuth(): AuthContextValue {
  */
 export function landingPath(role: AuthUser["role"]): string {
   if (role === "REQUESTER") return "/tickets";
-  return role === "ADMINISTRATOR" ? "/users" : "/queue";
+  // Lab 4 ui-spec §2: IT Staff start at the Dashboard; an Administrator still
+  // lands on User Management, unchanged from Lab 3.
+  return role === "ADMINISTRATOR" ? "/users" : "/dashboard";
 }
