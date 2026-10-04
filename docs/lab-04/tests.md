@@ -311,3 +311,15 @@ transcribed.
   schema of its own (`lab4_perf_test`), migrated and loaded with the demo seed, and points the
   application at it (issue #84). It fails if that seed did not load, rather than timing an
   empty database, which its first draft did.
+- **The one console error left is the browser's 401 before sign-in** (issue #89). A probe
+  signed in as each role, opened every screen and followed every in-app link and anchor: 54
+  page loads, including both Ticket Detail screens on a Ticket with a status history, a
+  completed Action and an open one. It recorded every console error and warning, page error,
+  failed request, unexpected HTTP status and redirected link. Only two kinds of message
+  appeared. React Router logged two v7 future-flag warnings on every page load; the client now
+  opts in to both flags, and they are gone. Chromium also logs "Failed to load resource: 401"
+  when the Login screen asks `GET /api/auth/me` and nobody is signed in. That 401 is the Lab 3
+  contract's answer (Lab 3 api-spec §2), the browser logs it rather than the application, and
+  it occurs before sign-in, on no Lab 4 screen, so AC-28 holds. Removing it would mean changing
+  a Lab 3 contract for a log line. The probe was a one-off and is not committed; the Lab 4
+  browser suite (issue #90) makes the console check permanent.
