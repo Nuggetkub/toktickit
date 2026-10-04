@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ApiError,
@@ -121,6 +121,29 @@ export default function TicketDetail() {
     };
   }, [user, ticketId, reloadToken]);
 
+  // Issue #89. A 409 means the Ticket changed elsewhere (closed, or its
+  // attachments changed in another tab). The refusal is shown where it happened,
+  // and the Ticket is re-read in place so the badge and the controls stop
+  // offering what the server just refused — as the IT Staff screen does on a
+  // conflict. It never shows "Loading"; only the latest re-read may land, and
+  // only while the screen is still on this Ticket. A failed re-read leaves the
+  // screen as it was, with the refusal still showing.
+  const routeTicketId = useRef(ticketId);
+  routeTicketId.current = ticketId;
+  const refreshSeq = useRef(0);
+  function refreshAfterConflict(error: unknown) {
+    if (!(error instanceof ApiError && error.status === 409) || !ticket) return;
+    const seq = ++refreshSeq.current;
+    const requestedId = String(ticket.id);
+    fetchTicket(ticket.id)
+      .then((loaded) => {
+        if (seq !== refreshSeq.current || requestedId !== routeTicketId.current) return;
+        setTicket(loaded);
+        setAttachments(loaded.attachments);
+      })
+      .catch(() => undefined);
+  }
+
   const activeCount = attachments.filter((file) => file.removedAt === null).length;
   const atLimit = activeCount >= MAX_FILES;
 
@@ -159,6 +182,7 @@ export default function TicketDetail() {
     } catch (error) {
       const message = error instanceof ApiError ? error.message : "The attachment could not be uploaded.";
       setAttachmentError(`${chosen.name} was not uploaded — ${message}`);
+      refreshAfterConflict(error);
     } finally {
       setUploadingName("");
     }
@@ -175,6 +199,7 @@ export default function TicketDetail() {
     } catch (error) {
       const apiError = error instanceof ApiError ? error : null;
       setCommentError(apiError?.fieldErrors?.content ?? apiError?.message ?? "The comment could not be posted.");
+      refreshAfterConflict(error);
     } finally {
       setCommentBusy(false);
     }
@@ -192,6 +217,7 @@ export default function TicketDetail() {
     } catch (error) {
       const apiError = error instanceof ApiError ? error : null;
       setIndicationError(apiError?.message ?? "IT Staff could not be told just now.");
+      refreshAfterConflict(error);
     } finally {
       setIndicationBusy(false);
     }
@@ -245,6 +271,7 @@ export default function TicketDetail() {
         setAttachmentError(
           `${attachment.originalFilename} could not be removed — ${apiError?.message ?? "please try again."}`,
         );
+        refreshAfterConflict(error);
       }
     } finally {
       setRemovalBusy(false);
