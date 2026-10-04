@@ -111,7 +111,7 @@ export default function RequesterDashboard() {
       {state === "ready" && data && (
         <div className="zen-dashboard__lists">
           <TicketPanel id="needs-attention" title="Needs your attention" empty="Nothing needs your attention." list={data.lists.needsAttention} when="updated" />
-          <TicketPanel id="recently-updated" title="Recently updated" empty="None of your tickets has been updated yet." list={data.lists.recentlyUpdated} when="updated" viewAll="/tickets" />
+          <TicketPanel id="recently-updated" title="Recently updated" empty="None of your tickets has been updated yet." list={data.lists.recentlyUpdated} when="updated" viewAll={linkFor("/tickets", { sortBy: "updatedAt", sortOrder: "desc" })} />
           <TicketPanel id="recently-resolved" title="Recently resolved" empty="No ticket was resolved in the last 7 days." list={data.lists.recentlyResolved} when="resolved" />
         </div>
       )}
