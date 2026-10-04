@@ -7,6 +7,7 @@ import {
   capture,
   createTicket,
   openInQueue,
+  openMyTickets,
   signIn,
   signOut,
   submitSignIn,
@@ -67,11 +68,9 @@ test("loading — My Tickets while the list is still in flight", async ({ page }
   // test has no business delaying.
   await page.route((url) => url.pathname === "/api/tickets", (route) => delay(route, 4_000));
 
-  // Reload rather than clicking the nav: sign-in has already landed on
-  // /tickets, and navigating to the route you are already on does not remount
-  // the screen, so no second request would be made and the pending state would
-  // never appear.
-  await page.reload();
+  // Since Lab 4 issue #88 sign-in lands on the Dashboard, so opening My Tickets
+  // from the navigation mounts the screen and makes the delayed request.
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "My Tickets" }).click();
 
   await expect(page.getByText("Loading your Tickets…")).toBeVisible();
   await capture(page, "states", "loading");
@@ -128,7 +127,9 @@ test("empty — a Requester who has never raised a Ticket", async ({ page }) => 
   await page.getByLabel(/^Confirm new password/).fill(SESSION_PASSWORD);
   await page.getByRole("button", { name: "Save new password" }).click();
 
-  await expect(page.getByRole("heading", { name: "My Tickets" })).toBeVisible();
+  // A Requester lands on the Dashboard since Lab 4 issue #88; My Tickets is opened.
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  await openMyTickets(page);
   // Empty and no-results are different situations with different fixes, and the
   // screen says so: this one offers Create Ticket, not "clear your filters".
   await expect(page.getByText("You have not created any Tickets yet.")).toBeVisible();
@@ -184,7 +185,8 @@ test("failure — the list cannot be loaded, and says so with a way back", async
     (url) => url.pathname === "/api/tickets",
     (route) => fulfillJson(route, 500, errorBody("INTERNAL_ERROR", "Something went wrong.")),
   );
-  await page.reload();
+  // Since Lab 4 issue #88 sign-in lands on the Dashboard; My Tickets is opened.
+  await openMyTickets(page);
 
   const alert = page.getByRole("alert");
   await expect(alert).toContainText("Your Tickets could not be loaded.");

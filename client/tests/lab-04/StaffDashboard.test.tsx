@@ -64,6 +64,7 @@ function mockApi(user: unknown, replies: Reply[]) {
     if (url.pathname === "/api/staff/tickets") return answer(200, { items: [], page: 1, pageSize: 10, totalItems: 0, totalPages: 1 });
     if (url.pathname === "/api/staff/assignees" || url.pathname === "/api/categories" || url.pathname === "/api/related-systems") return answer(200, []);
     if (url.pathname === "/api/tickets") return answer(200, { items: [], page: 1, pageSize: 10, totalItems: 0, totalPages: 1 });
+    if (url.pathname === "/api/dashboard/requester") return answer(503, { error: { code: "DEPENDENCY_UNAVAILABLE", message: "x" } });
     throw new Error(`Unexpected request: ${url.pathname}`);
   }));
   return { calls, held };
@@ -253,11 +254,12 @@ describe("UI-05 the role boundary, both directions", () => {
     expect(calls.some((c) => c.startsWith("/api/dashboard/requester"))).toBe(false);
   });
 
-  it("a Requester is refused the staff dashboard and never asks for it", async () => {
+  it("a Requester at /dashboard gets their own dashboard and never asks for the staff one", async () => {
     const { calls } = mockApi(REQUESTER, [ok()]);
     render(<MemoryRouter initialEntries={["/dashboard"]}><App /></MemoryRouter>);
-    expect(await screen.findByRole("heading", { name: "You do not have access to this page" })).toBeInTheDocument();
-    expect(calls.some((c) => c.startsWith("/api/dashboard/"))).toBe(false);
+    await screen.findByRole("heading", { name: "Dashboard" });
+    await waitFor(() => expect(calls.some((c) => c.startsWith("/api/dashboard/requester"))).toBe(true));
+    expect(calls.some((c) => c.startsWith("/api/dashboard/staff"))).toBe(false);
   });
 });
 

@@ -6,6 +6,7 @@ import UserManagement from "./admin/UserManagement.js";
 import StaffTicketDetail from "./staff/StaffTicketDetail.js";
 import StaffTicketQueue from "./staff/StaffTicketQueue.js";
 import StaffDashboard from "./dashboard/StaffDashboard.js";
+import RequesterDashboard from "./dashboard/RequesterDashboard.js";
 import CreateTicket from "./tickets/CreateTicket.js";
 import MyTickets from "./tickets/MyTickets.js";
 import TicketDetail from "./tickets/TicketDetail.js";
@@ -25,6 +26,8 @@ export default function App() {
 function navigationFor(role: string, navigate: (path: string) => void): NavItem[] {
   if (role === "REQUESTER") {
     return [
+      // Lab 4 ui-spec §2: Dashboard comes first for every role (issue #88).
+      { key: "/dashboard", label: "Dashboard", onSelect: () => navigate("/dashboard") },
       { key: "/tickets", label: "My Tickets", onSelect: () => navigate("/tickets") },
       { key: "/create", label: "Create Ticket", onSelect: () => navigate("/create") },
     ];
@@ -34,7 +37,7 @@ function navigationFor(role: string, navigate: (path: string) => void): NavItem[
   // Administrator is offered Users, which issue #55 adds. IT Staff must not see
   // the control at all — the server refuses them at step 4, and offering a
   // button that is certain to be refused is not a courtesy.
-  // Lab 4 ui-spec §2: Dashboard comes first. The Requester's arrives with #88.
+  // Lab 4 ui-spec §2: Dashboard comes first.
   const items: NavItem[] = [
     { key: "/dashboard", label: "Dashboard", onSelect: () => navigate("/dashboard") },
     { key: "/queue", label: "Ticket Queue", onSelect: () => navigate("/queue") },
@@ -102,10 +105,9 @@ function Shell() {
           path="/dashboard"
           element={
             // Lab 4 ui-spec §2: one route for every role, the version chosen by
-            // role. This issue adds the staff version (#87); the Requester's
-            // follows in #88, and until then a Requester is refused here.
-            <RequireAuth roles={["IT_STAFF", "ADMINISTRATOR"]}>
-              <StaffDashboard />
+            // the signed-in role. Each version calls only its own endpoint.
+            <RequireAuth>
+              <DashboardForRole />
             </RequireAuth>
           }
         />
@@ -184,3 +186,9 @@ function Landing() {
 
 // The `Workspace` placeholder that stood here is gone: issue #50 gives IT Staff
 // and Administrators the real Ticket Queue to land on.
+
+/** The dashboard for the signed-in role (Lab 4 ui-spec §2): never the other one. */
+function DashboardForRole() {
+  const { user } = useAuth();
+  return user?.role === "REQUESTER" ? <RequesterDashboard /> : <StaffDashboard />;
+}

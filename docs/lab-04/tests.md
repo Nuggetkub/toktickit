@@ -265,6 +265,23 @@ transcribed.
   queue from the navigation where a journey works from it (and `openInQueue()` uses it when not
   already there), and the two assertions of the old landing heading name the Dashboard. Before
   the change 11 of the 27 journeys failed on the landing alone; after it all 27 pass.
+- **Requesters now land on the Dashboard, so Lab 2 and Lab 3 tests that began on My Tickets
+  open it first** (issue #88, Lab 4 ui-spec §2). Each keeps what it asserted:
+  - `client/tests/lab-03/Login.test.tsx` (two tests) and `ChangePassword.test.tsx` (one) expected
+    a Requester to land on My Tickets; they now expect the Dashboard, and their mocks answer it.
+    What is sent, and how, is unchanged.
+  - `client/tests/lab-02/MyTickets.test.tsx`: the Current Status options gain "Active tickets".
+  - `client/tests/lab-04/StaffDashboard.test.tsx` asserted that `/dashboard` refuses a Requester
+    (true only until #88); it now asserts that a Requester gets their own dashboard and never
+    asks for the staff one.
+  - Lab 2 browser suite: `signIn()` in `e2e/lab-02/support.ts` keeps its documented contract,
+    "signs in and opens My Tickets": it meets the Dashboard, then opens My Tickets from the
+    navigation. All 10 journeys pass.
+  - Lab 3 browser suite: the four Requester accounts' `landing` is "Dashboard", and a new
+    `openMyTickets()` helper opens My Tickets in the four journeys that work from it (a search
+    in the staff flow, and the loading, failure and empty-state captures, which now open My
+    Tickets from the navigation where they used to reload it). Before the change 19 of 27
+    journeys failed on the landing alone; after it all 27 pass, capturing the same screens.
 - **Lab 3 DB-03 now applies every later migration before comparing** (issue #81).
   `server/tests/lab-03/migration.test.ts` "leaves a schema that matches schema.prisma" built
   the Lab 2 and Lab 3 migrations and compared the result with `schema.prisma`. Once Lab 4

@@ -41,7 +41,10 @@ export function uniqueSummary(prefix: string): string {
 }
 
 /**
- * Signs in as the given Requester and lands on My Tickets.
+ * Signs in as the given Requester and opens My Tickets, where every Lab 2
+ * journey starts. Since Lab 4 issue #88 a Requester lands on the Dashboard
+ * (Lab 4 ui-spec §2), so the helper meets the Dashboard and then opens My
+ * Tickets from the navigation, as a person would.
  *
  * Every seeded account is issued an initial password, and BR-12 leaves the
  * mandatory-change gate on for all of them — so a first sign-in always lands on
@@ -64,7 +67,7 @@ export async function signIn(page: Page, email: string): Promise<void> {
   await page.getByRole("button", { name: "Sign in" }).click();
 
   const gate = page.getByRole("heading", { name: "Choose a new password" });
-  const landing = page.getByRole("heading", { name: "My Tickets" });
+  const landing = page.getByRole("heading", { name: "Dashboard" });
   const failure = page.getByRole("alert");
   await expect(gate.or(landing).or(failure)).toBeVisible();
 
@@ -75,6 +78,7 @@ export async function signIn(page: Page, email: string): Promise<void> {
     await page.getByLabel(/^Password/).fill(SESSION_PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(landing).toBeVisible();
+    await openMyTickets(page);
     return;
   }
 
@@ -92,6 +96,13 @@ export async function signIn(page: Page, email: string): Promise<void> {
   }
 
   await expect(landing).toBeVisible();
+  await openMyTickets(page);
+}
+
+/** Opens My Tickets from the navigation (Lab 4 issue #88: no longer the landing page). */
+async function openMyTickets(page: Page): Promise<void> {
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "My Tickets" }).click();
+  await expect(page.getByRole("heading", { name: "My Tickets" })).toBeVisible();
 }
 
 /**
