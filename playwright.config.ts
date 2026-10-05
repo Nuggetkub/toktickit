@@ -17,7 +17,7 @@ const API_PORT = 3101;
 const CLIENT_PORT = 4173;
 const CLIENT_ORIGIN = `http://127.0.0.1:${CLIENT_PORT}`;
 
-export type Lab = "lab-02" | "lab-03";
+export type Lab = "lab-02" | "lab-03" | "lab-04";
 
 export function labConfig(lab: Lab): PlaywrightTestConfig {
   const artifacts = `artifacts/${lab}`;
@@ -60,6 +60,10 @@ export function labConfig(lab: Lab): PlaywrightTestConfig {
           ...process.env,
           PORT: String(API_PORT),
           E2E_SCHEMA: schema,
+          // Lab 4's dashboards and captures need volume: the demo Tickets, Actions
+          // and status history the development seed loads (ui-spec §9, "from the
+          // seeded database"). Labs 2 and 3 keep reference data only, unchanged.
+          ...(lab === "lab-04" ? { E2E_SEED: "demo" } : {}),
           DATABASE_URL: schemaUrl(schema),
           ATTACHMENT_STORAGE_DIR: path.join(runtimeDirectory, "uploads"),
           // CORS is pinned to the Vite dev server by default (server/src/config.ts).
