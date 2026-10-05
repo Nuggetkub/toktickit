@@ -267,6 +267,28 @@ body {
   resize: vertical;
 }
 
+/* A checkbox or radio inside a field is not a text box: the rule above made it
+   full-width with a border, so it floated mid-row away from its label (found
+   by eye in the RESP-01 captures, issue #90). Its label keeps the touch height. */
+.zen-field input[type="checkbox"],
+.zen-field input[type="radio"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  flex: none;
+  accent-color: var(--zen-primary);
+}
+
+.zen-field label:has(> input[type="checkbox"]),
+.zen-field label:has(> input[type="radio"]) {
+  display: flex;
+  align-items: center;
+  gap: var(--zen-space-2);
+  min-height: 44px;
+}
+
 /* Read-only values are visibly distinct from editable ones (ui-spec §3). */
 .zen-field--readonly .zen-field__value {
   padding: var(--zen-space-2) var(--zen-space-3);
@@ -1175,6 +1197,13 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* ...but a status badge is one word and stays whole: inheriting the rule above,
+   "Completed" broke into "Com / plete / d" (found by eye, issue #90). */
+.zen-actions-table .zen-badge {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
 /* Lab 4 issue 86 - the status history (ui-spec.md section 5) */
 .zen-timeline {
   display: grid;
@@ -1251,12 +1280,16 @@ body {
 }
 
 /* The breakdowns come first in the DOM, for the keyboard order of ui-spec
-   section 7; the areas keep the lists in the wider left column. */
-.zen-dashboard__lists {
+   section 7; the areas keep the lists in the wider left column.
+   Only inside the panels grid, which defines those areas: the Requester
+   Dashboard puts its lists straight into .zen-dashboard, where an unknown area
+   name makes the browser invent an extra column and push the panels sideways
+   (found by RESP-01, issue #90). */
+.zen-dashboard__panels > .zen-dashboard__lists {
   grid-area: lists;
 }
 
-.zen-dashboard__breakdowns {
+.zen-dashboard__panels > .zen-dashboard__breakdowns {
   grid-area: side;
 }
 

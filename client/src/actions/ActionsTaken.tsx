@@ -198,17 +198,24 @@ export function ActionsTaken({ ticketId, ticketStatus, canWrite, currentUserId, 
                   <Fragment key={action.id}>
                     <tr id={`action-${action.id}`}>
                       <td data-label="Action date/time">{moment(action.actionAt)}</td>
+                      {/* One wrapper per cell: on mobile each cell is a label-and-value
+                          row, and two loose children became two columns, squeezing the
+                          Result into a one-word strip (issue #90). */}
                       <td data-label="Description">
-                        {action.description}
-                        {action.result && <p className="zen-action__result">{action.result}</p>}
+                        <div>
+                          {action.description}
+                          {action.result && <p className="zen-action__result">{action.result}</p>}
+                        </div>
                       </td>
                       <td data-label="Assignee">
                         {action.assignee ? action.assignee.fullName : <span className="zen-action__unassigned">Unassigned</span>}
                       </td>
                       <td data-label="Performed by">{action.performedBy?.fullName ?? "—"}</td>
                       <td data-label="Status">
-                        <ActionStatusBadge status={action.status} />
-                        {action.followUpRequired && <p className="zen-action__result">Follow-up required</p>}
+                        <div>
+                          <ActionStatusBadge status={action.status} />
+                          {action.followUpRequired && <p className="zen-action__result">Follow-up required</p>}
+                        </div>
                       </td>
                       <td data-label="Actions">
                         <div className="zen-form-actions">
