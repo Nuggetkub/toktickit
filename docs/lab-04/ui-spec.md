@@ -299,22 +299,44 @@ Completed against the running application at all three viewports, never from mem
 marks an item a test asserts; **E** marks one checked by eye, naming the capture that shows
 it. Each box is ticked only with that evidence named beside it.
 
-- [ ] **E** Zen Green tokens are consistent across both dashboards, the Actions section and
-      the Lab 2 and Lab 3 screens
-- [ ] **A** Metric cards carry a label, a value and a sentence-form accessible name, and each
-      links to a list whose total equals the card
-- [ ] **A** Action Status, Ticket status and priority badges carry text
-- [ ] **A** Editable Action fields are visibly distinct from read-only ones; a final Action
-      offers no edit control
-- [ ] **A** Validation messages sit beneath their own field, including the conditional
-      Follow-up note
-- [ ] **A** Focus is visible; dialogs trap and restore it; drill-down links are
-      keyboard-reachable in reading order
-- [ ] **A** Nothing clipped, nothing overlapping, and no page-level horizontal scroll at any
-      viewport (RESP-01)
-- [ ] **E** Loading, empty, forbidden, conflict and failure states captured from real
-      responses for both dashboards and the Actions section
-- [ ] **A** No console error during the full E2E run
+- [x] **E** Zen Green tokens are consistent across both dashboards, the Actions section and
+      the Lab 2 and Lab 3 screens. Checked by eye in `staff-dashboard/administrator-desktop.png`,
+      `requester-dashboard/populated-{desktop,mobile}.png`, `actions-taken/staff-form-mobile.png`
+      and `states/{dashboard-loading,action-conflict}.png`; the badge tones are Lab 3's, which
+      Lab 3 STYLE-01 asserts against its §1 tables. This inspection found three defects, each
+      fixed and now asserted by every capture (tests.md §7).
+- [x] **A** Metric cards carry a label, a value and a sentence-form accessible name, and each
+      links to a list whose total equals the card. STYLE-01 (`MetricCard`); E2E-03 clicks every
+      card and breakdown row for all three roles and compares the list's total.
+- [x] **A** Action Status, Ticket status and priority badges carry text. STYLE-01
+      (`ActionStatusBadge`) and Lab 3 STYLE-01 (status, priority, role); every RESP-01 capture
+      also fails if a badge breaks across lines.
+- [x] **A** Editable Action fields are visibly distinct from read-only ones; a final Action
+      offers no edit control. UI-01 ("Final — record a new action to correct it.", no Edit),
+      Lab 3 STYLE-01 (read-only information against the editable Work panel), and E2E-01 (the
+      Requester is offered no Action control at all).
+- [x] **A** Validation messages sit beneath their own field, including the conditional
+      Follow-up note. UI-01 (each message beneath its field, focus to the first; the Follow-up
+      note required once ticked); STYLE-01 (`aria-controls`); `states/action-validation.png`.
+- [x] **A** Focus is visible; dialogs trap and restore it; drill-down links are
+      keyboard-reachable in reading order. RESP-01 measures the computed outline on a focused
+      card and walks Tab through cards, breakdowns and panels at all three widths; the dialog
+      trap and restore is Lab 3's `StaffTicketDetail.test.tsx`, unchanged for Lab 4's dialogs,
+      which use the same `ConfirmDialog`.
+- [x] **A** Nothing clipped, nothing overlapping, and no page-level horizontal scroll at any
+      viewport (RESP-01). Every one of the 26 captures asserts it first, with 44 px targets on
+      mobile, and the Requester Dashboard's panels are asserted to sit below its cards.
+- [x] **E** Loading, empty, forbidden, conflict and failure states captured for both
+      dashboards and the Actions section. Real: loading (the real request held at the network
+      edge), empty (`requester-dashboard/empty-*`, a Requester the seed gives no tickets), the
+      conflict (`states/action-conflict.png`, a real `409` after the Action changed elsewhere),
+      and validation. Forbidden is E2E-03's real `/queue` refusal for a Requester. The failure
+      (`states/dashboard-failure.png`) is a `503` fulfilled at the network edge in the server's
+      own error shape, because a real one needs the database stopped mid-run; Retry then
+      recovers against the real API.
+- [x] **A** No console error during the full Lab 4 E2E run. `e2e/lab-04/support.ts` fails any
+      test on a console error or warning, a page error, or an HTTP failure the test did not
+      declare beforehand (tests.md §7).
 
 ### Screenshot paths
 

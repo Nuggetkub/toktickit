@@ -324,3 +324,53 @@ transcribed.
   it occurs before sign-in, on no Lab 4 screen, so AC-28 holds. Removing it would mean changing
   a Lab 3 contract for a log line. The probe was a one-off and is not committed; the Lab 4
   browser suite (issue #90) makes the console check permanent.
+- **The Lab 4 browser suite runs on the demo seed, and fails on any console error** (issue
+  #90). `npm run e2e:lab4` uses its own schema, `lab4_e2e`, reset on every run like Lab 3's.
+  Unlike Labs 2 and 3 it also loads the demo Tickets, Actions and status history
+  (`E2E_SEED=demo`, read only by `prepare-e2e.ts` and only into the guarded schema), because
+  the dashboards need something to count. Every test runs under a guard in
+  `e2e/lab-04/support.ts`. It fails the test on an application console error or warning, a page
+  error, or an HTTP status of 400 or more that the test did not declare before provoking it: a
+  forged request, a forced `500` or `503`, a real `409`. Chromium logs every such response as
+  "Failed to load resource", so the guard checks the response rather than the log line. Two
+  responses are declared for every test, both from signing in: the pre-sign-in
+  `GET /api/auth/me` `401` (above), and the `POST /api/auth/login` `401` the shared Lab 3
+  sign-in helper meets when it tries the development password on an account this run has
+  already rotated. Lab 2 and Lab 3 suites are unchanged and run without the guard.
+- **RESP-01 found three layout defects, all fixed, and each is now asserted** (issue #90):
+  1. The Requester Dashboard's panels sat 13 px past the edge at 390 px. #104 gave
+     `.zen-dashboard__lists` the grid area `lists` for the Staff Dashboard. The Requester
+     Dashboard puts that element straight into `.zen-dashboard`, which names no areas, so the
+     browser invented a column. The area rules now apply only inside `.zen-dashboard__panels`.
+     RESP-01 asserts the Requester panels sit below the cards, as wide as they are, at every
+     width.
+  2. In the Actions table a Completed badge broke into "Com / plete / d". It inherited the
+     cell's `overflow-wrap: anywhere`, which long descriptions need. The badge is now
+     `nowrap`, and every capture fails on a badge taller than one line.
+  3. Checkboxes and radios inside a `.zen-field` were styled as text boxes: full width, with a
+     border. The Follow-up checkbox floated mid-row away from its label. They are now sized as
+     controls, with a 44 px label. Every capture fails on one wider than 32 px.
+  A fourth was found the same way. On mobile, each table cell becomes a label-and-value row,
+  so the Actions Description cell's two children, the text and its Result, became two columns,
+  leaving the Result a one-word strip. Each cell now holds one wrapper. Every mobile capture
+  fails on a split cell, and Lab 4 STYLE-01 pins all four. The first was a regression from our
+  own #104; the others date from #85.
+- **Every Lab 4 browser test is break-proved, with a no-op control per spec file** (issue #90).
+  The four controls pass. Seventeen breaks each turn their test red at the assertion that guards
+  them:
+  - E2E-01: inactive staff offered as assignees; the Requester given write controls; a My open
+    actions row linking nowhere.
+  - E2E-05: Save not busy while saving; a failed save offering no Retry.
+  - E2E-02: Resolved offered while the gate is closed; cancelling a Ticket leaving its Action
+    open.
+  - E2E-03: the queue ignoring a link's owner; User Management ignoring a link's role; IT Staff
+    shown User accounts.
+  - RESP-01: the grid areas unscoped; the badge rule removed; checkboxes stretched; the Actions
+    cells unwrapped; the metric focus ring switched off; the pre-#104 Tab order; and one
+    application `console.error`.
+
+  One first attempt stayed green, and it was a weak break, not a weak test. Setting the badge
+  rule's `white-space` back to `normal` left its `overflow-wrap: normal`, which alone keeps
+  "Completed" whole. Removing the whole rule, the true regression, turns RESP-01 red. Lab 4
+  STYLE-01 has its own six breaks, all red with a green control. E2E-04 is the Lab 2 and Lab 3
+  suites, break-proved in their own labs and green here.
