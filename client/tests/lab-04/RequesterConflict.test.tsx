@@ -31,7 +31,8 @@ function ticket(currentStatus: string, attachments: unknown[] = []) {
 
 const refusal = (status: number, code: string, message: string) => ({ status, body: { error: { code, message } } });
 
-type Read = { body: unknown; hold?: boolean };
+type Read = { body?: unknown; hold?: boolean; status?: number };
+type Reply = { status: number; body: unknown };
 
 /**
  * The first read answers `first`. Later reads take `later` in turn, repeating
@@ -40,7 +41,10 @@ type Read = { body: unknown; hold?: boolean };
  * the screen while the re-read is still on its way (an instant answer would
  * hide a screen that blanks and comes back). `write` answers the write under test.
  */
-function mockApi(first: unknown, later: unknown | Read[], write: { key: string; reply: { status: number; body: unknown } }) {
+function mockApi(first: unknown, later: unknown | Read[], write: { key: string; reply: Reply | Reply[] }) {
+  // A list of replies answers successive writes in turn, repeating the last.
+  const replies = Array.isArray(write.reply) ? write.reply : [write.reply];
+  let writes = 0;
   const reads: string[] = [];
   const held: Array<() => void> = [];
   const script: Read[] = Array.isArray(later) ? later : [{ body: later }];
@@ -49,13 +53,18 @@ function mockApi(first: unknown, later: unknown | Read[], write: { key: string; 
     const method = (init?.method ?? "GET").toUpperCase();
     const answer = (status: number, body: unknown) => ({ ok: status < 400, status, json: async () => body, headers: new Headers() });
     if (url.pathname === "/api/auth/me") return answer(200, { user: USER });
-    if (`${method} ${url.pathname}` === write.key) return answer(write.reply.status, write.reply.body);
+    if (`${method} ${url.pathname}` === write.key) {
+      const reply = replies[Math.min(writes++, replies.length - 1)];
+      return answer(reply.status, reply.body);
+    }
     if (method === "GET" && url.pathname === "/api/tickets/42") {
       reads.push(url.pathname);
       if (reads.length === 1) return answer(200, first);
       const next = script[Math.min(reads.length - 2, script.length - 1)];
-      if (next.hold) return new Promise((resolve) => held.push(() => resolve(answer(200, next.body))));
-      return answer(200, next.body);
+      const status = next.status ?? 200;
+      const body = status < 400 ? next.body : { error: { code: "DEPENDENCY_UNAVAILABLE", message: "The service is unavailable. Please try again." } };
+      if (next.hold) return new Promise((resolve) => held.push(() => resolve(answer(status, body))));
+      return answer(status, body);
     }
     if (url.pathname === "/api/tickets/42/comments") return answer(200, []);
     if (url.pathname === "/api/tickets/42/actions") return answer(200, { items: [] });
@@ -149,6 +158,44 @@ describe("UI-09 the Requester's Ticket Detail catches up after a 409 (issue #89)
     expect(reads).toHaveLength(3);
     expect(screen.getByText("latest-read.png")).toBeInTheDocument();
     expect(screen.queryByText("older-read.png")).not.toBeInTheDocument();
+  });
+
+  it("a write that succeeds after a re-read started supersedes it (Earth2509, PR #105)", async () => {
+    const four = [1, 2, 3, 4].map((n) => FILE(n, `photo-${n}.png`));
+    // The re-read was taken before the retry succeeded, so it does not have the retried file.
+    const { reads, held } = mockApi(ticket("OPEN", four), [{ body: ticket("OPEN", four), hold: true }], {
+      key: "POST /api/tickets/42/attachments",
+      reply: [refusal(409, "ATTACHMENT_ALREADY_REMOVED", "That attachment has already been removed."), { status: 201, body: FILE(7, "retried.png") }],
+    });
+    await renderDetail();
+    await userEvent.upload(screen.getByLabelText("Add an attachment"), png("first-try.png"));
+    await waitFor(() => expect(held).toHaveLength(1));
+    await userEvent.upload(screen.getByLabelText("Add an attachment"), png("retried.png"));
+    expect(await screen.findByText(/retried\.png was uploaded/)).toBeInTheDocument();
+    held[0]();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(reads).toHaveLength(2);
+    expect(within(screen.getByRole("list", { name: "Attachments" })).getByText("retried.png")).toBeInTheDocument();
+  });
+
+  it("a re-read that fails says so with Retry, keeping the refusal and the draft; Retry catches up (Earth2509, PR #105)", async () => {
+    const { reads } = mockApi(ticket("IN_PROGRESS"), [{ status: 503 }, { body: ticket("CLOSED") }], {
+      key: "POST /api/tickets/42/comments", reply: refusal(409, "TICKET_TERMINAL", "This Ticket is closed and can no longer change."),
+    });
+    await renderDetail();
+    await userEvent.type(screen.getByLabelText(/Add a comment/), "Still failing this morning.");
+    await userEvent.click(screen.getByRole("button", { name: "Post comment" }));
+
+    const failed = await screen.findByText("This ticket could not be refreshed, so what it shows may be out of date.");
+    expect(screen.getByText("This Ticket is closed and can no longer change.")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Add a comment/)).toHaveValue("Still failing this morning.");
+    expect(screen.getByText("In Progress")).toBeInTheDocument();
+
+    await userEvent.click(within(failed.closest("[role=alert]") as HTMLElement).getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("Closed")).toBeInTheDocument();
+    expect(reads).toHaveLength(3);
+    expect(screen.queryByText("This ticket could not be refreshed, so what it shows may be out of date.")).not.toBeInTheDocument();
+    expect(screen.getByText("This ticket is closed. Create a new ticket if you need more help.")).toBeInTheDocument();
   });
 
   it("anything but a 409 leaves the Ticket alone: a failed comment is reported and nothing is re-read", async () => {

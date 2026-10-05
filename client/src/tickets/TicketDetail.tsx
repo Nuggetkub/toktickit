@@ -126,22 +126,38 @@ export default function TicketDetail() {
   // and the Ticket is re-read in place so the badge and the controls stop
   // offering what the server just refused — as the IT Staff screen does on a
   // conflict. It never shows "Loading"; only the latest re-read may land, and
-  // only while the screen is still on this Ticket. A failed re-read leaves the
-  // screen as it was, with the refusal still showing.
+  // only while the screen is still on this Ticket.
+  //
+  // Earth2509's review of PR #105: a write that succeeds after the re-read
+  // started is newer than anything that re-read can bring back, so it
+  // supersedes it; and a re-read that fails says so, with a Retry, rather than
+  // leaving controls on screen that the server has just refused. Neither
+  // touches the refusal or anything typed.
   const routeTicketId = useRef(ticketId);
   routeTicketId.current = ticketId;
   const refreshSeq = useRef(0);
+  const [refreshFailed, setRefreshFailed] = useState(false);
   function refreshAfterConflict(error: unknown) {
-    if (!(error instanceof ApiError && error.status === 409) || !ticket) return;
+    if (error instanceof ApiError && error.status === 409) refreshInPlace();
+  }
+  function refreshInPlace() {
+    if (!ticket) return;
     const seq = ++refreshSeq.current;
     const requestedId = String(ticket.id);
+    setRefreshFailed(false);
     fetchTicket(ticket.id)
       .then((loaded) => {
         if (seq !== refreshSeq.current || requestedId !== routeTicketId.current) return;
         setTicket(loaded);
         setAttachments(loaded.attachments);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (seq === refreshSeq.current && requestedId === routeTicketId.current) setRefreshFailed(true);
+      });
+  }
+  /** A write the server accepted: any re-read still on its way is older than it. */
+  function supersedePendingRefresh() {
+    refreshSeq.current++;
   }
 
   const activeCount = attachments.filter((file) => file.removedAt === null).length;
@@ -177,6 +193,7 @@ export default function TicketDetail() {
     setUploadingName(chosen.name);
     try {
       const stored = await uploadAttachment(ticket.id, chosen);
+      supersedePendingRefresh();
       setAttachments((current) => [...current, stored]);
       setNotice(`${stored.originalFilename} was uploaded.`);
     } catch (error) {
@@ -212,7 +229,9 @@ export default function TicketDetail() {
     try {
       // The answer is the whole ticket, so the screen redraws from the server —
       // including `requesterResolvedAt`, which is what replaces the button.
-      setTicket(await indicateResolved(ticket.id));
+      const indicated = await indicateResolved(ticket.id);
+      supersedePendingRefresh();
+      setTicket(indicated);
       setConfirmingIndication(false);
     } catch (error) {
       const apiError = error instanceof ApiError ? error : null;
@@ -259,6 +278,7 @@ export default function TicketDetail() {
       const removed = await removeAttachment(ticket.id, attachment.id, trimmed);
       // Replaced rather than dropped: the row stays on screen carrying its
       // removal reason and date, which is the whole point of a soft removal.
+      supersedePendingRefresh();
       setAttachments((current) => current.map((file) => (file.id === removed.id ? removed : file)));
       setRemovingId(null);
       setReason("");
@@ -366,6 +386,12 @@ export default function TicketDetail() {
           Back to My Tickets
         </Link>
       </Card>
+
+      {refreshFailed && (
+        <ErrorAlert onRetry={refreshInPlace} retryLabel="Retry">
+          This ticket could not be refreshed, so what it shows may be out of date.
+        </ErrorAlert>
+      )}
 
       {/* Lab 4 ui-spec §4: the same list, read-only. No write control is
           rendered and none is requested (BR-16). */}
