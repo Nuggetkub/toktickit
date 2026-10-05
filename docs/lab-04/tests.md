@@ -148,8 +148,8 @@ Labsheet §10 requires every level below. Each is met by a named row, not by an 
 | Level | Rows |
 |---|---|
 | Unit | UNIT-01 to UNIT-04 |
-| API / integration | API-01 to API-14 |
-| UI component | UI-01 to UI-08 |
+| API / integration | API-01 to API-15 |
+| UI component | UI-01 to UI-09 |
 | UI style | STYLE-01 |
 | Responsive | RESP-01 |
 | Authorization | AUTH-01, plus the role clauses of API-08, API-13 and UI-06 |
