@@ -306,7 +306,7 @@ export interface TicketListParams {
   requestedPriority?: RequestedPriority;
   /** One status, or a comma-separated list of different ones (Lab 4 BR-30). */
   currentStatus?: string;
-  sortBy?: "ticketDate" | "ticketNumber" | "requestedPriority";
+  sortBy?: "ticketDate" | "updatedAt" | "ticketNumber" | "requestedPriority";
   sortOrder?: "asc" | "desc";
   page?: number;
   pageSize?: number;

@@ -285,6 +285,11 @@ accepts one status or a comma-separated list, such as
 On My Tickets this replaces the Lab 2/3 refusal ("Current Status filtering arrives in
 Lab 3"). That half is issue #78.
 
+`sortBy` on `GET /api/tickets` (My Tickets) also accepts `updatedAt`, beside Lab 2's
+`ticketDate`, `ticketNumber` and `requestedPriority` (D-17). Ties break by Ticket Number,
+high to low, as for every other sort. Any other value is still `400 VALIDATION_FAILED`
+with `fieldErrors.sortBy`. The Queue already accepted `updatedAt` in Lab 3.
+
 ---
 
 ## 6. Dashboards

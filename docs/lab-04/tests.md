@@ -77,6 +77,7 @@ behaviour, and each such change is listed in §7 with its reason:
 | API-12 | API | AC-20 | For every card and breakdown row on both dashboards, the card's own `query` sent to `/api/tickets` or `/api/staff/tickets` as the same user returns `totalItems` equal to its `value`. | `server/tests/lab-04/requester-dashboard.api.test.ts`, `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
 | API-13 | API | AC-21 | An Administrator's staff dashboard includes `users`, whose counts match the User table. An IT Staff member's does not include the key at all. A Requester gets `403` from the staff endpoint, and staff get `403` from the Requester endpoint. Any query parameter returns `400`. | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
 | API-14 | API | AC-22 | My Tickets and the Queue each filter by a list of statuses and return only those. A single status behaves as in Lab 3. An unknown or repeated member returns `400` naming `currentStatus`. My Tickets no longer answers "arrives in Lab 3" (issue #78). | `server/tests/lab-04/status-filter.api.test.ts` | Planned |
+| API-15 | API | AC-20 | My Tickets sorts by `updatedAt` in both directions, with ties broken by Ticket Number high to low. Tickets created in one order and updated in another prove it is not the Ticket date. Another Requester's newer update never appears. An unknown `sortBy` is still `400` naming `sortBy` (D-17). | `server/tests/lab-04/my-tickets-sort.api.test.ts` | Planned |
 | DB-01 | Migration | AC-23 | A schema built from the Lab 3 migrations is populated with users of each role, Tickets in every status, attachments (one removed), comments and notes. The Lab 4 migration is applied: every row and id is unchanged, and `prisma migrate diff` against `schema.prisma` is empty. The rollback script is run: the schema equals the Lab 3 schema, and every row is still unchanged. | `server/tests/lab-04/migration.test.ts` | Planned |
 | DB-02 | Seed | AC-24 | After two seed runs: Tickets with zero, one and several Actions exist; every Action status and an unassigned open Action exist; Status Events exist inside the window; and Ananya Wong and Kanya Srisuk have nothing to count. There are no duplicates. An Action edited between the runs is not reverted. | `server/tests/lab-04/seed.test.ts` | Planned |
 | REG-01 | Regression | AC-25 | The Lab 1, Lab 2 and Lab 3 server suites pass against the Lab 4 codebase. Any test changed because of a Lab 4 rule is listed in §7 with its reason, and no assertion is weakened. | `server/tests/lab-01/`, `server/tests/lab-02/`, `server/tests/lab-03/` | Planned |
@@ -87,8 +88,9 @@ behaviour, and each such change is listed in §7 with its reason:
 | UI-04 | UI | AC-16 | The History disclosure lists events oldest first, with both statuses in words, and shows the "Earlier changes…" line only when `recordedFromCreation` is false. | `client/tests/lab-04/TicketWorkflow.test.tsx` | Planned |
 | UI-05 | UI | AC-18, AC-19, AC-20, AC-21 | Staff dashboard: four cards, all eight status rows and all four priority rows including zeros. Each link's href is built from its `query`. The My open actions rows open their Ticket, with an Overdue marker. The Administrator's User accounts panel is shown only to them. The loading, empty, forbidden and failure states are distinct, and no stale number stays beside a failure. | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
 | UI-06 | UI | AC-02, AC-19, AC-20 | Requester dashboard: four cards and three panels, with links into My Tickets. A Requester with no Tickets sees the empty message and Create Ticket. No request is ever made to `/api/dashboard/staff` or any `/api/staff` path. | `client/tests/lab-04/RequesterDashboard.test.tsx` | Planned |
-| UI-07 | UI | AC-20, AC-22 | My Tickets, the Queue and User Management read `currentStatus`, `owner`, `itPriority`, `requesterIndicated` and `role` from the URL and request exactly those filters. The Active tickets option maps to the five statuses. A later filter change replaces the URL. An invalid URL filter shows the server's refusal with Clear filters. The Lab 3 "Back to queue" restore still wins over the URL. | `client/tests/lab-04/DrillDownFilters.test.tsx` | Planned |
+| UI-07 | UI | AC-20, AC-22 | My Tickets, the Queue and User Management read `currentStatus`, `owner`, `itPriority`, `requesterIndicated` and `role` from the URL and request exactly those filters. The Active tickets option maps to the five statuses. A later filter change replaces the URL. An invalid URL filter shows the server's refusal with Clear filters. My Tickets and the Queue also take a link's `sortBy` and `sortOrder` when the Sort control offers that pair, and otherwise keep the default. The URL follows the sort and drops both parameters at the default (D-17). The Lab 3 "Back to queue" restore still wins over the URL. | `client/tests/lab-04/DrillDownFilters.test.tsx` | Planned |
 | UI-08 | UI | AC-27 | Create Ticket, the comment and note composers, the Action form and the user panel each keep every entered value after a `500` and after a network failure, and clear only on success or an explicit Cancel. | `client/tests/lab-04/FormPreservation.test.tsx` | Planned |
+| UI-09 | UI | AC-27 | Requester Ticket Detail after a `409` (issue #89): a comment, upload, removal or indication refused because the Ticket changed elsewhere keeps the refusal where it happened, and the Ticket is re-read in place. While the re-read is on its way, the old Ticket stays with no "Loading". Afterwards the badge and the controls match the server. Only the latest re-read lands, and a write that succeeds after a re-read started supersedes it. A re-read that fails says so, with an in-place Retry, keeping the refusal and the draft (Earth2509, PR #105). Any other failure re-reads nothing and keeps what was typed. | `client/tests/lab-04/RequesterConflict.test.tsx` | Planned |
 | STYLE-01 | UI style | AC-28 | `MetricCard` has a label, value and focus ring. `ActionStatusBadge` carries its word and tone class. The active navigation item has `aria-current="page"` and the underline class, not colour alone. The Follow-up note field has `aria-controls` wiring. | `client/tests/lab-04/ZenGreen.lab4.styles.test.tsx` | Planned |
 | E2E-01 | E2E | AC-01, AC-04, AC-05, AC-09 | In a browser: IT Staff record a completed Action and plan an open one assigned to a colleague; the colleague signs in, sees it under My open actions, and completes it; an inactive user is not offered as an assignee, and a forged request with one is refused; the Requester sees both Actions read-only. | `e2e/lab-04/actions-taken-flow.spec.ts` | Planned |
 | E2E-02 | E2E | AC-11, AC-12, AC-15, AC-16 | Resolved shows as disabled with its reasons while an Action is open; completing it enables Resolved; resolving succeeds; the History shows each change. A second Ticket, cancelled with an open Action, shows that Action cancelled. | `e2e/lab-04/ticket-resolution.spec.ts` | Planned |
@@ -126,14 +128,14 @@ specification in the same run, so the two cannot disagree.
 | AC-17 The Requester indication stays advisory | WF-06 |
 | AC-18 Staff metrics equal independent counts | API-11, UI-05, E2E-03 |
 | AC-19 Zero metrics and empty states | API-10, API-11, UI-05, UI-06 |
-| AC-20 Every drill-down lands on exactly what was counted | UNIT-04, API-12, UI-05, UI-06, UI-07, E2E-03 |
+| AC-20 Every drill-down lands on exactly what was counted | UNIT-04, API-12, API-15, UI-05, UI-06, UI-07, E2E-03 |
 | AC-21 Dashboard roles and the Administrator's user counts | AUTH-01, API-13, UI-05, E2E-03 |
 | AC-22 Multi-status list filters | UNIT-03, API-14, UI-07 |
 | AC-23 Migration and rollback preserve Lab 3 data | DB-01 |
 | AC-24 Idempotent Lab 4 seed | DB-02 |
 | AC-25 Labs 1-3 regression | REG-01, E2E-04 |
 | AC-26 No duplicate records from double-clicks or retries | API-06, UI-02, E2E-05 |
-| AC-27 Forms keep input after recoverable failures | UI-02, UI-08, E2E-05 |
+| AC-27 Forms keep input after recoverable failures | UI-02, UI-08, UI-09, E2E-05 |
 | AC-28 Zen Green, three viewports, no console errors | STYLE-01, RESP-01 |
 | AC-29 Dashboard performance smoke | PERF-01 |
 
@@ -310,3 +312,15 @@ transcribed.
   schema of its own (`lab4_perf_test`), migrated and loaded with the demo seed, and points the
   application at it (issue #84). It fails if that seed did not load, rather than timing an
   empty database, which its first draft did.
+- **The one console error left is the browser's 401 before sign-in** (issue #89). A probe
+  signed in as each role, opened every screen and followed every in-app link and anchor: 54
+  page loads, including both Ticket Detail screens on a Ticket with a status history, a
+  completed Action and an open one. It recorded every console error and warning, page error,
+  failed request, unexpected HTTP status and redirected link. Only two kinds of message
+  appeared. React Router logged two v7 future-flag warnings on every page load; the client now
+  opts in to both flags, and they are gone. Chromium also logs "Failed to load resource: 401"
+  when the Login screen asks `GET /api/auth/me` and nobody is signed in. That 401 is the Lab 3
+  contract's answer (Lab 3 api-spec §2), the browser logs it rather than the application, and
+  it occurs before sign-in, on no Lab 4 screen, so AC-28 holds. Removing it would mean changing
+  a Lab 3 contract for a log line. The probe was a one-off and is not committed; the Lab 4
+  browser suite (issue #90) makes the console check permanent.

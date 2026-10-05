@@ -8,7 +8,9 @@
 
 import { parseStatusList, type TicketStatusName } from "./status-filter.js";
 
-export const SORT_FIELDS = ["ticketDate", "ticketNumber", "requestedPriority"] as const;
+// `updatedAt` is Lab 4 D-17: the Requester dashboard's Recently updated panel
+// links here in its own order.
+export const SORT_FIELDS = ["ticketDate", "updatedAt", "ticketNumber", "requestedPriority"] as const;
 export const SORT_ORDERS = ["asc", "desc"] as const;
 export const PAGE_SIZES = [10, 25, 50] as const;
 export const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;

@@ -116,7 +116,7 @@ describe("UI-06 the three panels", () => {
 
     const updated = screen.getByRole("region", { name: "Recently updated" });
     expect(within(updated).getByText("Showing 2 of 9")).toBeInTheDocument();
-    expect(within(updated).getByRole("link", { name: "View all" })).toHaveAttribute("href", "/tickets");
+    expect(within(updated).getByRole("link", { name: "View all" })).toHaveAttribute("href", "/tickets?sortBy=updatedAt&sortOrder=desc");
 
     const resolved = screen.getByRole("region", { name: "Recently resolved" });
     expect(within(resolved).getByRole("link", { name: /TKT-2026-00031/ })).toHaveAttribute("href", "/tickets/31");
@@ -128,6 +128,18 @@ describe("UI-06 the three panels", () => {
     await renderDashboard();
     expect(await screen.findByText("Nothing needs your attention.")).toBeInTheDocument();
     expect(screen.getByText("No ticket was resolved in the last 7 days.")).toBeInTheDocument();
+  });
+});
+
+describe("UI-06 Recently updated's View all keeps the panel's order (D-17, follow-up to the #102 review)", () => {
+  it("opens My Tickets asking for the most recently updated first, with the Sort control showing it", async () => {
+    const { calls } = mockApi([ok()]);
+    await renderDashboard();
+    const updated = await screen.findByRole("region", { name: "Recently updated" });
+    await userEvent.click(within(updated).getByRole("link", { name: "View all" }));
+    await screen.findByRole("heading", { name: "My Tickets" });
+    await waitFor(() => expect(calls.some((c) => c.startsWith("/api/tickets?") && c.includes("sortBy=updatedAt") && c.includes("sortOrder=desc"))).toBe(true));
+    expect(screen.getByLabelText("Sort")).toHaveValue("updatedAt:desc");
   });
 });
 

@@ -305,9 +305,11 @@ function orderBy(query: TicketListQuery): Prisma.TicketOrderByWithRelationInput[
   const primary =
     query.sortBy === "ticketDate"
       ? { createdAt: direction }
-      : query.sortBy === "ticketNumber"
-        ? { ticketNumber: direction }
-        : { requestedPriority: direction };
+      : query.sortBy === "updatedAt"
+        ? { updatedAt: direction }
+        : query.sortBy === "ticketNumber"
+          ? { ticketNumber: direction }
+          : { requestedPriority: direction };
 
   // Ticket Number descending is always the tie-breaker, so paging is stable:
   // without it, two tickets sharing a timestamp can swap between pages and one

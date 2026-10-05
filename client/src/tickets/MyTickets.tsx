@@ -30,6 +30,8 @@ import { ACTIVE_STATUS_LIST } from "../dashboard/dashboard-links.js";
 type SortChoice =
   | "ticketDate:desc"
   | "ticketDate:asc"
+  | "updatedAt:desc"
+  | "updatedAt:asc"
   | "ticketNumber:desc"
   | "ticketNumber:asc"
   | "requestedPriority:desc"
@@ -53,6 +55,17 @@ const DEFAULTS: Filters = {
   currentStatus: "",
   sort: "ticketDate:desc",
 };
+
+/** Every value the Sort control offers, so a link's sort can be checked against them. */
+const SORT_CHOICES: readonly SortChoice[] = [
+  "ticketDate:desc", "ticketDate:asc", "updatedAt:desc", "updatedAt:asc", "ticketNumber:desc", "ticketNumber:asc", "requestedPriority:desc", "requestedPriority:asc",
+];
+
+/** A link's sort when it is one the Sort control offers; anything else leaves the default. */
+function sortFromUrl(params: URLSearchParams): SortChoice {
+  const choice = `${params.get("sortBy")}:${params.get("sortOrder")}`;
+  return (SORT_CHOICES as readonly string[]).includes(choice) ? (choice as SortChoice) : DEFAULTS.sort;
+}
 
 const PAGE_SIZE = 10;
 
@@ -79,6 +92,10 @@ export default function MyTickets() {
   const [linkStatus] = useState(() => new URLSearchParams(location.search).get("currentStatus"));
   const [filters, setFilters] = useState<Filters>(() => ({
     ...DEFAULTS,
+    // Recently updated's View all carries its order (sortBy and sortOrder). It is
+    // ignored rather than refused when the control cannot show it: an order
+    // cannot make a list wrong, a filter can.
+    sort: sortFromUrl(new URLSearchParams(location.search)),
     currentStatus:
       linkStatus === ACTIVE_STATUS_LIST
         ? "ACTIVE"
@@ -121,7 +138,7 @@ export default function MyTickets() {
   }, [filters.search]);
 
   const [sortBy, sortOrder] = filters.sort.split(":") as [
-    "ticketDate" | "ticketNumber" | "requestedPriority",
+    "ticketDate" | "updatedAt" | "ticketNumber" | "requestedPriority",
     "asc" | "desc",
   ];
 
@@ -185,15 +202,22 @@ export default function MyTickets() {
     setPage(1);
   }
 
-  // The URL follows the status filter, replacing rather than pushing, so Back
-  // returns to the dashboard rather than stepping through every change.
+  // The URL follows the status filter and the sort, replacing rather than
+  // pushing, so Back returns to the dashboard rather than stepping through every
+  // change. The default sort is left out, so a plain list keeps a plain URL.
   useEffect(() => {
     const sent = statusAsWritten ?? (filters.currentStatus === "ACTIVE" ? ACTIVE_STATUS_LIST : filters.currentStatus);
-    const search = sent || statusAsWritten === "" ? `?${new URLSearchParams({ currentStatus: sent }).toString()}` : "";
+    const params = new URLSearchParams();
+    if (sent || statusAsWritten === "") params.set("currentStatus", sent);
+    if (filters.sort !== DEFAULTS.sort) {
+      params.set("sortBy", sortBy);
+      params.set("sortOrder", sortOrder);
+    }
+    const search = params.toString() ? `?${params.toString()}` : "";
     if (search !== location.search) navigate({ pathname: location.pathname, search }, { replace: true, state: location.state });
-    // Only the filter drives this; reading the location is how it avoids a loop.
+    // Only the filters drive this; reading the location is how it avoids a loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.currentStatus, statusAsWritten]);
+  }, [filters.currentStatus, filters.sort, statusAsWritten]);
 
   // Every control the button resets counts towards whether it is enabled. If
   // `sort` is cleared by it, changing only `sort` has to enable it — otherwise
@@ -315,6 +339,8 @@ export default function MyTickets() {
             <select {...control} value={filters.sort} onChange={(event) => update({ sort: event.target.value as SortChoice })}>
               <option value="ticketDate:desc">Newest first</option>
               <option value="ticketDate:asc">Oldest first</option>
+              <option value="updatedAt:desc">Recently updated</option>
+              <option value="updatedAt:asc">Least recently updated</option>
               <option value="ticketNumber:desc">Ticket Number, high to low</option>
               <option value="ticketNumber:asc">Ticket Number, low to high</option>
               <option value="requestedPriority:desc">Priority, urgent first</option>

@@ -142,6 +142,14 @@ describe("UI-07 the Ticket Queue reads a link's sort (follow-up to the #101 revi
     await waitFor(() => expect(location.search).toBe("?sortBy=itPriority&sortOrder=desc"));
   });
 
+  it("drops both parameters when the sort returns to the default (follow-up to the #104 review)", async () => {
+    mockApi(STAFF);
+    renderAt(["/queue?sortBy=updatedAt&sortOrder=desc"]);
+    await screen.findByRole("heading", { name: "Ticket Queue" });
+    await userEvent.selectOptions(screen.getByLabelText("Sort"), "ticketDate:desc");
+    await waitFor(() => expect(location.search).toBe(""));
+  });
+
   it("ignores a sort the control does not offer, keeping the default order", async () => {
     const { queueCalls } = mockApi(STAFF);
     renderAt(["/queue?sortBy=summary&sortOrder=sideways"]);
@@ -169,6 +177,45 @@ describe("UI-07 User Management reads the role from the URL", () => {
     await userEvent.click(screen.getByRole("button", { name: "Clear filters" }));
     await waitFor(() => expect(userCalls.at(-1)!.has("role")).toBe(false));
     expect(location.search).toBe("");
+  });
+});
+
+describe("UI-07 My Tickets reads a link's sort (D-17, follow-up to the #102 review)", () => {
+  it("takes a sort the control offers, and the URL follows later sort changes", async () => {
+    const { ticketCalls } = mockApi(REQUESTER);
+    renderAt(["/tickets?sortBy=updatedAt&sortOrder=desc"]);
+    await screen.findByRole("heading", { name: "My Tickets" });
+    await waitFor(() => expect(ticketCalls.length).toBeGreaterThan(0));
+    expect([ticketCalls[0].get("sortBy"), ticketCalls[0].get("sortOrder")]).toEqual(["updatedAt", "desc"]);
+    expect(screen.getByLabelText("Sort")).toHaveValue("updatedAt:desc");
+    await userEvent.selectOptions(screen.getByLabelText("Sort"), "requestedPriority:asc");
+    await waitFor(() => expect(location.search).toBe("?sortBy=requestedPriority&sortOrder=asc"));
+    await waitFor(() => expect([ticketCalls.at(-1)!.get("sortBy"), ticketCalls.at(-1)!.get("sortOrder")]).toEqual(["requestedPriority", "asc"]));
+  });
+
+  it("drops both parameters when the sort returns to the default", async () => {
+    mockApi(REQUESTER);
+    renderAt(["/tickets?sortBy=updatedAt&sortOrder=desc"]);
+    await screen.findByRole("heading", { name: "My Tickets" });
+    await userEvent.selectOptions(screen.getByLabelText("Sort"), "ticketDate:desc");
+    await waitFor(() => expect(location.search).toBe(""));
+  });
+
+  it("keeps the status beside the sort in the URL", async () => {
+    mockApi(REQUESTER);
+    renderAt(["/tickets?currentStatus=RESOLVED&sortBy=updatedAt&sortOrder=desc"]);
+    await screen.findByRole("heading", { name: "My Tickets" });
+    await userEvent.selectOptions(screen.getByLabelText("Current Status"), "CLOSED");
+    await waitFor(() => expect(location.search).toBe("?currentStatus=CLOSED&sortBy=updatedAt&sortOrder=desc"));
+  });
+
+  it("ignores a sort the control does not offer (a queue-only sort here), keeping the default order", async () => {
+    const { ticketCalls } = mockApi(REQUESTER);
+    renderAt(["/tickets?sortBy=itPriority&sortOrder=desc"]);
+    await screen.findByRole("heading", { name: "My Tickets" });
+    await waitFor(() => expect(ticketCalls.length).toBeGreaterThan(0));
+    expect([ticketCalls[0].get("sortBy"), ticketCalls[0].get("sortOrder")]).toEqual(["ticketDate", "desc"]);
+    expect(screen.getByLabelText("Sort")).toHaveValue("ticketDate:desc");
   });
 });
 
