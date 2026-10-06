@@ -299,22 +299,74 @@ Completed against the running application at all three viewports, never from mem
 marks an item a test asserts; **E** marks one checked by eye, naming the capture that shows
 it. Each box is ticked only with that evidence named beside it.
 
-- [ ] **E** Zen Green tokens are consistent across both dashboards, the Actions section and
-      the Lab 2 and Lab 3 screens
-- [ ] **A** Metric cards carry a label, a value and a sentence-form accessible name, and each
-      links to a list whose total equals the card
-- [ ] **A** Action Status, Ticket status and priority badges carry text
-- [ ] **A** Editable Action fields are visibly distinct from read-only ones; a final Action
-      offers no edit control
-- [ ] **A** Validation messages sit beneath their own field, including the conditional
-      Follow-up note
-- [ ] **A** Focus is visible; dialogs trap and restore it; drill-down links are
-      keyboard-reachable in reading order
-- [ ] **A** Nothing clipped, nothing overlapping, and no page-level horizontal scroll at any
-      viewport (RESP-01)
-- [ ] **E** Loading, empty, forbidden, conflict and failure states captured from real
-      responses for both dashboards and the Actions section
-- [ ] **A** No console error during the full E2E run
+- [x] **E** Zen Green tokens are consistent across both dashboards, the Actions section and
+      the Lab 2 and Lab 3 screens. Checked by eye in `staff-dashboard/administrator-desktop.png`,
+      `requester-dashboard/populated-{desktop,mobile}.png`, `actions-taken/staff-form-mobile.png`
+      and `states/{dashboard-loading,action-conflict}.png`; the badge tones are Lab 3's, which
+      Lab 3 STYLE-01 asserts against its §1 tables. This inspection found three defects, each
+      fixed and now asserted by every capture (tests.md §7).
+- [x] **A** Metric cards carry a label, a value and a sentence-form accessible name, and each
+      links to a list whose total equals the card. STYLE-01 (`MetricCard`); E2E-03 clicks every
+      card and breakdown row for all three roles and compares the list's total.
+- [x] **A** Action Status, Ticket status and priority badges carry text. STYLE-01
+      (`ActionStatusBadge`) and Lab 3 STYLE-01 (status, priority, role); every RESP-01 capture
+      also fails if a badge breaks across lines.
+- [x] **A** Editable Action fields are visibly distinct from read-only ones; a final Action
+      offers no edit control. UI-01 ("Final — record a new action to correct it.", no Edit),
+      Lab 3 STYLE-01 (read-only information against the editable Work panel), and E2E-01 (the
+      Requester is offered no Action control at all).
+- [x] **A** Validation messages sit beneath their own field, including the conditional
+      Follow-up note. UI-01 (each message beneath its field, focus to the first; the Follow-up
+      note required once ticked); STYLE-01 (`aria-controls`); `states/action-validation.png`.
+- [x] **A** Focus is visible; dialogs trap and restore it; drill-down links are
+      keyboard-reachable in reading order. RESP-01 measures the computed outline on a focused
+      card and walks Tab through cards, breakdowns and panels at all three widths; the dialog
+      trap and restore is Lab 3's `StaffTicketDetail.test.tsx`, unchanged for Lab 4's dialogs,
+      which use the same `ConfirmDialog`.
+- [x] **A** Nothing clipped, nothing overlapping, and no page-level horizontal scroll at any
+      viewport (RESP-01). Before every capture, `expectUsable` in `e2e/lab-04/support.ts`
+      asserts the following:
+      - no page-level horizontal scroll, and no clipped label;
+      - for every visible, enabled link, button, input, select and textarea, and for the
+        clickable label of each checkbox and radio: a 44 px target on mobile; no overlap with
+        another target; and nothing else at its centre;
+      - whole badges, unstretched checkboxes and unsplit mobile cells.
+
+      The Requester Dashboard's panels are also asserted to sit below its cards. These checks
+      have negative controls of their own (`checks.selftest.spec.ts`): an undersized card, an
+      undersized Action select, two overlapping cards and a covered card each fail by name.
+      Earth2509's review of PR #106 found the first version measured buttons only and had no
+      overlap check.
+- [x] **E** Loading, empty, forbidden, conflict and failure states captured for both
+      dashboards and the Actions section, each mapped to its capture (all under
+      `states/` unless named):
+
+      | Screen | Loading | Empty | Failure | Other |
+      |---|---|---|---|---|
+      | Staff Dashboard | `dashboard-loading` | `staff-dashboard-own-work-empty` | `dashboard-failure` | — |
+      | Requester Dashboard | `requester-dashboard-loading` | `requester-dashboard/empty-*` | `requester-dashboard-failure` | — |
+      | Actions section | `actions-loading` | `actions-empty` | `actions-failure` | `action-validation`, `action-conflict` |
+      | Requester on `/queue` | — | — | — | `forbidden` |
+
+      - **Real:** each loading state is the real request, held at the network edge. Each empty
+        state is a real account or Ticket with nothing to show. Forbidden is the real
+        refusal, and the conflict is a real `409` after the Action changed elsewhere.
+      - **Controlled:** each failure is a `503` fulfilled at the network edge in the server's
+        own error shape, because a real one needs the database stopped mid-run. Retry then
+        recovers against the real API.
+
+      The Staff Dashboard's empty capture is IT Staff who own nothing (Kanya Srisuk): their
+      own cards and panels are empty, while the queue-wide counts are not, since the demo
+      seed is loaded.
+- [x] **A** No console error during the full Lab 4 E2E run. `e2e/lab-04/support.ts` fails any
+      test on any of these the test did not declare beforehand (tests.md §7):
+      - a console error or warning;
+      - a page error;
+      - an HTTP failure;
+      - a request that failed with no HTTP response at all, such as a refused connection.
+
+      `checks.selftest.spec.ts` proves that an undeclared refused connection is caught, and
+      that a declared one, and a declared refusal, are not.
 
 ### Screenshot paths
 
@@ -324,7 +376,13 @@ artifacts/lab-04/screenshots/requester-dashboard/{populated,empty}-{desktop,tabl
 artifacts/lab-04/screenshots/actions-taken/{staff-list,staff-form,requester-list}-{desktop,tablet,mobile}.png
 artifacts/lab-04/screenshots/actions-taken/resolution-blocked-desktop.png
 artifacts/lab-04/screenshots/states/{dashboard-loading,dashboard-failure,action-conflict,action-validation}.png
+artifacts/lab-04/screenshots/states/{requester-dashboard-loading,requester-dashboard-failure,staff-dashboard-own-work-empty,forbidden}.png
+artifacts/lab-04/screenshots/states/{actions-loading,actions-empty,actions-failure}.png
 ```
+
+`dashboard-loading` and `dashboard-failure` are the Staff Dashboard's. The second and third
+lines were added after Earth2509's review of PR #106 found the state claims below broader
+than the captures.
 
 The three folders are the ones labsheet §12 names. Every capture is written by the E2E suite
 from the seeded database, never taken by hand.

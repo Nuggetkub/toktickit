@@ -208,6 +208,7 @@ npm --prefix server test   # Vitest + Supertest — unit, API, migration and per
 npm --prefix client test   # Vitest + Testing Library — UI component and UI style
 npm run e2e                # Playwright — the Lab 2 journeys
 npm run e2e:lab3           # Playwright — the Lab 3 journeys and the §13 evidence
+npm run e2e:lab4           # Playwright — the Lab 4 journeys, RESP-01 and the §9 screenshots
 ```
 
 The server suite needs the database from step 2, and it never touches the development data:
@@ -218,15 +219,18 @@ finish.
 Both browser suites start the API and the client themselves; nothing needs to be running
 first. They need `server/.env` (or an `E2E_DATABASE_URL`), and `npm run e2e:install` once to
 fetch the browser. They are separate configurations sharing one webServer definition —
-`playwright.config.ts` exports a factory and `playwright.lab3.config.ts` calls it — and they
-use **different schemas**, `lab2_e2e` and `lab3_e2e`, so neither can see the other's Tickets
-and neither touches development data. Each writes its evidence under its own `artifacts/`
-root. `npm run e2e:report` and `npm run e2e:report:lab3` open the HTML report of either run.
+`playwright.config.ts` exports a factory, and `playwright.lab3.config.ts` and
+`playwright.lab4.config.ts` call it — and they use **different schemas**, `lab2_e2e`,
+`lab3_e2e` and `lab4_e2e`, so none can see another's Tickets and none touches development
+data. The Lab 4 schema also gets the demo Tickets and Actions, so the dashboards have
+something to count. Each writes its evidence under its own `artifacts/` root, and
+`npm run e2e:report`, `e2e:report:lab3` and `e2e:report:lab4` open the HTML report of each run.
 
-**Both browser suites rewrite their committed screenshots** — `npm run e2e` those under
-`artifacts/lab-02/`, `npm run e2e:lab3` those under `artifacts/lab-03/` — so restore them with
-`git checkout -- artifacts/lab-02/screenshots artifacts/lab-03/screenshots` if you are changing
-something else.
+**Every browser suite rewrites its committed screenshots** — `npm run e2e` those under
+`artifacts/lab-02/`, `e2e:lab3` those under `artifacts/lab-03/`, `e2e:lab4` those under
+`artifacts/lab-04/` — so restore them with
+`git checkout -- artifacts/lab-02/screenshots artifacts/lab-03/screenshots artifacts/lab-04/screenshots`
+if you are changing something else.
 
 See [`docs/lab-04/tests.md`](docs/lab-04/tests.md) for the Lab 4 test plan,
 [`docs/lab-03/tests.md`](docs/lab-03/tests.md) for Lab 3,
@@ -337,14 +341,17 @@ server/
   tests/support/  shared session helper for the API suites
 e2e/lab-02/       Playwright journeys for the Lab 2 Requester flows
 e2e/lab-03/       Playwright journeys for Lab 3, plus the responsive and state evidence
+e2e/lab-04/       Playwright journeys for Lab 4, RESP-01 and its captures, and the console guard
 artifacts/lab-02/screenshots/   committed responsive evidence
 artifacts/lab-03/screenshots/   committed Lab 3 evidence (ui-spec.md §13)
+artifacts/lab-04/screenshots/   committed Lab 4 evidence (docs/lab-04/ui-spec.md §9)
 docs/lab-01/      tests.md, reviewer.md, ai_use.md
 docs/lab-02/      specification.md, api-spec.md, ui-spec.md, tests.md, reviewer.md, ai-use.md
 docs/lab-03/      specification.md, api-spec.md, ui-spec.md, tests.md, reviewer.md, ai-use.md
 docs/lab-04/      specification.md, api-spec.md, ui-spec.md, tests.md, reviewer.md, ai-use.md
 playwright.config.ts        the Lab 2 configuration, and the shared factory
 playwright.lab3.config.ts   the Lab 3 configuration, three lines calling it
+playwright.lab4.config.ts   the Lab 4 configuration, the same way
 ```
 
 ## Branching model
