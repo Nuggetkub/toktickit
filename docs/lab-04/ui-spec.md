@@ -324,19 +324,49 @@ it. Each box is ticked only with that evidence named beside it.
       trap and restore is Lab 3's `StaffTicketDetail.test.tsx`, unchanged for Lab 4's dialogs,
       which use the same `ConfirmDialog`.
 - [x] **A** Nothing clipped, nothing overlapping, and no page-level horizontal scroll at any
-      viewport (RESP-01). Every one of the 26 captures asserts it first, with 44 px targets on
-      mobile, and the Requester Dashboard's panels are asserted to sit below its cards.
+      viewport (RESP-01). Before every capture, `expectUsable` in `e2e/lab-04/support.ts`
+      asserts the following:
+      - no page-level horizontal scroll, and no clipped label;
+      - for every visible, enabled link, button, input, select and textarea, and for the
+        clickable label of each checkbox and radio: a 44 px target on mobile; no overlap with
+        another target; and nothing else at its centre;
+      - whole badges, unstretched checkboxes and unsplit mobile cells.
+
+      The Requester Dashboard's panels are also asserted to sit below its cards. These checks
+      have negative controls of their own (`checks.selftest.spec.ts`): an undersized card, an
+      undersized Action select, two overlapping cards and a covered card each fail by name.
+      Earth2509's review of PR #106 found the first version measured buttons only and had no
+      overlap check.
 - [x] **E** Loading, empty, forbidden, conflict and failure states captured for both
-      dashboards and the Actions section. Real: loading (the real request held at the network
-      edge), empty (`requester-dashboard/empty-*`, a Requester the seed gives no tickets), the
-      conflict (`states/action-conflict.png`, a real `409` after the Action changed elsewhere),
-      and validation. Forbidden is E2E-03's real `/queue` refusal for a Requester. The failure
-      (`states/dashboard-failure.png`) is a `503` fulfilled at the network edge in the server's
-      own error shape, because a real one needs the database stopped mid-run; Retry then
-      recovers against the real API.
+      dashboards and the Actions section, each mapped to its capture (all under
+      `states/` unless named):
+
+      | Screen | Loading | Empty | Failure | Other |
+      |---|---|---|---|---|
+      | Staff Dashboard | `dashboard-loading` | `staff-dashboard-own-work-empty` | `dashboard-failure` | — |
+      | Requester Dashboard | `requester-dashboard-loading` | `requester-dashboard/empty-*` | `requester-dashboard-failure` | — |
+      | Actions section | `actions-loading` | `actions-empty` | `actions-failure` | `action-validation`, `action-conflict` |
+      | Requester on `/queue` | — | — | — | `forbidden` |
+
+      - **Real:** each loading state is the real request, held at the network edge. Each empty
+        state is a real account or Ticket with nothing to show. Forbidden is the real
+        refusal, and the conflict is a real `409` after the Action changed elsewhere.
+      - **Controlled:** each failure is a `503` fulfilled at the network edge in the server's
+        own error shape, because a real one needs the database stopped mid-run. Retry then
+        recovers against the real API.
+
+      The Staff Dashboard's empty capture is IT Staff who own nothing (Kanya Srisuk): their
+      own cards and panels are empty, while the queue-wide counts are not, since the demo
+      seed is loaded.
 - [x] **A** No console error during the full Lab 4 E2E run. `e2e/lab-04/support.ts` fails any
-      test on a console error or warning, a page error, or an HTTP failure the test did not
-      declare beforehand (tests.md §7).
+      test on any of these the test did not declare beforehand (tests.md §7):
+      - a console error or warning;
+      - a page error;
+      - an HTTP failure;
+      - a request that failed with no HTTP response at all, such as a refused connection.
+
+      `checks.selftest.spec.ts` proves that an undeclared refused connection is caught, and
+      that a declared one, and a declared refusal, are not.
 
 ### Screenshot paths
 
@@ -346,7 +376,13 @@ artifacts/lab-04/screenshots/requester-dashboard/{populated,empty}-{desktop,tabl
 artifacts/lab-04/screenshots/actions-taken/{staff-list,staff-form,requester-list}-{desktop,tablet,mobile}.png
 artifacts/lab-04/screenshots/actions-taken/resolution-blocked-desktop.png
 artifacts/lab-04/screenshots/states/{dashboard-loading,dashboard-failure,action-conflict,action-validation}.png
+artifacts/lab-04/screenshots/states/{requester-dashboard-loading,requester-dashboard-failure,staff-dashboard-own-work-empty,forbidden}.png
+artifacts/lab-04/screenshots/states/{actions-loading,actions-empty,actions-failure}.png
 ```
+
+`dashboard-loading` and `dashboard-failure` are the Staff Dashboard's. The second and third
+lines were added after Earth2509's review of PR #106 found the state claims below broader
+than the captures.
 
 The three folders are the ones labsheet §12 names. Every capture is written by the E2E suite
 from the seeded database, never taken by hand.

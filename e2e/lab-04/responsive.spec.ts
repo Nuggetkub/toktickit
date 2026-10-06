@@ -2,6 +2,7 @@ import {
   ADMINISTRATOR,
   API_ORIGIN,
   EMPTY_REQUESTER,
+  IDLE_STAFF,
   REQUESTER,
   STAFF,
   actionRow,
@@ -195,6 +196,73 @@ test("RESP-01 states: loading, failure, Action validation and a real Action conf
   await expect(form.getByRole("alert")).toContainText("Someone else changed this action. Reload to see the latest version.");
   await expect(form.getByLabel(/^Description/)).toHaveValue(`${PLANNED} Bring a spare.`);
   await capture(page, "desktop", "states/action-conflict.png");
+});
+
+test("RESP-01 states on every screen: both dashboards, Forbidden, and the Actions section", async ({ page, expectHttp }) => {
+  // Earth2509's review of PR #106: the checklist claimed the states "for both
+  // dashboards and the Actions section", but only some were captured. These
+  // complete it. Loading holds the real request; each failure is a 503
+  // fulfilled at the network edge in the server's own error shape (a real one
+  // would need the database stopped mid-run), and Retry then recovers.
+  test.setTimeout(150_000);
+  await page.setViewportSize(VIEWPORTS[0]);
+  const fail503 = { status: 503, contentType: "application/json", body: JSON.stringify({ error: { code: "DEPENDENCY_UNAVAILABLE", message: "The service is unavailable. Please try again." } }) };
+
+  // Requester Dashboard: loading and failure, then Forbidden on the queue.
+  await signIn(page, REQUESTER);
+  let release!: () => void;
+  let held = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/api/dashboard/requester", async (route) => { await held; await route.continue(); });
+  await openMyTickets(page);
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Dashboard" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Loading dashboard…" })).toBeVisible();
+  await capture(page, "desktop", "states/requester-dashboard-loading.png");
+  release();
+  await expect(page.getByText("Loading dashboard…")).toHaveCount(0);
+  await page.unroute("**/api/dashboard/requester");
+  expectHttp("GET", /^\/api\/dashboard\/requester$/, 503);
+  await page.route("**/api/dashboard/requester", (route) => route.fulfill(fail503));
+  await page.getByRole("button", { name: "Refresh" }).click();
+  const failure = page.getByRole("alert").filter({ hasText: "The dashboard could not be loaded. Please try again." });
+  await expect(failure).toBeVisible();
+  await capture(page, "desktop", "states/requester-dashboard-failure.png");
+  await page.unroute("**/api/dashboard/requester");
+  await failure.getByRole("button", { name: "Retry" }).click();
+  await expect(page.getByRole("link", { name: /^My active tickets: \d+/ })).toBeVisible();
+  await page.goto("/queue");
+  await expect(page.getByRole("heading", { name: "You do not have access to this page" })).toBeVisible();
+  await capture(page, "desktop", "states/forbidden.png");
+  const ticketNumber = await createTicket(page, { summary: uniqueSummary("No work recorded yet") });
+  await signOut(page);
+
+  // Staff Dashboard with no work of one's own.
+  await signIn(page, IDLE_STAFF);
+  await expect(page.getByRole("link", { name: "My active tickets: 0 tickets" })).toBeVisible();
+  await expect(page.getByText("You have no open actions.")).toBeVisible();
+  await capture(page, "desktop", "states/staff-dashboard-own-work-empty.png");
+
+  // The Actions section: empty, loading, failure.
+  await openInQueue(page, ticketNumber);
+  await expect(actionsCard(page).getByText("No actions have been recorded yet.")).toBeVisible();
+  await capture(page, "desktop", "states/actions-empty.png");
+  const actionsPath = /\/api\/tickets\/\d+\/actions$/;
+  held = new Promise<void>((resolve) => { release = resolve; });
+  await page.route(actionsPath, async (route) => { if (route.request().method() !== "GET") return route.fallback(); await held; await route.continue(); });
+  await page.reload();
+  await expect(actionsCard(page).getByRole("status").filter({ hasText: "Loading actions…" })).toBeVisible();
+  await capture(page, "desktop", "states/actions-loading.png");
+  release();
+  await expect(actionsCard(page).getByText("No actions have been recorded yet.")).toBeVisible();
+  await page.unroute(actionsPath);
+  expectHttp("GET", /^\/api\/tickets\/\d+\/actions$/, 503);
+  await page.route(actionsPath, (route) => (route.request().method() === "GET" ? route.fulfill(fail503) : route.fallback()));
+  await page.reload();
+  const actionsFailure = actionsCard(page).getByRole("alert").filter({ hasText: "The actions could not be loaded." });
+  await expect(actionsFailure).toBeVisible();
+  await capture(page, "desktop", "states/actions-failure.png");
+  await page.unroute(actionsPath);
+  await actionsFailure.getByRole("button", { name: /Retry|Try again/ }).click();
+  await expect(actionsCard(page).getByText("No actions have been recorded yet.")).toBeVisible();
 });
 
 test("RESP-01 focus is visible, and Tab follows the reading order at every width (ui-spec §7)", async ({ page }) => {

@@ -1,6 +1,6 @@
 # Lab 4 Test Plan and Results
 
-**Status:** Planned — no Lab 4 test has run yet
+**Status:** Planned — verified results on `main` are still pending (§6). Feature-branch runs are recorded in each pull request and in §7, and they move no row.
 **Companion document:** [`specification.md`](./specification.md)
 **Status convention:** a row reads `Planned` until that test has actually run and passed on
 `main`. Nothing is marked `Passed` from a feature branch. At the release, every named file is
@@ -374,3 +374,26 @@ transcribed.
   "Completed" whole. Removing the whole rule, the true regression, turns RESP-01 red. Lab 4
   STYLE-01 has its own six breaks, all red with a green control. E2E-04 is the Lab 2 and Lab 3
   suites, break-proved in their own labs and green here.
+- **The guard and the capture checks were widened after Earth2509's review of PR #106**, which
+  showed both claimed more than they tested. He found two gaps:
+  1. The guard ignored every "Failed to load resource" line and checked only HTTP responses,
+     so a refused connection, which has no response, passed.
+  2. The 44 px rule measured buttons only, and nothing checked overlap.
+
+  Now:
+  - The guard also fails on `requestfailed` unless the test declared that failure with
+    `expectRequestFailure`. One case is exempt, and only that case: a request that had
+    already received its response. Chromium reports every Log out as `net::ERR_ABORTED` a
+    millisecond after its `204`, when it cancels reading the empty body (a probe timed it).
+    That response is judged by the status check, and the server did end the session.
+  - `expectUsable` measures every visible, enabled interactive target, with the clickable
+    label for a checkbox or radio. On mobile it requires 44 px both ways. Every target is
+    also checked pairwise for overlap and hit-tested at its centre.
+  - `e2e/lab-04/checks.selftest.spec.ts` plants each defect on a real screen and requires the
+    check to name it: an undeclared refused connection; a declared one and a declared
+    refusal (both must pass); a 20 px dashboard card; a 20 px Action select; two overlapping
+    cards; and a card under an overlay.
+  - The self-tests pass on the real screens and fail by name on each planted defect. Removing
+    the `requestfailed` handler, measuring buttons only, or dropping the overlap or the
+    obstruction check each turns them red.
+  - Seven state captures were added, so each state claim in ui-spec §9 maps to a file.
