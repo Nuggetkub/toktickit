@@ -35,9 +35,12 @@ Prompts are quoted as they were actually sent.
 ### Deliberate constraints I placed on the agent
 
 - **Draft, then let me check, then post.** Nothing is published to my partner's repository
-  until I have read it. This was broken once, for the first Earth2509 PR #61 review (prompt
-  3), and restored for every later review. I lifted it twice, each time explicitly and for a
-  bounded window: one evening (prompt 7), and the scheduled checks of prompt 11.
+  until I have read it. It was broken twice. The first time was the first Earth2509 PR #61
+  review (prompt 3). The second was five posts made without a draft after the window I had set
+  in prompt 11 had ended; they are listed there with their times. I lifted the rule twice on
+  purpose, each time explicitly and for a bounded window: one evening (prompt 7), and the 8am
+  to 3pm checks (prompt 11). Since that second lapse, every exception is checked against its
+  stated end rather than assumed to stand.
 - **Our pull requests open as drafts.** They become ready for review only once I have read
   them.
 - **Push only to a pull request that is still open and unapproved.** The agent once pushed a
@@ -54,4 +57,74 @@ Prompts are quoted as they were actually sent.
 
 ## My Reflection
 
-To be written at the release (issue #91), once the implementation has tested this contract.
+*Drafted with the agent from the sprint record, then read and approved by me.*
+
+Lab 3 taught me to prefer evidence that can fail. Lab 4 taught me how easily that evidence
+claims more than it proves, and that this happened to the evidence I wrote, not only to my
+partner's.
+
+**Our own checks overclaimed, and my partner was the one who showed it.** For the Lab 4 browser
+suite I wrote two safeguards: a guard that fails a test on any console error, and checks that
+every screen has 44 px touch targets and nothing overlapping. The checklist said both were
+covered. Earth2509 showed that neither was. A refused connection never reaches the response
+handler, so it passed the guard silently. The size check only measured buttons, and nothing
+checked overlap at all. He proved it with probes: a 20 px link and two overlapping buttons both
+passed. The fix wasn't just a wider check. The suite now contains negative controls: a
+self-test plants each defect on a real screen and requires the check to reject it by name. A
+check whose failure has never been seen is a claim, not a test. The same lesson came up at
+smaller scale too. One of my own break proofs stayed green, and it was the break that was weak,
+not the test.
+
+**The test was at the wrong level more often than it was missing.** My review of Earth2509's
+#71 found keyboard focus lost after every successful save, even though his unit test passed.
+The test rendered the Actions section on its own, while the real screen swapped the whole page
+for a loading message and unmounted it. Our own #100 had the same shape: instant mock responses
+hid a screen that went blank and came back, and only holding the response open made the test
+honest. When a test passes and the screen is still wrong, I now ask what the test isn't
+rendering.
+
+**Looking at the screenshots found what no assertion did.** The suite wrote 26 captures and
+every assertion passed. Reading them by eye found four defects:
+
+- a "Completed" badge broken into "Com / plete / d";
+- a checkbox stretched across its whole row;
+- a Result squeezed into a one-word strip on mobile;
+- the Requester Dashboard pushed off the screen on a phone.
+
+The last one was a regression from my own #104: a fix for the Staff Dashboard used a shared
+class and broke the other dashboard. Each defect is now asserted on every capture. But they
+were found because someone looked, and I don't want to pretend the assertions came first.
+
+**Peer review kept catching real defects in both directions.** Some of his findings on our
+code:
+
+- our resolution check compared timestamps from two clocks about 144 ms apart, so a legitimate
+  resolution could be refused;
+- a conflict reload reverted other people's edits;
+- a failed refresh was swallowed;
+- an older re-read could undo a newer save.
+
+Each was checked against the code before I accepted it, then fixed with a test that failed
+first. In the other direction, my reviews found his release command failing when pasted, and
+the lost focus above. The habit I'd keep from both: reproduce the claim yourself, then run the
+negative control the author didn't.
+
+**Working with the agent, my job was to set limits and check that they held.** It's fast, and
+it does what it's told rather than what I meant. I gave it a bounded permission to post without
+drafts, "from 8am until 3pm". It treated that as standing, and five reviews and replies went
+out after the window before anyone noticed. It came to light because my partner asked for an
+accurate record. The record now says what happened, not what was intended. I'll state an end to
+any exception and expect it to be checked, not assumed. One of my requests, an hourly scheduled
+job that would post on its own, was refused by Claude Code's safety check. That was a reasonable
+refusal for something meant to act with no one watching.
+
+**What I would do differently.** The running records rotted again despite the Lab 3 lesson.
+`ai-use.md` stopped at the contract stage, and its table split on blank lines, exactly as in
+Lab 3. A script audit at the release caught it; checking these files on every PR would have
+caught it earlier. I would also build the browser suite before the screens, not after. The four
+layout defects it found had been in the code since #85 and #104, and each was cheaper to fix the
+week it was written.
+
+What I keep from Lab 4 is that verification has to be verified too. A green suite, a ticked
+checklist and a passing review can all be true while proving less than they say. The question I
+now ask of each is: what would it take to make this fail, and has anyone seen it fail?
