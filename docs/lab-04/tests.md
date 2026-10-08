@@ -397,3 +397,19 @@ transcribed.
     the `requestfailed` handler, measuring buttons only, or dropping the overlap or the
     obstruction check each turns them red.
   - Seven state captures were added, so each state claim in ui-spec §9 maps to a file.
+- **UI-08's file was missing from the release candidate, and a review found it, not the suite**
+  (issue #91). UI-08 named `client/tests/lab-04/FormPreservation.test.tsx`, and no such file
+  existed. Every suite was green, because a green total says nothing about a file that was
+  never written. That is the Lab 3 STYLE-01 and API-14 failure again, and Earth2509 caught it
+  reviewing the release, #108. A script then checked all 51 file paths `tests.md` names against
+  the release candidate, and UI-08's was the only one missing. The file now exists. It covers
+  Create Ticket, the Requester's comment composer, the internal-note composer, the Action form
+  and the user panel. Each is tested once under a `500` and once under a dropped connection,
+  and must keep every entered value, show the error, clear its busy state, succeed on retry,
+  and clear only on success. The Action form and the user panel also clear on an explicit
+  Cancel. Seven breaks each turn both of their tests red, with a green control:
+  - discarding the input on failure, in each of the five forms;
+  - leaving the busy state set after a failure, in Create Ticket and in the user panel.
+
+  The file-existence check now runs before the release PR opens, not only before rows move to
+  `Passed`.
