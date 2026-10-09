@@ -1,0 +1,40 @@
+
+> toktickit@1.0.0 e2e:lab4
+> playwright test --config=playwright.lab4.config.ts
+
+[WebServer] 
+[WebServer] > toktickit-server@1.0.0 e2e:server
+[WebServer] > npm run e2e:prepare && tsx src/index.ts
+[WebServer] 
+
+[WebServer] 
+[WebServer] > toktickit-server@1.0.0 e2e:prepare
+[WebServer] > tsx scripts/prepare-e2e.ts
+[WebServer] 
+
+[WebServer] [e2e setup] schema "lab4_e2e" reset, migrated and seeded
+
+[WebServer] TokTickIT API listening on http://localhost:3101
+
+
+Running 18 tests using 1 worker
+
+[1/18] e2e\lab-04\actions-taken-flow.spec.ts:28:1 › E2E-01 IT Staff record and plan work, a colleague completes theirs, and the Requester reads both
+[2/18] e2e\lab-04\actions-taken-flow.spec.ts:100:1 › E2E-05 a double-clicked Save creates one Action, and a failed save keeps the form for Retry
+[3/18] e2e\lab-04\checks.selftest.spec.ts:24:1 › guard: an undeclared connection failure is caught; a declared one and a declared HTTP refusal are not
+[4/18] e2e\lab-04\checks.selftest.spec.ts:48:1 › targets: an undersized dashboard link and an undersized Action select fail at mobile
+[5/18] e2e\lab-04\checks.selftest.spec.ts:65:1 › overlap: two controls laid over each other, and a control under an overlay, both fail
+[6/18] e2e\lab-04\dashboards.spec.ts:33:1 › E2E-03 Requester: each card lands on exactly what it counts, and the queue is Forbidden
+[7/18] e2e\lab-04\dashboards.spec.ts:55:1 › E2E-03 IT Staff: cards and both breakdowns land on what they count; no User accounts
+[8/18] e2e\lab-04\dashboards.spec.ts:84:1 › E2E-03 Administrator: User accounts rows land on lists of that many accounts
+[9/18] e2e\lab-04\responsive.spec.ts:46:1 › RESP-01 fixture: an In Progress Ticket with a long completed Action and an open one
+[10/18] e2e\lab-04\responsive.spec.ts:67:1 › RESP-01 IT Staff: the dashboard, the Actions section, the form, and the resolution-blocked state
+[11/18] e2e\lab-04\responsive.spec.ts:93:1 › RESP-01 Administrator: the dashboard with User accounts
+[12/18] e2e\lab-04\responsive.spec.ts:104:1 › RESP-01 Requester: a populated dashboard, and the Actions section read-only
+[13/18] e2e\lab-04\responsive.spec.ts:129:1 › RESP-01 Requester with no tickets: the empty dashboard
+[14/18] e2e\lab-04\responsive.spec.ts:140:1 › RESP-01 states: loading, failure, Action validation and a real Action conflict
+[15/18] e2e\lab-04\responsive.spec.ts:201:1 › RESP-01 states on every screen: both dashboards, Forbidden, and the Actions section
+[16/18] e2e\lab-04\responsive.spec.ts:268:1 › RESP-01 focus is visible, and Tab follows the reading order at every width (ui-spec §7)
+[17/18] e2e\lab-04\ticket-resolution.spec.ts:46:1 › E2E-02 Resolved is disabled with its reasons until the work is done, then resolving succeeds and the History shows each change
+[18/18] e2e\lab-04\ticket-resolution.spec.ts:81:1 › E2E-02 cancelling a Ticket with an open Action says so, and cancels the Action with it
+  18 passed (59.7s)

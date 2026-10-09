@@ -192,6 +192,11 @@ Executed on **`main` at `316a8c0b444ec5f865242f62a3ffdb8ca88fdeaa`**, the merge 
 PR #108, the Lab 4 release, on 2026-10-09. Every command below was run from the repository
 root and its output captured from the run itself; nothing here is transcribed.
 
+**The captured output is published** in
+[`artifacts/lab-04/main-run-316a8c0/`](../../artifacts/lab-04/main-run-316a8c0/README.md):
+each command's full log, its exit code, the per-test results of each browser run, the PERF-01
+measurements, and a manifest that maps each row to where its files passed in this run.
+
 | Command | Exit | Result |
 |---|---:|---|
 | `npm --prefix server test` | 0 | **Test Files 43 passed (43) · Tests 870 passed (870)**, 102.05s |
@@ -233,7 +238,9 @@ in the server suite rather than being gated behind an environment variable.
 Each row moved only because every file named in its own row **exists** in the tree at
 `316a8c0` and is **listed in the captured run** above; a row naming a folder (REG-01, E2E-04)
 needed every test file in that folder to be listed. The check is a script over the run's
-output, not a reading of the totals. No row was held back, and none was reworded to fit.
+output, not a reading of the totals; the
+[row-to-run manifest](../../artifacts/lab-04/main-run-316a8c0/README.md#row-to-run-manifest)
+shows the result for each file. No row was held back, and none was reworded to fit.
 UI-08 is the row this check would have stopped: until PR #109 its file did not exist, and the
 release review found it.
 
