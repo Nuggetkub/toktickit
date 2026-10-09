@@ -119,6 +119,8 @@ describe("My Tickets — the list", () => {
       "Category",
       "Related System",
       "Requested Priority",
+      // Added by Lab 4 issue #78, as Lab 3 ui-spec §6 promised.
+      "Status",
       "Ticket Date",
     ]);
     expect(within(table).getByText("Campus Wi-Fi drops nightly")).toBeInTheDocument();
@@ -185,12 +187,32 @@ describe("My Tickets — searching and filtering", () => {
     expect(listUrls.at(-1)!.searchParams.get("page")).toBe("1");
   });
 
-  it("offers no Current Status filter, because every Lab 2 Ticket is NEW", async () => {
-    mockApi();
+  // Lab 2 asserted the opposite: no Current Status filter, because every Lab 2
+  // Ticket was NEW. Lab 3 ui-spec §6 promised the filter (UI-09) and Lab 4
+  // issue #78 delivered it, so this now proves it is there.
+  it("offers a Current Status filter with all eight statuses in words, sent as the enum value", async () => {
+    const { listUrls } = mockApi();
     await renderList();
     await screen.findByRole("table");
 
-    expect(screen.queryByLabelText(/Current Status/i)).not.toBeInTheDocument();
+    const select = screen.getByLabelText("Current Status");
+    expect(within(select).getAllByRole("option").map((option) => option.textContent)).toEqual([
+      // "Active tickets" (the five active statuses) added by Lab 4 issue #88.
+      "All statuses", "Active tickets", "New", "Open", "In Progress", "Waiting for Requester", "Resolved", "Closed", "Reopened", "Cancelled",
+    ]);
+    expect(listUrls.at(-1)!.searchParams.has("currentStatus")).toBe(false);
+
+    await userEvent.selectOptions(select, "WAITING_FOR_REQUESTER");
+    await waitFor(() => expect(listUrls.at(-1)!.searchParams.get("currentStatus")).toBe("WAITING_FOR_REQUESTER"));
+    expect(listUrls.at(-1)!.searchParams.get("page")).toBe("1");
+  });
+
+  it("shows each Ticket's status as a badge in words", async () => {
+    mockApi(() => page([{ ...ticket(1, "Waiting on me"), currentStatus: "WAITING_FOR_REQUESTER" }]));
+    await renderList();
+
+    const row = (await screen.findByText("Waiting on me")).closest("tr")!;
+    expect(within(row).getByText("Waiting for Requester")).toBeInTheDocument();
   });
 });
 
@@ -233,6 +255,22 @@ describe("My Tickets — empty and no-results are different", () => {
     // Telling someone to clear filters they never set would be the wrong advice,
     // and offering "Create Ticket" here answers a question they did not ask.
     expect(screen.queryByText("You have not created any Tickets yet.")).not.toBeInTheDocument();
+  });
+
+  // Lab 4 issue #78: a status filter alone is a filter too, and clearing it
+  // must take it out of the query rather than leave it behind.
+  it("treats a status filter that matched nothing as no-results, and Clear filters removes it", async () => {
+    const { listUrls } = mockApi((url) => (url.searchParams.get("currentStatus") ? page([]) : page([ticket(1, "Campus Wi-Fi drops nightly")])));
+    await renderList();
+    await screen.findByRole("table");
+
+    await userEvent.selectOptions(screen.getByLabelText("Current Status"), "CANCELLED");
+    expect(await screen.findByText("No Tickets match your search or filters.")).toBeInTheDocument();
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Clear filters" })[0]);
+    expect(await screen.findByText("Campus Wi-Fi drops nightly")).toBeInTheDocument();
+    expect(listUrls.at(-1)!.searchParams.has("currentStatus")).toBe(false);
+    expect(screen.getByLabelText("Current Status")).toHaveValue("");
   });
 });
 
@@ -287,6 +325,7 @@ describe("My Tickets — each control changes what is displayed", () => {
     if (url.searchParams.get("categoryId") === "3") return page([ticket(2, "Hardware fault")]);
     if (url.searchParams.get("relatedSystemId") === "5") return page([ticket(3, "Wi-Fi fault")]);
     if (url.searchParams.get("requestedPriority") === "URGENT") return page([ticket(4, "Urgent fault")]);
+    if (url.searchParams.get("currentStatus") === "RESOLVED") return page([ticket(6, "Resolved fault")]);
     if (url.searchParams.get("sortBy") === "ticketNumber") return page([ticket(5, "Sorted by number")]);
     return page([ticket(1, "Unfiltered result")]);
   }
@@ -295,6 +334,7 @@ describe("My Tickets — each control changes what is displayed", () => {
     ["Category", "3", "Hardware fault", "categoryId", "3"],
     ["Related System", "5", "Wi-Fi fault", "relatedSystemId", "5"],
     ["Requested Priority", "URGENT", "Urgent fault", "requestedPriority", "URGENT"],
+    ["Current Status", "RESOLVED", "Resolved fault", "currentStatus", "RESOLVED"],
     ["Sort", "ticketNumber:asc", "Sorted by number", "sortBy", "ticketNumber"],
   ])("%s replaces the rows on screen, not just the query", async (label, choice, expected, param, value) => {
     const { listUrls } = mockApi(fixtures);

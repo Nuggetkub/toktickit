@@ -6,6 +6,9 @@ import { currentUser } from "./auth-middleware.js";
 import { attachmentSelect } from "./attachment-view.js";
 import { serializeTicketDetail, ticketDetailSelect } from "./tickets-route.js";
 import { decideStatusChange, isTerminal } from "./ticket-workflow.js";
+import { lockEligibleOperator } from "./operator-lock.js";
+import { loadGateEvidence, loadGateSummary } from "./gate-evidence.js";
+import { unmetConditions } from "./resolution-gate.js";
 
 // The operations that move a ticket through its life (api-spec.md §6).
 //
@@ -34,12 +37,17 @@ type WorkflowTicket = {
  * compiles against TicketUpdateInput and then fails at the database.
  */
 type Decision =
-  | { write: Prisma.TicketUncheckedUpdateManyInput; event?: { statusChangedTo: TicketStatus; content: string } }
-  | { refuse: { status: number; code: ErrorCode; message: string; fieldErrors?: Record<string, string> } };
+  | {
+      write: Prisma.TicketUncheckedUpdateManyInput;
+      event?: { statusChangedTo: TicketStatus; content: string };
+      /** Lab 4 BR-22: recorded as a Status Event, in the same transaction as the write. */
+      statusChange?: { from: TicketStatus; to: TicketStatus; reason: string | null };
+    }
+  | { refuse: { status: number; code: ErrorCode; message: string; fieldErrors?: Record<string, string>; extra?: Record<string, unknown> } };
 
 type Outcome =
   | { kind: "missing" }
-  | { kind: "refused"; status: number; code: ErrorCode; message: string; fieldErrors?: Record<string, string> }
+  | { kind: "refused"; status: number; code: ErrorCode; message: string; fieldErrors?: Record<string, string>; extra?: Record<string, unknown> }
   | { kind: "stale" }
   | { kind: "updated"; detail: unknown };
 
@@ -68,8 +76,18 @@ async function mutate(
   version: number,
   actorId: number,
   decide: (ticket: WorkflowTicket, tx: Prisma.TransactionClient) => Promise<Decision> | Decision,
+  options: { lockFirst?: boolean } = {},
 ): Promise<Outcome> {
   return prisma.$transaction(async (tx) => {
+    // Lab 4 BR-14: the status route locks the Ticket row BEFORE deciding, because
+    // the resolution gate reads the Ticket's Actions, and Action writes lock this
+    // same row. Without it, an Action created or completed at the same moment
+    // could be missed by the gate. Claim and owner assignment do not take it here:
+    // they lock a user row first (operator-lock.ts), and must keep the same order
+    // as a deactivation.
+    if (options.lockFirst) {
+      await tx.$queryRaw`SELECT "id" FROM "Ticket" WHERE "id" = ${id} FOR UPDATE`;
+    }
     const ticket = await tx.ticket.findUnique({
       where: { id },
       select: { id: true, version: true, ownerId: true, currentStatus: true },
@@ -100,6 +118,20 @@ async function mutate(
       });
     }
 
+    if (decision.statusChange) {
+      const { from, to, reason } = decision.statusChange;
+      // BR-22: every status change appends one Status Event, append-only.
+      await tx.ticketStatusEvent.create({ data: { ticketId: id, fromStatus: from, toStatus: to, actorId } });
+      // BR-20: a cancelled Ticket cancels its open Actions, with its reason and
+      // actor, so no open work is left on a frozen Ticket.
+      if (to === "CANCELLED") {
+        await tx.actionTaken.updateMany({
+          where: { ticketId: id, status: "OPEN" },
+          data: { status: "CANCELLED", cancelledById: actorId, cancelledAt: new Date(), cancellationReason: reason, version: { increment: 1 } },
+        });
+      }
+    }
+
     const detail = await tx.ticket.findUniqueOrThrow({ where: { id }, select: ticketDetailSelect });
     const attachments = await tx.attachment.findMany({
       where: { ticketId: id },
@@ -107,7 +139,7 @@ async function mutate(
       select: attachmentSelect,
     });
 
-    return { kind: "updated" as const, detail: serializeTicketDetail(detail, attachments) };
+    return { kind: "updated" as const, detail: serializeTicketDetail(detail, attachments, await loadGateSummary(tx, id)) };
   });
 }
 
@@ -118,6 +150,10 @@ async function respond(res: Response, outcome: Outcome, prisma: PrismaClient, id
     return;
   }
   if (outcome.kind === "refused") {
+    if (outcome.extra) {
+      res.status(outcome.status).json({ error: { code: outcome.code, message: outcome.message, ...outcome.extra } });
+      return;
+    }
     sendError(res, outcome.status, outcome.code, outcome.message, outcome.fieldErrors);
     return;
   }
@@ -132,7 +168,7 @@ async function respond(res: Response, outcome: Outcome, prisma: PrismaClient, id
       error: {
         code: "TICKET_VERSION_CONFLICT",
         message: "This Ticket changed while you were working on it. Reload it and try again.",
-        ...(detail ? { ticket: serializeTicketDetail(detail, attachments) } : {}),
+        ...(detail ? { ticket: serializeTicketDetail(detail, attachments, await loadGateSummary(prisma, id)) } : {}),
       },
     });
     return;
@@ -140,13 +176,17 @@ async function respond(res: Response, outcome: Outcome, prisma: PrismaClient, id
   res.status(200).json(outcome.detail);
 }
 
-/** An owner must be an active IT Staff or Administrator at the moment of assignment (BR-21). */
+/**
+ * An owner must be an active IT Staff or Administrator at the moment of
+ * assignment (BR-21). Decided under a share lock on the user's row, so a
+ * concurrent deactivation cannot slip between this check and the write
+ * (operator-lock.ts; found in Earth2509's review of PR #94). mutate() reads the
+ * Ticket without a lock and locks it only at the write, so the user row is
+ * always locked first, the same order as a deactivation, and the two cannot
+ * deadlock.
+ */
 async function eligibleOwner(tx: Prisma.TransactionClient, ownerId: number): Promise<boolean> {
-  const user = await tx.user.findFirst({
-    where: { id: ownerId, isActive: true, role: { in: ["IT_STAFF", "ADMINISTRATOR"] } },
-    select: { id: true },
-  });
-  return user !== null;
+  return lockEligibleOperator(tx, ownerId);
 }
 
 export async function claimTicket(req: Request, res: Response): Promise<void> {
@@ -166,7 +206,7 @@ export async function claimTicket(req: Request, res: Response): Promise<void> {
 
   const prisma = getPrisma();
   try {
-    const outcome = await mutate(prisma, id, version, actor.id, (ticket) => {
+    const outcome = await mutate(prisma, id, version, actor.id, async (ticket, tx) => {
       if (isTerminal(ticket.currentStatus)) {
         return { refuse: { status: 409, code: "TICKET_TERMINAL", message: "This Ticket is closed and can no longer change." } };
       }
@@ -174,6 +214,13 @@ export async function claimTicket(req: Request, res: Response): Promise<void> {
       // it is a different answer from a stale version, and says so.
       if (ticket.ownerId !== null) {
         return { refuse: { status: 409, code: "TICKET_ALREADY_ASSIGNED", message: "Another person already owns this Ticket." } };
+      }
+      // The caller passed the session check when the request arrived, but may
+      // have been deactivated since. Claiming makes them the owner, so they are
+      // re-checked under the same share lock as any other assignment. A caller
+      // who is no longer active has no session to speak of: step 2's 401.
+      if (!(await eligibleOwner(tx, actor.id))) {
+        return { refuse: { status: 401, code: "UNAUTHENTICATED", message: "Your session has ended. Please sign in again." } };
       }
       return { write: { ownerId: actor.id } };
     });
@@ -289,7 +336,7 @@ export async function changeTicketStatus(req: Request, res: Response): Promise<v
 
   const prisma = getPrisma();
   try {
-    const outcome = await mutate(prisma, id, version, actor.id, (ticket) => {
+    const outcome = await mutate(prisma, id, version, actor.id, async (ticket, tx) => {
       const decision = decideStatusChange({
         from: ticket.currentStatus,
         to: body.toStatus,
@@ -313,6 +360,23 @@ export async function changeTicketStatus(req: Request, res: Response): Promise<v
       }
 
       const to = body.toStatus as TicketStatus;
+
+      // Lab 4 BR-19: the gate, decided after every Lab 3 check (so each Lab 3
+      // answer is unchanged) and under the row lock mutate() took first.
+      if (to === "RESOLVED") {
+        const unmet = unmetConditions(await loadGateEvidence(tx, ticket.id));
+        if (unmet.length > 0) {
+          return {
+            refuse: {
+              status: 409,
+              code: "RESOLUTION_BLOCKED",
+              message: "This ticket cannot be resolved until its actions are finished.",
+              extra: { unmet },
+            },
+          };
+        }
+      }
+
       const write: Prisma.TicketUncheckedUpdateManyInput = { currentStatus: to };
 
       if (to === "RESOLVED") write.resolutionSummary = decision.evidence;
@@ -326,8 +390,9 @@ export async function changeTicketStatus(req: Request, res: Response): Promise<v
       return {
         write,
         ...(decision.evidence ? { event: { statusChangedTo: to, content: decision.evidence } } : {}),
+        statusChange: { from: ticket.currentStatus, to, reason: to === "CANCELLED" ? decision.evidence : null },
       };
-    });
+    }, { lockFirst: true });
     await respond(res, outcome, prisma, id);
   } catch (error) {
     sendDependencyUnavailable(res, "POST /api/tickets/:id/status", error);

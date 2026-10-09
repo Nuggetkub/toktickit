@@ -267,6 +267,28 @@ body {
   resize: vertical;
 }
 
+/* A checkbox or radio inside a field is not a text box: the rule above made it
+   full-width with a border, so it floated mid-row away from its label (found
+   by eye in the RESP-01 captures, issue #90). Its label keeps the touch height. */
+.zen-field input[type="checkbox"],
+.zen-field input[type="radio"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  flex: none;
+  accent-color: var(--zen-primary);
+}
+
+.zen-field label:has(> input[type="checkbox"]),
+.zen-field label:has(> input[type="radio"]) {
+  display: flex;
+  align-items: center;
+  gap: var(--zen-space-2);
+  min-height: 44px;
+}
+
 /* Read-only values are visibly distinct from editable ones (ui-spec §3). */
 .zen-field--readonly .zen-field__value {
   padding: var(--zen-space-2) var(--zen-space-3);
@@ -1120,4 +1142,205 @@ body {
 .zen-password-rules li[data-met="true"] {
   color: var(--zen-primary);
   font-weight: 600;
+}
+/* ---------------------------------------------------------------------------
+   Lab 4 issue 85 — Actions Taken on Ticket Detail (ui-spec.md §4)
+   --------------------------------------------------------------------------- */
+
+.zen-action-form {
+  display: grid;
+  gap: var(--zen-space-3);
+  margin-bottom: var(--zen-space-4);
+  padding: var(--zen-space-4);
+  border: 1px solid var(--zen-border);
+  border-radius: var(--zen-radius);
+  background: var(--zen-surface);
+}
+
+.zen-form-actions {
+  display: flex;
+  gap: var(--zen-space-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* The Result beneath its Description, muted, as the list reads them together. */
+.zen-action__result {
+  margin: var(--zen-space-1) 0 0;
+  color: var(--zen-text-muted);
+}
+
+/* An Open Action whose assignee was cleared (BR-17). */
+.zen-action__unassigned {
+  color: var(--zen-text-muted);
+  font-style: italic;
+}
+
+.zen-action__details {
+  display: grid;
+  gap: var(--zen-space-2);
+  margin: 0;
+}
+
+.zen-action__details dt {
+  font-weight: 600;
+}
+
+.zen-action__details dd {
+  margin: 0 0 var(--zen-space-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Long text wraps and never widens the table (ui-spec.md §7). */
+.zen-actions-table td {
+  overflow-wrap: anywhere;
+}
+
+/* ...but a status badge is one word and stays whole: inheriting the rule above,
+   "Completed" broke into "Com / plete / d" (found by eye, issue #90). */
+.zen-actions-table .zen-badge {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+/* Lab 4 issue 86 - the status history (ui-spec.md section 5) */
+.zen-timeline {
+  display: grid;
+  gap: var(--zen-space-2);
+  margin: var(--zen-space-3) 0 0;
+  padding-left: var(--zen-space-4);
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------------------
+   Lab 4 issue 87 - the dashboards (ui-spec.md sections 1 and 3)
+   --------------------------------------------------------------------------- */
+
+.zen-dashboard {
+  display: grid;
+  gap: var(--zen-space-4);
+}
+
+.zen-dashboard__updated {
+  margin: 0 0 var(--zen-space-3);
+  color: var(--zen-text-muted);
+}
+
+.zen-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--zen-space-3);
+}
+
+.zen-metric {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zen-space-1);
+  min-height: 7rem;
+  padding: var(--zen-space-4);
+  border: 1px solid var(--zen-border);
+  border-radius: var(--zen-radius);
+  background: var(--zen-surface);
+  color: inherit;
+  text-decoration: none;
+}
+
+.zen-metric:hover {
+  border-color: var(--zen-primary);
+}
+
+.zen-metric--placeholder {
+  background: var(--zen-readonly);
+}
+
+.zen-metric__label {
+  font-weight: 600;
+}
+
+/* A value never truncates (ui-spec section 7). */
+.zen-metric__value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.zen-metric__explanation {
+  color: var(--zen-text-muted);
+  font-size: 0.9rem;
+}
+
+.zen-dashboard__panels {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  grid-template-areas: "lists side";
+  gap: var(--zen-space-4);
+  align-items: start;
+}
+
+/* The breakdowns come first in the DOM, for the keyboard order of ui-spec
+   section 7; the areas keep the lists in the wider left column.
+   Only inside the panels grid, which defines those areas: the Requester
+   Dashboard puts its lists straight into .zen-dashboard, where an unknown area
+   name makes the browser invent an extra column and push the panels sideways
+   (found by RESP-01, issue #90). */
+.zen-dashboard__panels > .zen-dashboard__lists {
+  grid-area: lists;
+}
+
+.zen-dashboard__panels > .zen-dashboard__breakdowns {
+  grid-area: side;
+}
+
+.zen-dashboard__lists,
+.zen-dashboard__breakdowns {
+  display: grid;
+  gap: var(--zen-space-4);
+  min-width: 0;
+}
+
+.zen-dashboard__rows {
+  display: grid;
+  gap: var(--zen-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.zen-dashboard__rows a {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--zen-space-2);
+  min-height: 44px;
+  color: inherit;
+  overflow-wrap: anywhere;
+}
+
+.zen-dashboard__count {
+  margin-left: auto;
+  font-weight: 700;
+}
+
+.zen-dashboard__row--overdue {
+  border-left: 3px solid var(--zen-warning);
+  padding-left: var(--zen-space-2);
+}
+
+@media (max-width: 991px) {
+  .zen-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .zen-dashboard__panels {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "side" "lists";
+  }
+}
+
+@media (max-width: 767px) {
+  .zen-metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

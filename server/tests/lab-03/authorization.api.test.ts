@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { rawSessionCookieFor, sessionCookieFor, TEST_ORIGIN } from "../support/session.js";
+import { deleteTickets } from "../support/tickets.js";
 
 // API-09 to API-12, and the business-route half of API-04 (docs/lab-03/tests.md).
 //
@@ -178,7 +179,7 @@ afterAll(async () => {
 
   const tickets = await prisma.ticket.findMany({ where: { requesterId: { in: ids } }, select: { id: true } });
   await prisma.attachment.deleteMany({ where: { ticketId: { in: tickets.map((t) => t.id) } } });
-  await prisma.ticket.deleteMany({ where: { requesterId: { in: ids } } });
+  await deleteTickets({ requesterId: { in: ids } });
   await prisma.session.deleteMany({ where: { userId: { in: ids } } });
   await prisma.user.deleteMany({ where: { id: { in: ids } } });
 });

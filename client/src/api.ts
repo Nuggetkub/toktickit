@@ -130,6 +130,8 @@ export class ApiError extends Error {
     readonly status?: number,
     /** Seconds from `Retry-After`, so a throttled sign-in can say how long. */
     readonly retryAfterSeconds?: number,
+    /** `RESOLUTION_BLOCKED`'s unmet conditions (Lab 4 api-spec §4), when the server sends them. */
+    readonly unmet?: UnmetCondition[],
   ) {
     super(message);
     this.name = "ApiError";
@@ -137,7 +139,7 @@ export class ApiError extends Error {
 }
 
 type ErrorEnvelope = {
-  error?: { code?: string; message?: string; fieldErrors?: Record<string, string> };
+  error?: { code?: string; message?: string; fieldErrors?: Record<string, string>; unmet?: UnmetCondition[] };
 };
 
 /**
@@ -162,6 +164,7 @@ async function toApiError(response: Response): Promise<ApiError> {
     envelope?.error?.fieldErrors,
     response.status,
     Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
+    envelope?.error?.unmet,
   );
 }
 
@@ -301,7 +304,9 @@ export interface TicketListParams {
   categoryId?: number;
   relatedSystemId?: number;
   requestedPriority?: RequestedPriority;
-  sortBy?: "ticketDate" | "ticketNumber" | "requestedPriority";
+  /** One status, or a comma-separated list of different ones (Lab 4 BR-30). */
+  currentStatus?: string;
+  sortBy?: "ticketDate" | "updatedAt" | "ticketNumber" | "requestedPriority";
   sortOrder?: "asc" | "desc";
   page?: number;
   pageSize?: number;
@@ -360,11 +365,12 @@ export interface StaffQueueResponse {
 export interface StaffQueueParams {
   search?: string;
   currentStatus?: string;
-  itPriority?: RequestedPriority;
+  /** A priority, or a value from a dashboard link sent as written for the server to judge. */
+  itPriority?: string;
   categoryId?: number;
   /** `me`, `unassigned`, or a user id. */
   owner?: string;
-  requesterIndicated?: "true";
+  requesterIndicated?: string;
   sortBy?: "ticketDate" | "updatedAt" | "ticketNumber" | "itPriority" | "requestedPriority" | "currentStatus";
   sortOrder?: "asc" | "desc";
   page?: number;
@@ -431,6 +437,8 @@ export interface TicketDetail extends CreatedTicket {
   requesterResolvedAt: string | null;
   /** Carried back on every workflow write, which is how BR-24 detects a stale edit. */
   version: number;
+  /** Lab 4 BR-19, as advice for the screen; the status change re-decides under the lock. */
+  resolutionGate?: ResolutionGate;
 }
 
 export async function fetchTicket(ticketId: number): Promise<TicketDetail> {
@@ -694,4 +702,218 @@ export async function setUserInitialPassword(userId: number, initialPassword: st
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ initialPassword }),
   });
+}
+
+// ---------------------------------------------------------------------------
+// Lab 4 issue 85 — Actions Taken (api-spec.md §2)
+// ---------------------------------------------------------------------------
+
+export type ActionStatus = "OPEN" | "COMPLETED" | "CANCELLED";
+
+export interface ActionTaken {
+  id: number;
+  ticketId: number;
+  status: ActionStatus;
+  actionAt: string;
+  description: string;
+  result: string | null;
+  followUpRequired: boolean;
+  followUpNote: string | null;
+  attachmentNotes: string | null;
+  /** Null only after the assignee was deactivated or demoted (BR-17). */
+  assignee: UserSummary | null;
+  performedBy: UserSummary | null;
+  completedAt: string | null;
+  cancelledBy: UserSummary | null;
+  cancelledAt: string | null;
+  cancellationReason: string | null;
+  createdBy: UserSummary;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+export interface NewAction {
+  status: "OPEN" | "COMPLETED";
+  actionAt: string;
+  description: string;
+  result: string | null;
+  followUpRequired: boolean;
+  followUpNote: string | null;
+  attachmentNotes: string | null;
+  assigneeId: number;
+}
+
+/** An open Action's editable fields; only the ones that changed are sent. */
+export type ActionEdit = Partial<Omit<NewAction, "status">> & { version: number };
+
+export interface ActionCompletion {
+  version: number;
+  result: string;
+  followUpRequired?: boolean;
+  followUpNote?: string | null;
+  actionAt?: string;
+}
+
+const json = (body: unknown): RequestInit => ({
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
+
+/** `GET /api/tickets/:id/actions` — newest first (BR-11), never paginated. */
+export async function fetchActions(ticketId: number): Promise<ActionTaken[]> {
+  return (await requestJson<{ items: ActionTaken[] }>(`/api/tickets/${ticketId}/actions`)).items;
+}
+
+/**
+ * `POST /api/tickets/:id/actions`. The key is created once per form opening and
+ * re-sent on every retry, so a retried create returns the first Action instead
+ * of making a second (BR-15).
+ */
+export async function createAction(ticketId: number, action: NewAction, idempotencyKey: string): Promise<ActionTaken> {
+  const init = json(action);
+  return requestJson<ActionTaken>(`/api/tickets/${ticketId}/actions`, {
+    ...init,
+    headers: { ...(init.headers as Record<string, string>), "Idempotency-Key": idempotencyKey },
+  });
+}
+
+export async function editAction(ticketId: number, actionId: number, edit: ActionEdit): Promise<ActionTaken> {
+  return requestJson<ActionTaken>(`/api/tickets/${ticketId}/actions/${actionId}`, { ...json(edit), method: "PATCH" });
+}
+
+export async function completeAction(ticketId: number, actionId: number, completion: ActionCompletion): Promise<ActionTaken> {
+  return requestJson<ActionTaken>(`/api/tickets/${ticketId}/actions/${actionId}/complete`, json(completion));
+}
+
+export async function cancelAction(ticketId: number, actionId: number, version: number, reason: string): Promise<ActionTaken> {
+  return requestJson<ActionTaken>(`/api/tickets/${ticketId}/actions/${actionId}/cancel`, json({ version, reason }));
+}
+
+// ---------------------------------------------------------------------------
+// Lab 4 issue 86 — resolution feedback and status history (api-spec.md §3, §4)
+// ---------------------------------------------------------------------------
+
+export interface ResolutionGate {
+  openActions: number;
+  completedActions: number;
+  latestFollowUpRequired: boolean;
+  reopenedSinceWork: boolean;
+  ready: boolean;
+}
+
+export type UnmetCondition =
+  | { condition: "OPEN_ACTIONS"; count: number }
+  | { condition: "NO_COMPLETED_ACTION" }
+  | { condition: "FOLLOW_UP_REQUIRED"; actionId: number }
+  | { condition: "NO_WORK_SINCE_REOPEN" };
+
+export interface StatusEvent {
+  id: number;
+  fromStatus: string | null;
+  toStatus: string;
+  actor: UserSummary;
+  createdAt: string;
+}
+
+export interface StatusHistory {
+  items: StatusEvent[];
+  /** False for a Ticket from before the history began (BR-24). */
+  recordedFromCreation: boolean;
+}
+
+/** `GET /api/tickets/:id/history` — oldest first (BR-23). */
+export async function fetchHistory(ticketId: number): Promise<StatusHistory> {
+  return requestJson<StatusHistory>(`/api/tickets/${ticketId}/history`);
+}
+
+// ---------------------------------------------------------------------------
+// Lab 4 issue 87 — the IT Staff and Administrator dashboard (api-spec.md §6)
+// ---------------------------------------------------------------------------
+
+/** A card or breakdown row: its value, and the exact list query its link opens (or null). */
+export interface DashboardCard {
+  value: number;
+  query: Record<string, string> | null;
+}
+
+export interface StaffTicketCard {
+  id: number;
+  ticketNumber: string;
+  summary: string;
+  currentStatus: string;
+  itPriority: RequestedPriority;
+  owner: UserSummary | null;
+  updatedAt: string;
+}
+
+export interface MyOpenAction {
+  actionId: number;
+  ticketId: number;
+  ticketNumber: string;
+  summary: string;
+  actionAt: string;
+  description: string;
+}
+
+export interface StaffDashboardData {
+  generatedAt: string;
+  windowStart: string;
+  cards: {
+    unassignedActive: DashboardCard;
+    myActive: DashboardCard;
+    myOpenActions: DashboardCard;
+    requesterIndicated: DashboardCard;
+  };
+  byStatus: Record<string, DashboardCard>;
+  activeByItPriority: Record<string, DashboardCard>;
+  lists: {
+    myOpenActions: { total: number; items: MyOpenAction[] };
+    urgentActive: { total: number; items: StaffTicketCard[] };
+    recentlyUpdated: { total: number; items: StaffTicketCard[] };
+  };
+  /** Present for an Administrator only (BR-28). */
+  users?: Record<string, { active: number; inactive: number; query: { role: string } }>;
+}
+
+/** `GET /api/dashboard/staff` — IT Staff and Administrators; it takes no parameters. */
+export async function fetchStaffDashboard(): Promise<StaffDashboardData> {
+  return requestJson<StaffDashboardData>("/api/dashboard/staff");
+}
+
+// ---------------------------------------------------------------------------
+// Lab 4 issue 88 — the Requester dashboard (api-spec.md §6)
+// ---------------------------------------------------------------------------
+
+export interface RequesterTicketCard {
+  id: number;
+  ticketNumber: string;
+  summary: string;
+  currentStatus: string;
+  requestedPriority: RequestedPriority;
+  updatedAt: string;
+  /** Recently resolved only: the time of the latest resolution. */
+  resolvedAt?: string;
+}
+
+export interface RequesterDashboardData {
+  generatedAt: string;
+  windowStart: string;
+  cards: {
+    activeTickets: DashboardCard;
+    waitingForMe: DashboardCard;
+    resolvedAwaitingClosure: DashboardCard;
+    resolvedLast7Days: DashboardCard;
+  };
+  lists: {
+    needsAttention: { total: number; items: RequesterTicketCard[] };
+    recentlyUpdated: { total: number; items: RequesterTicketCard[] };
+    recentlyResolved: { total: number; items: RequesterTicketCard[] };
+  };
+}
+
+/** `GET /api/dashboard/requester` — the caller's own Tickets only; it takes no parameters. */
+export async function fetchRequesterDashboard(): Promise<RequesterDashboardData> {
+  return requestJson<RequesterDashboardData>("/api/dashboard/requester");
 }

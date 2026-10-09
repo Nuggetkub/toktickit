@@ -64,8 +64,11 @@ describe("staff queue query — each filter is validated on its own", () => {
 });
 
 describe("staff queue query — every whitelisted value is accepted", () => {
+  // Lab 4 BR-30 (issue #84) widens the filter to a list, so a single status is
+  // now carried as a list of one. What the queue returns for it is unchanged
+  // (staff-queue.api.test.ts); docs/lab-04/tests.md section 7 records this.
   it.each(STAFF_STATUSES)("accepts currentStatus=%s", (status) => {
-    expect(validateStaffQueueQuery({ currentStatus: status }).value?.currentStatus).toBe(status);
+    expect(validateStaffQueueQuery({ currentStatus: status }).value?.currentStatus).toEqual([status]);
   });
 
   it.each(STAFF_PRIORITIES)("accepts itPriority=%s", (priority) => {

@@ -2,8 +2,11 @@ import { test, expect } from "@playwright/test";
 import {
   REQUESTER,
   STAFF,
+  openMyTickets,
+  openQueue,
   createTicket,
   openInQueue,
+  recordCompletedAction,
   signIn,
   signOut,
   uniqueSummary,
@@ -27,6 +30,7 @@ test("the queue finds a Ticket by number, by status and by owner", async ({ page
   await signOut(page);
 
   await signIn(page, STAFF);
+  await openQueue(page);
   const row = page.getByRole("row").filter({ hasText: ticketNumber });
 
   await page.getByLabel(/^Search/).fill(ticketNumber);
@@ -129,6 +133,7 @@ test("a Ticket is claimed, prioritised, worked, indicated, resolved and closed",
 
   // ---- The Requester sees one of them, and says it looks fixed -----------
   await signIn(page, REQUESTER);
+  await openMyTickets(page);
   await page.getByLabel(/^Search/).fill(ticketNumber);
   await page.getByRole("link", { name: ticketNumber }).click();
   await expect(page.getByRole("heading", { name: `Ticket ${ticketNumber}` })).toBeVisible();
@@ -155,11 +160,20 @@ test("a Ticket is claimed, prioritised, worked, indicated, resolved and closed",
 
   // ---- IT Staff see the marker, resolve and close (AC-19, AC-16) ---------
   await signIn(page, STAFF);
+  await openQueue(page);
   await page.getByLabel(/^Search/).fill(ticketNumber);
   const queueRow = page.getByRole("row").filter({ hasText: ticketNumber });
   await expect(queueRow).toContainText("Requester says resolved");
   await queueRow.getByRole("link", { name: ticketNumber }).click();
   await expect(page.getByText(`${REQUESTER.fullName} says the problem appears resolved`)).toBeVisible();
+
+  // Lab 4's resolution gate (BR-19) needs completed work first. It is recorded
+  // through the real Actions API, as this staff member, because the Lab 3 screen
+  // has no control for it until issue #85 (docs/lab-04/tests.md §7). The reload
+  // makes the screen read the Ticket as it now is.
+  const ticketId = Number(new URL(page.url()).pathname.split("/").pop());
+  expect(await recordCompletedAction(page, ticketId)).toBe(201);
+  await page.reload();
 
   // Resolving is confirmed and carries evidence (BR-30, BR-31).
   await page.getByLabel(/^Status/).selectOption({ label: "Resolved" });

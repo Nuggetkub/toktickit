@@ -27,3 +27,7 @@ artifacts/lab-02/playwright-report/
 artifacts/lab-03/e2e-runtime/
 artifacts/lab-03/test-results/
 artifacts/lab-03/playwright-report/
+# Lab 4 likewise: artifacts/lab-04/screenshots/ is the evidence ui-spec.md §9 names.
+artifacts/lab-04/e2e-runtime/
+artifacts/lab-04/test-results/
+artifacts/lab-04/playwright-report/

@@ -8,8 +8,10 @@
     "e2e": "playwright test",
     "e2e:install": "playwright install chromium",
     "e2e:lab3": "playwright test --config=playwright.lab3.config.ts",
+    "e2e:lab4": "playwright test --config=playwright.lab4.config.ts",
     "e2e:report": "playwright show-report artifacts/lab-02/playwright-report",
-    "e2e:report:lab3": "playwright show-report artifacts/lab-03/playwright-report"
+    "e2e:report:lab3": "playwright show-report artifacts/lab-03/playwright-report",
+    "e2e:report:lab4": "playwright show-report artifacts/lab-04/playwright-report"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0"

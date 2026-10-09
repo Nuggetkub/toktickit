@@ -112,6 +112,15 @@ function mockApi(handlers: Record<string, Handler> = {}, asUser: unknown = USER)
     if (url.pathname === "/api/tickets/42/comments") {
       return { ok: true, status: 200, json: async () => [], headers: new Headers() };
     }
+    // Lab 4 issue #85 added the read-only Actions taken section, one question
+    // more, answered the same way and for the same reason.
+    if (url.pathname === "/api/tickets/42/actions") {
+      return { ok: true, status: 200, json: async () => ({ items: [] }), headers: new Headers() };
+    }
+    // Lab 4 issue #86 added the History disclosure, answered the same way.
+    if (url.pathname === "/api/tickets/42/history") {
+      return { ok: true, status: 200, json: async () => ({ items: [], recordedFromCreation: true }), headers: new Headers() };
+    }
     throw new Error(`Unexpected request: ${method} ${url.pathname}`);
   });
 

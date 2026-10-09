@@ -69,7 +69,7 @@ function queueWhere(query: StaffQueueQuery, callerId: number): Prisma.TicketWher
         : { ownerId: query.owner === "me" ? callerId : query.owner };
 
   return {
-    ...(query.currentStatus ? { currentStatus: query.currentStatus } : {}),
+    ...(query.currentStatus ? { currentStatus: { in: query.currentStatus } } : {}),
     ...(query.itPriority ? { itPriority: query.itPriority } : {}),
     ...(query.categoryId ? { categoryId: query.categoryId } : {}),
     ...owner,

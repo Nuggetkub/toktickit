@@ -5,6 +5,7 @@ import { sendDependencyUnavailable, sendError } from "./errors.js";
 import { currentUser } from "./auth-middleware.js";
 import { attachmentSelect } from "./attachment-view.js";
 import { serializeTicketDetail, ticketDetailSelect } from "./tickets-route.js";
+import { loadGateSummary } from "./gate-evidence.js";
 import { indicationAllowedFrom, validateContent } from "./discussion.js";
 import { isTerminal } from "./ticket-workflow.js";
 
@@ -295,7 +296,7 @@ export async function indicateResolved(req: Request, res: Response): Promise<voi
         orderBy: { uploadedAt: "asc" },
         select: attachmentSelect,
       });
-      return { kind: "ok" as const, body: serializeTicketDetail(detail, attachments) };
+      return { kind: "ok" as const, body: serializeTicketDetail(detail, attachments, await loadGateSummary(tx, id)) };
     });
 
     if (outcome.kind === "missing") {

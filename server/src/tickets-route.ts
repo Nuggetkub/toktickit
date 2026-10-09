@@ -4,6 +4,8 @@ import { getPrisma } from "./prisma.js";
 import { sendDependencyUnavailable, sendError } from "./errors.js";
 import { currentUser } from "./auth-middleware.js";
 import { attachmentSelect, type AttachmentView } from "./attachment-view.js";
+import type { GateSummary } from "./resolution-gate.js";
+import { loadGateSummary } from "./gate-evidence.js";
 import {
   DEFAULT_PAGE_SIZE,
   totalPages as pageCount,
@@ -61,7 +63,13 @@ export const ticketDetailSelect = {
 
 type TicketDetailRow = Prisma.TicketGetPayload<{ select: typeof ticketDetailSelect }>;
 
-export function serializeTicketDetail(ticket: TicketDetailRow, attachments: AttachmentView[] = []) {
+/**
+ * Ticket Detail. `resolutionGate` is a required argument rather than a field
+ * added by some callers: every response that carries a Ticket's detail carries
+ * the gate too (Lab 4 api-spec §4), and a required parameter makes the compiler
+ * name any caller that forgets.
+ */
+export function serializeTicketDetail(ticket: TicketDetailRow, attachments: AttachmentView[], resolutionGate: GateSummary) {
   return {
     ...serialize(ticket, attachments),
     itPriority: ticket.itPriority,
@@ -72,6 +80,7 @@ export function serializeTicketDetail(ticket: TicketDetailRow, attachments: Atta
     resolutionSummary: ticket.resolutionSummary,
     requesterResolvedAt: ticket.requesterResolvedAt,
     version: ticket.version,
+    resolutionGate,
   };
 }
 
@@ -228,7 +237,7 @@ async function createWithNumber(
       RETURNING "lastValue"
     `;
 
-    return tx.ticket.create({
+    const created = await tx.ticket.create({
       data: {
         ticketNumber: formatTicketNumber(year, rows[0].lastValue),
         requesterId,
@@ -246,6 +255,13 @@ async function createWithNumber(
       },
       select: ticketSelect,
     });
+
+    // Lab 4 BR-22: creation is the first entry in the status history, from
+    // nothing to NEW, by the Requester, in the same transaction as the Ticket.
+    await tx.ticketStatusEvent.create({
+      data: { ticketId: created.id, fromStatus: null, toStatus: "NEW", actorId: requesterId },
+    });
+    return created;
   });
 }
 
@@ -289,9 +305,11 @@ function orderBy(query: TicketListQuery): Prisma.TicketOrderByWithRelationInput[
   const primary =
     query.sortBy === "ticketDate"
       ? { createdAt: direction }
-      : query.sortBy === "ticketNumber"
-        ? { ticketNumber: direction }
-        : { requestedPriority: direction };
+      : query.sortBy === "updatedAt"
+        ? { updatedAt: direction }
+        : query.sortBy === "ticketNumber"
+          ? { ticketNumber: direction }
+          : { requestedPriority: direction };
 
   // Ticket Number descending is always the tie-breaker, so paging is stable:
   // without it, two tickets sharing a timestamp can swap between pages and one
@@ -317,6 +335,7 @@ export async function listTickets(req: Request, res: Response): Promise<void> {
   // not something the caller can influence.
   const where: Prisma.TicketWhereInput = {
     requesterId: requester.id,
+    ...(query.currentStatus ? { currentStatus: { in: query.currentStatus } } : {}),
     ...(query.categoryId ? { categoryId: query.categoryId } : {}),
     ...(query.relatedSystemId ? { relatedSystemId: query.relatedSystemId } : {}),
     ...(query.requestedPriority ? { requestedPriority: query.requestedPriority } : {}),
@@ -392,7 +411,7 @@ export async function getTicket(req: Request, res: Response): Promise<void> {
       select: attachmentSelect,
     });
 
-    res.status(200).json(serializeTicketDetail(ticket, attachments));
+    res.status(200).json(serializeTicketDetail(ticket, attachments, await loadGateSummary(getPrisma(), ticket.id)));
   } catch (error) {
     sendDependencyUnavailable(res, "GET /api/tickets/:id", error);
   }

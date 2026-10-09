@@ -6,7 +6,11 @@
 // "you asked the wrong question" are different answers and the user cannot tell
 // them apart from the outside.
 
-export const SORT_FIELDS = ["ticketDate", "ticketNumber", "requestedPriority"] as const;
+import { parseStatusList, type TicketStatusName } from "./status-filter.js";
+
+// `updatedAt` is Lab 4 D-17: the Requester dashboard's Recently updated panel
+// links here in its own order.
+export const SORT_FIELDS = ["ticketDate", "updatedAt", "ticketNumber", "requestedPriority"] as const;
 export const SORT_ORDERS = ["asc", "desc"] as const;
 export const PAGE_SIZES = [10, 25, 50] as const;
 export const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
@@ -21,6 +25,7 @@ export type Priority = (typeof PRIORITIES)[number];
 
 export type TicketListQuery = {
   search?: string;
+  currentStatus?: TicketStatusName[];
   categoryId?: number;
   relatedSystemId?: number;
   requestedPriority?: Priority;
@@ -46,20 +51,18 @@ export function validateTicketListQuery(raw: Record<string, unknown>): QueryVali
   const page = optionalPage(raw.page, fieldErrors);
   const pageSize = optionalPageSize(raw.pageSize, fieldErrors);
 
-  // Lab 2 has no Current Status filter (BR-30, decision D-07): every ticket is
-  // NEW, so the control could never change a result set. Rejecting it rather
-  // than ignoring it means a client written against a later lab is told, instead
-  // of silently receiving unfiltered results it believes are filtered.
-  if (raw.currentStatus !== undefined) {
-    fieldErrors.currentStatus =
-      "Current Status filtering arrives in Lab 3. Every Lab 2 Ticket is NEW.";
-  }
+  // Lab 2 refused this filter because every Ticket was NEW (Lab 2 D-07), and
+  // Lab 3 left the refusal in place although its Tickets move (Lab 3 API-14,
+  // issue #78). Lab 4 BR-30 gives My Tickets the same one-or-more status filter
+  // as the queue, which the Requester dashboard's drill-downs land on.
+  const currentStatus = parseStatusList(raw.currentStatus, fieldErrors);
 
   if (Object.keys(fieldErrors).length > 0) return { fieldErrors };
 
   return {
     value: {
       ...(search ? { search } : {}),
+      ...(currentStatus ? { currentStatus } : {}),
       ...(categoryId ? { categoryId } : {}),
       ...(relatedSystemId ? { relatedSystemId } : {}),
       ...(requestedPriority ? { requestedPriority } : {}),

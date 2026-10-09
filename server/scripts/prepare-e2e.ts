@@ -2,6 +2,8 @@ import { execSync } from "node:child_process";
 import { PrismaClient } from "@prisma/client";
 import { baseDatabaseUrl, withSchema } from "../src/database-url.js";
 import { seedReferenceData } from "../src/seed-data.js";
+import { seedDemoTickets } from "../src/demo-tickets.js";
+import { seedDemoActivity } from "../src/demo-activity.js";
 
 /**
  * Prepares the database the Playwright run uses.
@@ -56,6 +58,13 @@ async function main(): Promise<void> {
   const prisma = new PrismaClient({ datasourceUrl: url });
   try {
     await seedReferenceData(prisma);
+    // Lab 4 (issue #90): the demo Tickets, Actions and status history too, so
+    // the dashboards have something to count. Only on request, and only into
+    // the schema guarded above.
+    if (process.env.E2E_SEED === "demo") {
+      await seedDemoTickets(prisma);
+      await seedDemoActivity(prisma);
+    }
   } finally {
     await prisma.$disconnect();
   }

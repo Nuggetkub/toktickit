@@ -1,4 +1,5 @@
 /** The Zen Green component set. Screens import from here, never from files. */
+export { ActionStatusBadge } from "./ActionStatusBadge.js";
 export { AppShell, type NavItem } from "./AppShell.js";
 export { Badge, type BadgeTone } from "./Badge.js";
 export { Button, type ButtonVariant } from "./Button.js";

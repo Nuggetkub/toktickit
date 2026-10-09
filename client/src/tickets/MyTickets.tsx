@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   REQUESTED_PRIORITIES,
   fetchCategories,
@@ -10,12 +10,28 @@ import {
   type RequestedPriority,
   type TicketListResponse,
 } from "../api.js";
-import { Badge, Button, Card, EmptyState, ErrorAlert, Field, StatusMessage } from "../components/index.js";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  ErrorAlert,
+  Field,
+  StatusBadge,
+  StatusMessage,
+  TICKET_STATUSES,
+  statusLabel,
+  type TicketStatus,
+} from "../components/index.js";
 import { useAuth } from "../auth/index.js";
+import { ApiError } from "../api.js";
+import { ACTIVE_STATUS_LIST } from "../dashboard/dashboard-links.js";
 
 type SortChoice =
   | "ticketDate:desc"
   | "ticketDate:asc"
+  | "updatedAt:desc"
+  | "updatedAt:asc"
   | "ticketNumber:desc"
   | "ticketNumber:asc"
   | "requestedPriority:desc"
@@ -26,6 +42,8 @@ type Filters = {
   categoryId: string;
   relatedSystemId: string;
   requestedPriority: "" | RequestedPriority;
+  /** A single status, or "ACTIVE" for the five active statuses (Lab 4 ui-spec §2). */
+  currentStatus: "" | TicketStatus | "ACTIVE";
   sort: SortChoice;
 };
 
@@ -34,8 +52,20 @@ const DEFAULTS: Filters = {
   categoryId: "",
   relatedSystemId: "",
   requestedPriority: "",
+  currentStatus: "",
   sort: "ticketDate:desc",
 };
+
+/** Every value the Sort control offers, so a link's sort can be checked against them. */
+const SORT_CHOICES: readonly SortChoice[] = [
+  "ticketDate:desc", "ticketDate:asc", "updatedAt:desc", "updatedAt:asc", "ticketNumber:desc", "ticketNumber:asc", "requestedPriority:desc", "requestedPriority:asc",
+];
+
+/** A link's sort when it is one the Sort control offers; anything else leaves the default. */
+function sortFromUrl(params: URLSearchParams): SortChoice {
+  const choice = `${params.get("sortBy")}:${params.get("sortOrder")}`;
+  return (SORT_CHOICES as readonly string[]).includes(choice) ? (choice as SortChoice) : DEFAULTS.sort;
+}
 
 const PAGE_SIZE = 10;
 
@@ -55,7 +85,27 @@ export default function MyTickets() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [filters, setFilters] = useState<Filters>(DEFAULTS);
+  const location = useLocation();
+  // Lab 4 ui-spec §2: a Requester dashboard card links here with `currentStatus`
+  // in the URL. A value the control can show becomes the filter; anything else
+  // is sent as written, so the server refuses it and the reader is told.
+  const [linkStatus] = useState(() => new URLSearchParams(location.search).get("currentStatus"));
+  const [filters, setFilters] = useState<Filters>(() => ({
+    ...DEFAULTS,
+    // Recently updated's View all carries its order (sortBy and sortOrder). It is
+    // ignored rather than refused when the control cannot show it: an order
+    // cannot make a list wrong, a filter can.
+    sort: sortFromUrl(new URLSearchParams(location.search)),
+    currentStatus:
+      linkStatus === ACTIVE_STATUS_LIST
+        ? "ACTIVE"
+        : linkStatus !== null && (TICKET_STATUSES as readonly string[]).includes(linkStatus)
+          ? (linkStatus as TicketStatus)
+          : "",
+  }));
+  const [statusAsWritten, setStatusAsWritten] = useState<string | null>(() =>
+    linkStatus !== null && linkStatus !== ACTIVE_STATUS_LIST && !(TICKET_STATUSES as readonly string[]).includes(linkStatus) ? linkStatus : null,
+  );
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
 
@@ -63,7 +113,7 @@ export default function MyTickets() {
   const [relatedSystems, setRelatedSystems] = useState<RelatedSystem[]>([]);
 
   const [results, setResults] = useState<TicketListResponse | null>(null);
-  const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
+  const [state, setState] = useState<"loading" | "ready" | "failed" | "invalidLink">("loading");
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
@@ -88,13 +138,19 @@ export default function MyTickets() {
   }, [filters.search]);
 
   const [sortBy, sortOrder] = filters.sort.split(":") as [
-    "ticketDate" | "ticketNumber" | "requestedPriority",
+    "ticketDate" | "updatedAt" | "ticketNumber" | "requestedPriority",
     "asc" | "desc",
   ];
 
   useEffect(() => {
     if (!user) return;
     let active = true;
+    // An empty `?currentStatus=` could not be sent at all (empty parameters are
+    // left out), so it would quietly list everything. It is refused here.
+    if (statusAsWritten === "") {
+      setState("invalidLink");
+      return;
+    }
     setState("loading");
 
     fetchTickets(
@@ -103,6 +159,8 @@ export default function MyTickets() {
         ...(filters.categoryId ? { categoryId: Number(filters.categoryId) } : {}),
         ...(filters.relatedSystemId ? { relatedSystemId: Number(filters.relatedSystemId) } : {}),
         ...(filters.requestedPriority ? { requestedPriority: filters.requestedPriority } : {}),
+        ...(filters.currentStatus ? { currentStatus: filters.currentStatus === "ACTIVE" ? ACTIVE_STATUS_LIST : filters.currentStatus } : {}),
+        ...(statusAsWritten !== null ? { currentStatus: statusAsWritten } : {}),
         sortBy,
         sortOrder,
         page,
@@ -116,19 +174,22 @@ export default function MyTickets() {
         setResults(response);
         setState("ready");
       })
-      .catch(() => {
-        if (active) setState("failed");
+      .catch((error: unknown) => {
+        if (!active) return;
+        setState(error instanceof ApiError && error.status === 400 && statusAsWritten !== null ? "invalidLink" : "failed");
       });
 
     return () => {
       active = false;
     };
   }, [
+    statusAsWritten,
     user,
     debouncedSearch,
     filters.categoryId,
     filters.relatedSystemId,
     filters.requestedPriority,
+    filters.currentStatus,
     sortBy,
     sortOrder,
     page,
@@ -137,8 +198,26 @@ export default function MyTickets() {
 
   function update(patch: Partial<Filters>) {
     setFilters((current) => ({ ...current, ...patch }));
+    setStatusAsWritten(null);
     setPage(1);
   }
+
+  // The URL follows the status filter and the sort, replacing rather than
+  // pushing, so Back returns to the dashboard rather than stepping through every
+  // change. The default sort is left out, so a plain list keeps a plain URL.
+  useEffect(() => {
+    const sent = statusAsWritten ?? (filters.currentStatus === "ACTIVE" ? ACTIVE_STATUS_LIST : filters.currentStatus);
+    const params = new URLSearchParams();
+    if (sent || statusAsWritten === "") params.set("currentStatus", sent);
+    if (filters.sort !== DEFAULTS.sort) {
+      params.set("sortBy", sortBy);
+      params.set("sortOrder", sortOrder);
+    }
+    const search = params.toString() ? `?${params.toString()}` : "";
+    if (search !== location.search) navigate({ pathname: location.pathname, search }, { replace: true, state: location.state });
+    // Only the filters drive this; reading the location is how it avoids a loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.currentStatus, filters.sort, statusAsWritten]);
 
   // Every control the button resets counts towards whether it is enabled. If
   // `sort` is cleared by it, changing only `sort` has to enable it — otherwise
@@ -148,15 +227,20 @@ export default function MyTickets() {
     filters.categoryId === DEFAULTS.categoryId &&
     filters.relatedSystemId === DEFAULTS.relatedSystemId &&
     filters.requestedPriority === DEFAULTS.requestedPriority &&
-    filters.sort === DEFAULTS.sort;
+    filters.currentStatus === DEFAULTS.currentStatus &&
+    filters.sort === DEFAULTS.sort &&
+    statusAsWritten === null;
 
   const hasQuery =
     debouncedSearch !== "" ||
     filters.categoryId !== "" ||
     filters.relatedSystemId !== "" ||
-    filters.requestedPriority !== "";
+    filters.requestedPriority !== "" ||
+    filters.currentStatus !== "" ||
+    statusAsWritten !== null;
 
   function clearFilters() {
+    setStatusAsWritten(null);
     setFilters(DEFAULTS);
     setDebouncedSearch("");
     setPage(1);
@@ -229,13 +313,34 @@ export default function MyTickets() {
           )}
         </Field>
 
-        {/* No Current Status filter: every Lab 2 Ticket is NEW, so the control
-            could never change a result set (BR-30). The API rejects it too. */}
+        {/* Lab 2 had no Current Status filter, because every Lab 2 Ticket was NEW.
+            Lab 3 ui-spec §6 promised it and the server refused it until Lab 4
+            BR-30 (issue #78). */}
+        <Field id="currentStatus" label="Current Status">
+          {(control) => (
+            <select
+              {...control}
+              value={filters.currentStatus}
+              onChange={(event) => update({ currentStatus: event.target.value as Filters["currentStatus"] })}
+            >
+              <option value="">All statuses</option>
+              <option value="ACTIVE">Active tickets</option>
+              {TICKET_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {statusLabel(status)}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+
         <Field id="sort" label="Sort">
           {(control) => (
             <select {...control} value={filters.sort} onChange={(event) => update({ sort: event.target.value as SortChoice })}>
               <option value="ticketDate:desc">Newest first</option>
               <option value="ticketDate:asc">Oldest first</option>
+              <option value="updatedAt:desc">Recently updated</option>
+              <option value="updatedAt:asc">Least recently updated</option>
               <option value="ticketNumber:desc">Ticket Number, high to low</option>
               <option value="ticketNumber:asc">Ticket Number, low to high</option>
               <option value="requestedPriority:desc">Priority, urgent first</option>
@@ -260,6 +365,12 @@ export default function MyTickets() {
       {state === "failed" && (
         <ErrorAlert onRetry={() => setReloadToken((token) => token + 1)}>
           Your Tickets could not be loaded.
+        </ErrorAlert>
+      )}
+
+      {state === "invalidLink" && (
+        <ErrorAlert onRetry={clearFilters} retryLabel="Clear filters">
+          This link&apos;s filter is not valid.
         </ErrorAlert>
       )}
 
@@ -293,6 +404,7 @@ export default function MyTickets() {
                   <th scope="col">Category</th>
                   <th scope="col">Related System</th>
                   <th scope="col">Requested Priority</th>
+                  <th scope="col">Status</th>
                   <th scope="col">Ticket Date</th>
                 </tr>
               </thead>
@@ -309,6 +421,9 @@ export default function MyTickets() {
                     <td data-label="Related System">{ticket.relatedSystem.name}</td>
                     <td data-label="Requested Priority">
                       <Badge tone={PRIORITY_TONE[ticket.requestedPriority]}>{ticket.requestedPriority}</Badge>
+                    </td>
+                    <td data-label="Status">
+                      <StatusBadge status={ticket.currentStatus as TicketStatus} />
                     </td>
                     <td data-label="Ticket Date">{new Date(ticket.ticketDate).toLocaleString()}</td>
                   </tr>

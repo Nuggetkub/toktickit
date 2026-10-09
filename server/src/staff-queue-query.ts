@@ -14,6 +14,8 @@
 // while reviewing my peer's queue (Earth2509 PR #46), where
 // `?currentStatus=unknown` answered 200 with the unfiltered queue.
 
+import { parseStatusList } from "./status-filter.js";
+
 export const STAFF_SORT_FIELDS = [
   "ticketDate",
   "updatedAt",
@@ -50,7 +52,8 @@ export type OwnerFilter = "me" | "unassigned" | number;
 
 export type StaffQueueQuery = {
   search?: string;
-  currentStatus?: StaffStatus;
+  /** One status, or several (Lab 4 BR-30): every dashboard drill-down is a real queue query. */
+  currentStatus?: StaffStatus[];
   itPriority?: StaffPriority;
   categoryId?: number;
   owner?: OwnerFilter;
@@ -70,7 +73,7 @@ export function validateStaffQueueQuery(raw: Record<string, unknown>): StaffQueu
 
   // All ten are computed first. See the note at the top of this file.
   const search = optionalSearch(raw.search, fieldErrors);
-  const currentStatus = optionalChoice(raw.currentStatus, "currentStatus", STAFF_STATUSES, fieldErrors);
+  const currentStatus = parseStatusList(raw.currentStatus, fieldErrors);
   const itPriority = optionalChoice(raw.itPriority, "itPriority", STAFF_PRIORITIES, fieldErrors);
   const categoryId = optionalId(raw.categoryId, "categoryId", fieldErrors);
   const owner = optionalOwner(raw.owner, fieldErrors);

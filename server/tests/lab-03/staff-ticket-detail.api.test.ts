@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { sessionCookieFor, TEST_ORIGIN } from "../support/session.js";
+import { deleteTickets, recordCompletedWork } from "../support/tickets.js";
 import { ALLOWED_TRANSITIONS, TERMINAL_STATUSES, TICKET_STATUSES } from "../../src/ticket-workflow.js";
 
 // API-17 to API-21 — AC-14, AC-15, AC-16 (docs/lab-03/tests.md).
@@ -89,7 +90,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await prisma.publicComment.deleteMany({ where: { ticket: { categoryId } } });
-  await prisma.ticket.deleteMany({ where: { categoryId } });
+  await deleteTickets({ categoryId });
   const users = await prisma.user.findMany({ where: { email: { endsWith: DOMAIN } }, select: { id: true } });
   const ids = users.map((user) => user.id);
   await prisma.session.deleteMany({ where: { userId: { in: ids } } });
@@ -295,6 +296,9 @@ describe("API-20 — status transitions", () => {
 
   it("stores the resolution summary and posts it as a status-change comment (BR-30)", async () => {
     const ticket = await newTicket({ status: "OPEN", ownerId: staffId });
+    // Lab 4 BR-19: resolving needs completed work, so the Ticket carries some
+    // (docs/lab-04/tests.md §7). Nothing this test asserts changes.
+    await recordCompletedWork(ticket.id, staffId);
     const summary = "The access point was replaced and the connection verified.";
 
     const res = await send("post", `/api/tickets/${ticket.id}/status`, staff, {
@@ -376,8 +380,11 @@ describe("API-20 — the whole matrix, against real tickets", () => {
 
   it.each(pairs)("%s -> %s", async (from, to) => {
     // Owned, so an owner-required target fails on the transition rather than on
-    // BR-28, and carrying both kinds of evidence so it never fails on BR-30.
+    // BR-28, and carrying both kinds of evidence so it never fails on BR-30 --
+    // and, since Lab 4, completed work, so RESOLVED never fails on the resolution
+    // gate (BR-19, docs/lab-04/tests.md §7).
     const ticket = await newTicket({ status: from, ownerId: staffId });
+    await recordCompletedWork(ticket.id, staffId);
     const res = await send("post", `/api/tickets/${ticket.id}/status`, staff, {
       toStatus: to,
       version: ticket.version,

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import App from "../../src/App.js";
@@ -56,6 +56,17 @@ function mockApi(user: unknown | null, ticketsAnswer?: { status: number; body?: 
       return json(200, { items: [], page: 1, pageSize: 10, totalItems: 0, totalPages: 1 });
     }
     if (target.includes("/api/staff/assignees")) return json(200, []);
+    // Lab 4 issue #87: IT Staff now land on the Dashboard (Lab 4 ui-spec §2).
+    if (target.includes("/api/dashboard/staff")) {
+      const card = (value: number) => ({ value, query: null });
+      return json(200, {
+        generatedAt: "2026-10-03T08:00:00.000Z", windowStart: "2026-09-26T08:00:00.000Z",
+        cards: { unassignedActive: card(0), myActive: card(0), myOpenActions: card(0), requesterIndicated: card(0) },
+        byStatus: Object.fromEntries(["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "RESOLVED", "CLOSED", "REOPENED", "CANCELLED"].map((k) => [k, card(0)])),
+        activeByItPriority: Object.fromEntries(["URGENT", "HIGH", "MEDIUM", "LOW"].map((k) => [k, card(0)])),
+        lists: { myOpenActions: { total: 0, items: [] }, urgentActive: { total: 0, items: [] }, recentlyUpdated: { total: 0, items: [] } },
+      });
+    }
     if (target.includes("/api/categories") || target.includes("/api/related-systems")) return json(200, []);
     throw new Error(`Unexpected request: ${target}`);
   });
@@ -100,18 +111,20 @@ describe("Application shell — who is signed in", () => {
     expect(nav).not.toHaveTextContent(/Users|Ticket Queue/);
   });
 
-  it("lands IT Staff on the Ticket Queue and offers them none of the Requester screens", async () => {
+  it("lands IT Staff on the Dashboard and offers them none of the Requester screens", async () => {
     // UPDATED IN LAB 3 (Issue #50). This asserted that IT Staff were offered no
     // navigation at all, which was true only while their screens did not exist.
     // The claim it was really making — that the Requester screens are not
     // offered to them — is unchanged and still asserted below.
+    // UPDATED IN LAB 4 (Issue #87). IT Staff now land on the Dashboard, the
+    // first navigation item (Lab 4 ui-spec §2); the Ticket Queue is second.
     mockApi(USERS.staff);
     renderAt("/");
 
-    expect(await screen.findByRole("heading", { name: "Ticket Queue" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
 
     const nav = screen.getByRole("navigation", { name: "Primary" });
-    expect(nav).toHaveTextContent("Ticket Queue");
+    expect(within(nav).getAllByRole("button").map((b) => b.textContent)).toEqual(["Dashboard", "Ticket Queue"]);
     expect(nav).not.toHaveTextContent(/My Tickets|Create Ticket/);
 
     expect(screen.getByText("Grace Okafor")).toBeInTheDocument();

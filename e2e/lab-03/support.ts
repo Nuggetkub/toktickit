@@ -14,19 +14,22 @@ import path from "node:path";
 export const REQUESTER = {
   email: "nadia.rahman@toktickit.local",
   fullName: "Nadia Rahman",
-  landing: "My Tickets",
+  // Lab 4 issue #88: Requesters land on the Dashboard (Lab 4 ui-spec §2).
+  landing: "Dashboard",
 } as const;
 
 export const OTHER_REQUESTER = {
   email: "somchai.pattana@toktickit.local",
   fullName: "Somchai Pattana",
-  landing: "My Tickets",
+  // Lab 4 issue #88: Requesters land on the Dashboard (Lab 4 ui-spec §2).
+  landing: "Dashboard",
 } as const;
 
 export const STAFF = {
   email: "grace.okafor@toktickit.local",
   fullName: "Grace Okafor",
-  landing: "Ticket Queue",
+  // Lab 4 issue #87: IT Staff land on the Dashboard (Lab 4 ui-spec §2).
+  landing: "Dashboard",
 } as const;
 
 export const ADMINISTRATOR = {
@@ -54,7 +57,8 @@ export const INACTIVE_REQUESTER = {
 export const ROTATION_REQUESTER = {
   email: "marisa.chen@toktickit.local",
   fullName: "Marisa Chen",
-  landing: "My Tickets",
+  // Lab 4 issue #88: Requesters land on the Dashboard (Lab 4 ui-spec §2).
+  landing: "Dashboard",
 } as const;
 
 /**
@@ -69,7 +73,8 @@ export const ROTATION_REQUESTER = {
 export const CAPTURE_REQUESTER = {
   email: "tobias.lindqvist@toktickit.local",
   fullName: "Tobias Lindqvist",
-  landing: "My Tickets",
+  // Lab 4 issue #88: Requesters land on the Dashboard (Lab 4 ui-spec §2).
+  landing: "Dashboard",
 } as const;
 
 export type Account = { email: string; fullName: string; landing: string };
@@ -95,6 +100,36 @@ export async function apiStatus(page: Page, path: string): Promise<number> {
     const response = await fetch(`${origin}${target}`, { credentials: "include" });
     return response.status;
   }, { origin: API_ORIGIN, target: path });
+}
+
+/**
+ * Records one completed Action on a Ticket through the real Actions API, as the
+ * signed-in user, from inside the page, so the browser sends its own session
+ * cookie and trusted Origin exactly as the application does.
+ *
+ * Lab 4's resolution gate (BR-19) refuses to resolve a Ticket with no completed
+ * work, and the Lab 3 screens have no way to record any until issue #85 adds
+ * one. This is the minimum the Lab 3 journey needs to keep testing what it was
+ * written to test (docs/lab-04/tests.md §7). Returns the HTTP status.
+ */
+export async function recordCompletedAction(page: Page, ticketId: number): Promise<number> {
+  return page.evaluate(async ({ origin, id }) => {
+    const me = await (await fetch(`${origin}/api/auth/me`, { credentials: "include" })).json();
+    const response = await fetch(`${origin}/api/tickets/${id}/actions`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify({
+        status: "COMPLETED",
+        actionAt: new Date().toISOString(),
+        description: "Replaced the failed uplink module in the annexe switch.",
+        result: "Payroll reachable again from the annexe.",
+        followUpRequired: false,
+        assigneeId: me.user.id,
+      }),
+    });
+    return response.status;
+  }, { origin: API_ORIGIN, id: ticketId });
 }
 
 /**
@@ -259,7 +294,28 @@ export async function createTicket(page: Page, draft: TicketDraft): Promise<stri
 }
 
 /** Opens a Ticket from the IT Staff queue by its number. */
+/**
+ * Opens the Ticket Queue from the navigation. Lab 4 issue #87 moved the IT
+ * Staff landing page to the Dashboard, so a journey that works from the queue
+ * now goes there first, as a person would.
+ */
+export async function openQueue(page: Page): Promise<void> {
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Ticket Queue" }).click();
+  await expect(page.getByRole("heading", { name: "Ticket Queue" })).toBeVisible();
+}
+
+/**
+ * Opens My Tickets from the navigation. Lab 4 issue #88 moved the Requester
+ * landing page to the Dashboard, so a journey that works from My Tickets now
+ * goes there first, as a person would.
+ */
+export async function openMyTickets(page: Page): Promise<void> {
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "My Tickets" }).click();
+  await expect(page.getByRole("heading", { name: "My Tickets" })).toBeVisible();
+}
+
 export async function openInQueue(page: Page, ticketNumber: string): Promise<void> {
+  if (!(await page.getByRole("heading", { name: "Ticket Queue" }).isVisible())) await openQueue(page);
   await page.getByLabel(/^Search/).fill(ticketNumber);
   const row = page.getByRole("row").filter({ hasText: ticketNumber });
   await expect(row).toHaveCount(1);
