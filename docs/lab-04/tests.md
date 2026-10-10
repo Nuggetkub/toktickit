@@ -472,3 +472,16 @@ The Lab 3 rows that the Lab 3 §6 addendum said would become `Passed` only at th
 
   The file-existence check now runs before the release PR opens, not only before rows move to
   `Passed`.
+- **A control label broke inside a word on `main`, and no check could see it** (issue #111).
+  After the release, the Requester's Actions table showed its Details button as "Detail / s"
+  at desktop width. The committed RESP-01 capture showed it too, so the §9 clipping item had
+  been ticked over it. `overflow-wrap: anywhere` on the table's cells reached every control
+  inside them. #90 had exempted the badge from that rule and left the buttons, fixing one
+  instance and not the class. `expectUsable` now measures each word of every visible link and
+  button label, and fails if one renders on two lines. On the unfixed stylesheet it found a
+  second instance, Complete for IT Staff at tablet. The self-test plants a split Details label
+  and requires the check to name it. Removing the CSS fix turns the suite red, and a no-op
+  control stays green. The Lab 4 browser suite is now **19** tests.
+
+  §6 records the release at `316a8c0`, and it stays as written. This change reaches `main` in
+  a later release and is run there in its own post-merge evidence.
