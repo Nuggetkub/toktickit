@@ -12,9 +12,9 @@ test.describe.configure({ mode: "serial" });
 const MOBILE = VIEWPORTS[2];
 
 /** Runs `expectUsable` and returns its failure message, or "" if it passed. */
-async function usableFailure(page: Page, what: string): Promise<string> {
+async function usableFailure(page: Page, what: string, viewport = "mobile"): Promise<string> {
   try {
-    await expectUsable(page, "mobile", what);
+    await expectUsable(page, viewport, what);
     return "";
   } catch (error) {
     return String((error as Error).message);
@@ -60,6 +60,19 @@ test("targets: an undersized dashboard link and an undersized Action select fail
   expect(await usableFailure(page, "control: the real Action form")).toBe("");
   await page.addStyleTag({ content: "form.zen-action-form select { min-height: 0 !important; height: 20px !important; padding: 0 !important; }" });
   expect(await usableFailure(page, "a 20 px select")).toMatch(/touch targets under 44 px[\s\S]*select/);
+});
+
+test("labels: a control whose label breaks inside a word fails, at desktop width (issue #111)", async ({ page }) => {
+  await page.setViewportSize(VIEWPORTS[0]);
+  await signIn(page, STAFF);
+  // A seeded Ticket with Actions on it: the first of Grace's open actions.
+  await page.getByRole("region", { name: "My open actions" }).getByRole("link").first().click();
+  const details = page.locator(".zen-actions-table").getByRole("button", { name: "Details" }).first();
+  await expect(details).toBeVisible();
+  expect(await usableFailure(page, "control: the real Actions table", "desktop")).toBe("");
+  // The shipped defect, put back: the cell's rule reaches the button, in a column too narrow for the word.
+  await page.addStyleTag({ content: ".zen-actions-table button { white-space: normal !important; overflow-wrap: anywhere !important; width: 40px !important; min-width: 0 !important; }" });
+  expect(await usableFailure(page, "a split Details label", "desktop")).toMatch(/a control label breaks inside a word[\s\S]*splits \\?"Details\\?"/);
 });
 
 test("overlap: two controls laid over each other, and a control under an overlay, both fail", async ({ page }) => {
