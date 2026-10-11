@@ -1,0 +1,3 @@
+rows=46 spec ACs=29
+defined: {'FR-': 18, 'BR-': 35, 'AC-': 29, 'D-': 17}
+OK: every AC tested, matrix generated from rows, section-12 files and all levels planned, every citation defined
