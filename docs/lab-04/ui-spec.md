@@ -330,13 +330,22 @@ it. Each box is ticked only with that evidence named beside it.
       - for every visible, enabled link, button, input, select and textarea, and for the
         clickable label of each checkbox and radio: a 44 px target on mobile; no overlap with
         another target; and nothing else at its centre;
-      - whole badges, unstretched checkboxes and unsplit mobile cells.
+      - whole badges, unstretched checkboxes and unsplit mobile cells;
+      - no link or button label broken inside a word (issue #111).
 
       The Requester Dashboard's panels are also asserted to sit below its cards. These checks
       have negative controls of their own (`checks.selftest.spec.ts`): an undersized card, an
-      undersized Action select, two overlapping cards and a covered card each fail by name.
-      Earth2509's review of PR #106 found the first version measured buttons only and had no
-      overlap check.
+      undersized Action select, two overlapping cards, a covered card and a split Details
+      label each fail by name. Earth2509's review of PR #106 found the first version measured
+      buttons only and had no overlap check.
+
+      **This item was ticked while a defect stood.** After the release, the Requester's Actions
+      table still broke its Details button into "Detail / s" at desktop width, and the
+      committed capture `actions-taken/requester-list-desktop.png` showed it. It was found by
+      eye while capturing the Lab 4 report, not by any check, and both reviews had read past
+      it. The new check then found a second instance, Complete for IT Staff at tablet. Both
+      came from the cause #90 fixed for the badge alone. Issue #111 fixes the class and
+      regenerates the captures.
 - [x] **E** Loading, empty, forbidden, conflict and failure states captured for both
       dashboards and the Actions section, each mapped to its capture (all under
       `states/` unless named):

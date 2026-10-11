@@ -1204,6 +1204,17 @@ body {
   overflow-wrap: normal;
 }
 
+/* The same for every control in the table (issue #111). Exempting the badge
+   alone fixed one instance, not the class: the Details button still broke
+   into "Detail / s" on the Requester's screen at desktop, and Complete broke
+   the same way for IT Staff at tablet. A label may wrap between its words,
+   never inside one. */
+.zen-actions-table button,
+.zen-actions-table a {
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
 /* Lab 4 issue 86 - the status history (ui-spec.md section 5) */
 .zen-timeline {
   display: grid;
