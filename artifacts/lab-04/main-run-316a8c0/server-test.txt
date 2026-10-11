@@ -1,0 +1,138 @@
+
+> toktickit-server@1.0.0 test
+> vitest run
+
+
+ RUN  v2.1.9 <repo>/server
+
+[test setup] schema "lab2_test" reset, migrated and seeded
+ ✓ tests/lab-03/comments-notes.api.test.ts (37 tests) 2764ms
+   ✓ the eligibility check and the write are one atomic step (Earth2509, PR #66) > refuses a comment on a Ticket that closed while the request was in flight 440ms
+   ✓ the eligibility check and the write are one atomic step (Earth2509, PR #66) > refuses an internal note on a Ticket that closed while the request was in flight 434ms
+   ✓ the eligibility check and the write are one atomic step (Earth2509, PR #66) > refuses the indication on a Ticket that reached RESOLVED while the request was in flight 433ms
+   ✓ the eligibility check and the write are one atomic step (Earth2509, PR #66) > refuses an attachment removal on a Ticket that closed while the request was in flight 450ms
+ ✓ tests/lab-04/actions-taken.api.test.ts (24 tests) 1272ms
+ ✓ tests/lab-03/users-admin.api.test.ts (25 tests) 2344ms
+   ✓ API-26 — creating a user > creates a pending-password account, never echoes the password, and lets it sign in only with that password 534ms
+   ✓ API-26 — creating a user > refuses a duplicate email compared after normalisation 373ms
+ ✓ tests/lab-03/staff-queue.api.test.ts (46 tests) 516ms
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts (78 tests) 1252ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts (76 tests) 1966ms
+ ✓ tests/lab-03/auth.api.test.ts (16 tests) 7519ms
+   ✓ POST /api/auth/login > answers an unknown email, a wrong password and an account with no password identically 675ms
+   ✓ POST /api/auth/login > spends the same work on an unknown email as on a wrong password 997ms
+   ✓ POST /api/auth/login > names a deactivated account only once its password is correct 326ms
+   ✓ POST /api/auth/login > refuses the sixth attempt within the window, even with the correct password 823ms
+   ✓ POST /api/auth/change-password > reports a wrong current password on its field, and keeps the session alive 343ms
+   ✓ POST /api/auth/change-password > refuses a sixth attempt, even with the correct current password 1171ms
+   ✓ POST /api/auth/change-password > applies every password rule to the new password 669ms
+   ✓ POST /api/auth/change-password > clears the pending flag, replaces the session, and ends every other one 1023ms
+ ✓ tests/lab-03/authorization.api.test.ts (49 tests) 497ms
+ ✓ tests/lab-04/migration.test.ts (4 tests) 21926ms
+   ✓ Lab 4 migration against a populated Lab 3 database > adds Actions Taken and history without changing any Lab 3 row, and matches schema.prisma 4170ms
+   ✓ Lab 4 migration against a populated Lab 3 database > rolls back to exactly the Lab 3 schema, keeps every Lab 3 row, and can be re-applied 9673ms
+   ✓ Lab 4 migration against a populated Lab 3 database > numbers history already recorded in history order, and later events and completions after it (D-16) 4209ms
+   ✓ Lab 4 migration against a populated Lab 3 database > refuses, in the database itself, every state the Action rules forbid 3724ms
+ ✓ tests/lab-04/actions-taken.test.ts (21 tests) 10ms
+ ✓ tests/lab-04/staff-dashboard.api.test.ts (12 tests) 855ms
+ ✓ tests/lab-02/attachments.api.test.ts (13 tests) 906ms
+ ✓ tests/lab-04/requester-dashboard.api.test.ts (13 tests) 405ms
+ ✓ tests/lab-03/users-admin.test.ts (20 tests) 7ms
+ ✓ tests/lab-02/my-tickets.api.test.ts (19 tests) 310ms
+ ✓ tests/lab-04/status-filter.api.test.ts (34 tests) 380ms
+ ✓ tests/lab-04/seed.test.ts (7 tests) 1667ms
+ ✓ tests/lab-04/authorization.api.test.ts (44 tests) 457ms
+ ✓ tests/lab-03/seed.test.ts (6 tests) 4437ms
+   ✓ the Lab 3 seed > creates the accounts the labsheet requires 335ms
+   ✓ the Lab 3 seed > gives every seeded account the documented development password 2103ms
+   ✓ the Lab 3 seed > creates nothing on a second run and never resets a changed password 320ms
+   ✓ the Lab 3 seed > provisions a migrated Requester that has no password, and only then 669ms
+ ✓ tests/lab-02/ticket-detail.api.test.ts (6 tests) 233ms
+ ✓ tests/lab-03/migration.test.ts (3 tests) 8637ms
+   ✓ Lab 3 migration against a populated Lab 2 database > keeps every id, owner link and removal attribution 2297ms
+   ✓ Lab 3 migration against a populated Lab 2 database > stops before renaming anything when two emails collide once normalised 1978ms
+   ✓ Lab 3 migration against a populated Lab 2 database > leaves a schema that matches schema.prisma, with no drift 4277ms
+ ✓ tests/lab-03/requester-tickets.api.test.ts (19 tests) 352ms
+ ✓ tests/lab-03/ticket-workflow.test.ts (79 tests) 11ms
+ ✓ tests/lab-02/create-ticket.api.test.ts (10 tests) 626ms
+ ✓ tests/lab-04/dashboard-snapshot.api.test.ts (2 tests) 205ms
+ ✓ tests/lab-03/staff-queue-query.test.ts (44 tests) 8ms
+ ✓ tests/lab-03/password.test.ts (13 tests) 1998ms
+   ✓ password hashing > stores a self-describing scrypt hash with a fresh salt each time 361ms
+   ✓ password hashing > verifies the original password and rejects anything else 743ms
+   ✓ password hashing > verifies a hash written with different parameters, so the cost can be raised later 354ms
+   ✓ password hashing > offers a dummy hash that nothing verifies against, for the unknown-account path 536ms
+ ✓ tests/lab-04/my-tickets-sort.api.test.ts (5 tests) 174ms
+stdout | tests/lab-04/dashboard-performance.test.ts > PERF-01 the dashboards and the Action list answer within 500 ms at p95 (AC-29) > on the seeded demo data, as seeded accounts
+PERF-01 context: 32 Tickets, 12 Actions, 98 Status Events; Node v24.14.0
+
+stdout | tests/lab-04/dashboard-performance.test.ts > PERF-01 the dashboards and the Action list answer within 500 ms at p95 (AC-29) > on the seeded demo data, as seeded accounts
+PERF-01 Requester dashboard: 50 requests, median 12.7 ms, p95 14.0 ms, max 15.9 ms
+
+stdout | tests/lab-04/dashboard-performance.test.ts > PERF-01 the dashboards and the Action list answer within 500 ms at p95 (AC-29) > on the seeded demo data, as seeded accounts
+PERF-01 IT Staff dashboard: 50 requests, median 15.8 ms, p95 18.0 ms, max 30.2 ms
+
+stdout | tests/lab-04/dashboard-performance.test.ts > PERF-01 the dashboards and the Action list answer within 500 ms at p95 (AC-29) > on the seeded demo data, as seeded accounts
+PERF-01 Administrator dashboard: 50 requests, median 15.7 ms, p95 17.5 ms, max 19.7 ms
+
+stdout | tests/lab-04/dashboard-performance.test.ts > PERF-01 the dashboards and the Action list answer within 500 ms at p95 (AC-29) > on the seeded demo data, as seeded accounts
+PERF-01 Action list: 50 requests, median 6.8 ms, p95 7.7 ms, max 8.0 ms
+
+ ✓ tests/lab-04/dashboard-performance.test.ts (1 test) 4581ms
+   ✓ PERF-01 the dashboards and the Action list answer within 500 ms at p95 (AC-29) > on the seeded demo data, as seeded accounts 2837ms
+ ✓ tests/lab-04/resolution-gate.test.ts (7 tests) 4ms
+ ✓ tests/lab-02/reference.api.test.ts (4 tests) 172ms
+ ✓ tests/lab-03/discussion.test.ts (27 tests) 5ms
+ ✓ tests/lab-02/attachment-rules.test.ts (22 tests) 11ms
+ ✓ tests/lab-04/status-filter.test.ts (32 tests) 7ms
+ ✓ tests/lab-02/ticket-validation.test.ts (17 tests) 4ms
+ ✓ tests/lab-03/auth-middleware.test.ts (6 tests) 46ms
+ ✓ tests/lab-03/login-throttle.test.ts (6 tests) 3ms
+stderr | tests/lab-02/reference-failure.api.test.ts > reference endpoints when the database is unreachable > /api/categories returns a safe 503 in the documented envelope
+GET /api/categories failed: Error: connect ECONNREFUSED 127.0.0.1:5433
+    at Object.unreachable [as findMany] (<repo>\server\tests\lab-02\reference-failure.api.test.ts:14:42)
+    at <repo>\server\src\app.ts:113:51
+    at Layer.handle [as handle_request] (<repo>\server\node_modules\express\lib\router\layer.js:95:5)
+    at next (<repo>\server\node_modules\express\lib\router\route.js:149:13)
+    at requirePasswordChangeComplete (<repo>\server\src\auth-middleware.ts:86:3)
+    at Layer.handle [as handle_request] (<repo>\server\node_modules\express\lib\router\layer.js:95:5)
+    at next (<repo>\server\node_modules\express\lib\router\route.js:149:13)
+    at requireAuthenticatedUser (<repo>\server\src\auth-middleware.ts:57:5)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+stderr | tests/lab-02/reference-failure.api.test.ts > reference endpoints when the database is unreachable > /api/related-systems returns a safe 503 in the documented envelope
+GET /api/related-systems failed: Error: connect ECONNREFUSED 127.0.0.1:5433
+    at Object.unreachable [as findMany] (<repo>\server\tests\lab-02\reference-failure.api.test.ts:14:42)
+    at <repo>\server\src\app.ts:126:60
+    at Layer.handle [as handle_request] (<repo>\server\node_modules\express\lib\router\layer.js:95:5)
+    at next (<repo>\server\node_modules\express\lib\router\route.js:149:13)
+    at requirePasswordChangeComplete (<repo>\server\src\auth-middleware.ts:86:3)
+    at Layer.handle [as handle_request] (<repo>\server\node_modules\express\lib\router\layer.js:95:5)
+    at next (<repo>\server\node_modules\express\lib\router\route.js:149:13)
+    at requireAuthenticatedUser (<repo>\server\src\auth-middleware.ts:57:5)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+stderr | tests/lab-02/reference-failure.api.test.ts > reference endpoints when the database is unreachable > never leaks the underlying cause to the client
+GET /api/categories failed: Error: connect ECONNREFUSED 127.0.0.1:5433
+    at Object.unreachable [as findMany] (<repo>\server\tests\lab-02\reference-failure.api.test.ts:14:42)
+    at <repo>\server\src\app.ts:113:51
+    at Layer.handle [as handle_request] (<repo>\server\node_modules\express\lib\router\layer.js:95:5)
+    at next (<repo>\server\node_modules\express\lib\router\route.js:149:13)
+    at requirePasswordChangeComplete (<repo>\server\src\auth-middleware.ts:86:3)
+    at Layer.handle [as handle_request] (<repo>\server\node_modules\express\lib\router\layer.js:95:5)
+    at next (<repo>\server\node_modules\express\lib\router\route.js:149:13)
+    at requireAuthenticatedUser (<repo>\server\src\auth-middleware.ts:57:5)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+ ✓ tests/lab-02/reference-failure.api.test.ts (3 tests) 29ms
+ ✓ tests/lab-01/categories.test.ts (2 tests) 269ms
+ ✓ tests/lab-02/seed.test.ts (3 tests) 730ms
+ ✓ tests/lab-02/ticket-query.test.ts (11 tests) 4ms
+ ✓ tests/lab-02/ticket-number.test.ts (3 tests) 2ms
+ ✓ tests/lab-01/health.test.ts (1 test) 17ms
+
+ Test Files  43 passed (43)
+      Tests  870 passed (870)
+   Start at  21:24:00
+   Duration  102.05s (transform 1.25s, setup 262ms, collect 11.87s, tests 67.62s, environment 6ms, prepare 3.61s)
+

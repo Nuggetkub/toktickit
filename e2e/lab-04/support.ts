@@ -159,6 +159,29 @@ export async function expectUsable(page: Page, viewport: string, what: string): 
       .map((el) => el.textContent?.trim() ?? ""),
   );
   expect(broken, `${what}: badges broken across lines`).toEqual([]);
+  // The same defect on a control (issue #111): `overflow-wrap: anywhere` on the
+  // Actions table's cells broke the Details button into "Detail / s", and the
+  // badge rule above never looked at buttons. A label may wrap between words;
+  // it may not break inside one. Each word of every visible link and button is
+  // measured on its own, and one that renders on two lines fails.
+  const splitWords = await page.evaluate(() => {
+    const found: string[] = [];
+    for (const el of Array.from(document.querySelectorAll<HTMLElement>("a[href], button"))) {
+      if (el.offsetParent === null) continue;
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        for (const match of Array.from(node.textContent!.matchAll(/\S+/g))) {
+          const range = document.createRange();
+          range.setStart(node, match.index!);
+          range.setEnd(node, match.index! + match[0].length);
+          const tops = new Set(Array.from(range.getClientRects()).filter((r) => r.width > 0).map((r) => Math.round(r.top)));
+          if (tops.size > 1) found.push(`${el.tagName.toLowerCase()} "${(el.textContent ?? "").trim().slice(0, 30)}" splits "${match[0]}"`);
+        }
+      }
+    }
+    return found;
+  });
+  expect(splitWords, `${what} at ${viewport}: a control label breaks inside a word`).toEqual([]);
   const stretched = await page.evaluate(() =>
     Array.from(document.querySelectorAll<HTMLInputElement>('input[type="checkbox"], input[type="radio"]'))
       .filter((el) => el.offsetParent !== null && el.getBoundingClientRect().width > 32)

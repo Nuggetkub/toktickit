@@ -1,0 +1,49 @@
+
+> toktickit@1.0.0 e2e:lab3
+> playwright test --config=playwright.lab3.config.ts
+
+[WebServer] 
+[WebServer] > toktickit-server@1.0.0 e2e:server
+[WebServer] > npm run e2e:prepare && tsx src/index.ts
+[WebServer] 
+
+[WebServer] 
+[WebServer] > toktickit-server@1.0.0 e2e:prepare
+[WebServer] > tsx scripts/prepare-e2e.ts
+[WebServer] 
+
+[WebServer] [e2e setup] schema "lab3_e2e" reset, migrated and seeded
+
+[WebServer] TokTickIT API listening on http://localhost:3101
+
+
+Running 27 tests using 1 worker
+
+[1/27] e2e\lab-03\authentication.spec.ts:22:1 › a first sign-in is forced to change its password and then lands on its own screen
+[2/27] e2e\lab-03\authentication.spec.ts:54:1 › each role lands on its own start screen
+[3/27] e2e\lab-03\authentication.spec.ts:65:1 › a wrong password and a deactivated account are refused in the words the contract fixes
+[4/27] e2e\lab-03\authentication.spec.ts:84:1 › after logout a direct URL shows Login and the old session is refused by the API
+[5/27] e2e\lab-03\authentication.spec.ts:104:1 › a password change ends every other session that account holds
+[6/27] e2e\lab-03\requester-regression.spec.ts:22:1 › a Requester creates, finds and opens a Ticket with no selector in sight
+[7/27] e2e\lab-03\requester-regression.spec.ts:51:1 › an attachment survives upload and soft removal under a session
+[8/27] e2e\lab-03\requester-regression.spec.ts:77:1 › another Requester's Ticket is refused at the URL, in words that disclose nothing
+[9/27] e2e\lab-03\requester-regression.spec.ts:101:1 › a Requester is offered no Internal Notes control and asks for none
+[10/27] e2e\lab-03\responsive.spec.ts:32:5 › desktop — 1440×900 › every Lab 3 screen holds together at desktop width
+[11/27] e2e\lab-03\responsive.spec.ts:32:5 › tablet — 834×1112 › every Lab 3 screen holds together at tablet width
+[12/27] e2e\lab-03\responsive.spec.ts:32:5 › mobile — 390×844 › every Lab 3 screen holds together at mobile width
+[13/27] e2e\lab-03\staff-ticket-flow.spec.ts:23:1 › the queue finds a Ticket by number, by status and by owner
+[14/27] e2e\lab-03\staff-ticket-flow.spec.ts:62:1 › a Ticket is claimed, prioritised, worked, indicated, resolved and closed
+[15/27] e2e\lab-03\ui-states.spec.ts:62:1 › loading — My Tickets while the list is still in flight
+[16/27] e2e\lab-03\ui-states.spec.ts:79:1 › saving — the Administrator panel while a user is being written
+[17/27] e2e\lab-03\ui-states.spec.ts:97:1 › success — the Ticket created confirmation, with the number the server assigned
+[18/27] e2e\lab-03\ui-states.spec.ts:106:1 › empty — a Requester who has never raised a Ticket
+[19/27] e2e\lab-03\ui-states.spec.ts:139:1 › no-results — a search that matches nothing, offering to clear the filters
+[20/27] e2e\lab-03\ui-states.spec.ts:149:1 › forbidden — IT Staff at a URL their role does not include
+[21/27] e2e\lab-03\ui-states.spec.ts:157:1 › conflict — someone else changed the Ticket first
+[22/27] e2e\lab-03\ui-states.spec.ts:181:1 › failure — the list cannot be loaded, and says so with a way back
+[23/27] e2e\lab-03\ui-states.spec.ts:200:1 › the Internal Notes surface, so it can be compared with the public one
+[24/27] e2e\lab-03\user-administration.spec.ts:22:1 › an Administrator searches, filters by role, and creates an IT Staff account that must change its password
+[25/27] e2e\lab-03\user-administration.spec.ts:97:1 › an Administrator cannot deactivate themselves or change their own role
+[26/27] e2e\lab-03\user-administration.spec.ts:114:1 › IT Staff are refused the Users screen and are never offered it
+[27/27] e2e\lab-03\user-administration.spec.ts:131:1 › a deactivated account's sign-in is refused before it reaches any screen
+  27 passed (1.1m)

@@ -1,0 +1,28 @@
+file	line	outcome	results	ms	title
+e2e/lab-03/authentication.spec.ts	22	expected	passed	2097	a first sign-in is forced to change its password and then lands on its own screen
+e2e/lab-03/authentication.spec.ts	54	expected	passed	1552	each role lands on its own start screen
+e2e/lab-03/authentication.spec.ts	65	expected	passed	911	a wrong password and a deactivated account are refused in the words the contract fixes
+e2e/lab-03/authentication.spec.ts	84	expected	passed	1090	after logout a direct URL shows Login and the old session is refused by the API
+e2e/lab-03/authentication.spec.ts	104	expected	passed	3028	a password change ends every other session that account holds
+e2e/lab-03/requester-regression.spec.ts	22	expected	passed	1626	a Requester creates, finds and opens a Ticket with no selector in sight
+e2e/lab-03/requester-regression.spec.ts	51	expected	passed	1623	an attachment survives upload and soft removal under a session
+e2e/lab-03/requester-regression.spec.ts	77	expected	passed	2708	another Requester's Ticket is refused at the URL, in words that disclose nothing
+e2e/lab-03/requester-regression.spec.ts	101	expected	passed	1282	a Requester is offered no Internal Notes control and asks for none
+e2e/lab-03/responsive.spec.ts	32	expected	passed	5146	desktop — 1440×900 > every Lab 3 screen holds together at desktop width
+e2e/lab-03/responsive.spec.ts	32	expected	passed	4559	tablet — 834×1112 > every Lab 3 screen holds together at tablet width
+e2e/lab-03/responsive.spec.ts	32	expected	passed	4795	mobile — 390×844 > every Lab 3 screen holds together at mobile width
+e2e/lab-03/staff-ticket-flow.spec.ts	23	expected	passed	2242	the queue finds a Ticket by number, by status and by owner
+e2e/lab-03/staff-ticket-flow.spec.ts	62	expected	passed	5327	a Ticket is claimed, prioritised, worked, indicated, resolved and closed
+e2e/lab-03/ui-states.spec.ts	62	expected	passed	1019	loading — My Tickets while the list is still in flight
+e2e/lab-03/ui-states.spec.ts	79	expected	passed	1138	saving — the Administrator panel while a user is being written
+e2e/lab-03/ui-states.spec.ts	97	expected	passed	1196	success — the Ticket created confirmation, with the number the server assigned
+e2e/lab-03/ui-states.spec.ts	106	expected	passed	2862	empty — a Requester who has never raised a Ticket
+e2e/lab-03/ui-states.spec.ts	139	expected	passed	1608	no-results — a search that matches nothing, offering to clear the filters
+e2e/lab-03/ui-states.spec.ts	149	expected	passed	1075	forbidden — IT Staff at a URL their role does not include
+e2e/lab-03/ui-states.spec.ts	157	expected	passed	2397	conflict — someone else changed the Ticket first
+e2e/lab-03/ui-states.spec.ts	181	expected	passed	1070	failure — the list cannot be loaded, and says so with a way back
+e2e/lab-03/ui-states.spec.ts	200	expected	passed	2497	the Internal Notes surface, so it can be compared with the public one
+e2e/lab-03/user-administration.spec.ts	22	expected	passed	4401	an Administrator searches, filters by role, and creates an IT Staff account that must change its password
+e2e/lab-03/user-administration.spec.ts	97	expected	passed	1098	an Administrator cannot deactivate themselves or change their own role
+e2e/lab-03/user-administration.spec.ts	114	expected	passed	1019	IT Staff are refused the Users screen and are never offered it
+e2e/lab-03/user-administration.spec.ts	131	expected	passed	553	a deactivated account's sign-in is refused before it reaches any screen

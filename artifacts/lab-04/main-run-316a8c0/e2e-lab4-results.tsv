@@ -1,0 +1,19 @@
+file	line	outcome	results	ms	title
+e2e/lab-04/actions-taken-flow.spec.ts	28	expected	passed	8475	E2E-01 IT Staff record and plan work, a colleague completes theirs, and the Requester reads both
+e2e/lab-04/actions-taken-flow.spec.ts	100	expected	passed	2973	E2E-05 a double-clicked Save creates one Action, and a failed save keeps the form for Retry
+e2e/lab-04/checks.selftest.spec.ts	24	expected	passed	2915	guard: an undeclared connection failure is caught; a declared one and a declared HTTP refusal are not
+e2e/lab-04/checks.selftest.spec.ts	48	expected	passed	1494	targets: an undersized dashboard link and an undersized Action select fail at mobile
+e2e/lab-04/checks.selftest.spec.ts	65	expected	passed	1198	overlap: two controls laid over each other, and a control under an overlay, both fail
+e2e/lab-04/dashboards.spec.ts	33	expected	passed	1837	E2E-03 Requester: each card lands on exactly what it counts, and the queue is Forbidden
+e2e/lab-04/dashboards.spec.ts	55	expected	passed	4215	E2E-03 IT Staff: cards and both breakdowns land on what they count; no User accounts
+e2e/lab-04/dashboards.spec.ts	84	expected	passed	1588	E2E-03 Administrator: User accounts rows land on lists of that many accounts
+e2e/lab-04/responsive.spec.ts	46	expected	passed	2870	RESP-01 fixture: an In Progress Ticket with a long completed Action and an open one
+e2e/lab-04/responsive.spec.ts	67	expected	passed	4083	RESP-01 IT Staff: the dashboard, the Actions section, the form, and the resolution-blocked state
+e2e/lab-04/responsive.spec.ts	93	expected	passed	1590	RESP-01 Administrator: the dashboard with User accounts
+e2e/lab-04/responsive.spec.ts	104	expected	passed	2594	RESP-01 Requester: a populated dashboard, and the Actions section read-only
+e2e/lab-04/responsive.spec.ts	129	expected	passed	1775	RESP-01 Requester with no tickets: the empty dashboard
+e2e/lab-04/responsive.spec.ts	140	expected	passed	2480	RESP-01 states: loading, failure, Action validation and a real Action conflict
+e2e/lab-04/responsive.spec.ts	201	expected	passed	4522	RESP-01 states on every screen: both dashboards, Forbidden, and the Actions section
+e2e/lab-04/responsive.spec.ts	268	expected	passed	2095	RESP-01 focus is visible, and Tab follows the reading order at every width (ui-spec §7)
+e2e/lab-04/ticket-resolution.spec.ts	46	expected	passed	2921	E2E-02 Resolved is disabled with its reasons until the work is done, then resolving succeeds and the History shows each change
+e2e/lab-04/ticket-resolution.spec.ts	81	expected	passed	2659	E2E-02 cancelling a Ticket with an open Action says so, and cancels the Action with it

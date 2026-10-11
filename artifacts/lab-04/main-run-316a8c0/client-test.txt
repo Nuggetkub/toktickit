@@ -1,0 +1,255 @@
+
+> toktickit-client@1.0.0 test
+> vitest run
+
+
+ RUN  v2.1.9 <repo>/client
+
+ ✓ tests/lab-02/ZenGreen.styles.test.tsx (25 tests) 312ms
+stderr | tests/lab-04/StaffDashboard.test.tsx > UI-05 the four cards > show each count as a sentence, and link to the list each one counted, built from its query
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+stderr | tests/lab-03/StaffTicketDetail.test.tsx > IT Staff Ticket Detail — information is a record, the Work panel is not > shows the ticket facts read-only, with no control that would edit them
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+stderr | tests/lab-02/RequesterTicketDetail.test.tsx > Ticket Detail — the read-only record > shows every ticket field as a read-only value, not as an editable control
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+stderr | tests/lab-03/UserManagement.test.tsx > User Management — the list > shows the five columns the contract names, with role and status in words
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+stderr | tests/lab-04/RequesterDashboard.test.tsx > UI-06 the four cards > show each count as a sentence with its explanation, and link into My Tickets filtered
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+stderr | tests/lab-02/MyTickets.test.tsx > My Tickets — the list > shows the requester's tickets with the columns the spec names
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+stderr | tests/lab-04/TicketWorkflow.test.tsx > UI-03 the status control offers exactly BR-18's next statuses > from NEW
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+stderr | tests/lab-04/FormPreservation.test.tsx > UI-08 Create Ticket keeps everything after a 500 > keeps every value, shows the error, can retry, and only success moves on
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+stderr | tests/lab-03/Login.test.tsx > Login — validation > names each empty field beneath it and sends no request
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+stderr | tests/lab-03/StaffTicketQueue.test.tsx > Ticket Queue — the table > shows the seven columns the contract names
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+stderr | tests/lab-02/CreateTicket.test.tsx > Create Ticket — reference data and read-only values > loads Categories and Related Systems from the API
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+stderr | tests/lab-04/DrillDownFilters.test.tsx > UI-07 the Ticket Queue reads a link's filters from the URL > requests exactly the four drill-down filters, and the controls show them
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+stderr | tests/lab-04/RequesterConflict.test.tsx > UI-09 the Requester's Ticket Detail catches up after a 409 (issue #89) > a comment refused because the Ticket was closed: the screen shows it Closed and stops offering the composer
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+stderr | tests/lab-04/DrillDownFilters.test.tsx > UI-07 the Ticket Queue reads a link's filters from the URL > a later filter change replaces the URL, so Back returns to the dashboard
+Warning: An update to MemoryRouter inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at MemoryRouter (<repo>\client\node_modules\react-router\dist\umd\react-router.development.js:1097:7)
+
+stderr | tests/lab-02/RequesterTicketDetail.test.tsx > Ticket Detail — attachment states > downloads an active attachment through fetch, carrying the session
+Error: Not implemented: navigation (except hash changes)
+    at module.exports (<repo>\client\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at navigateFetch (<repo>\client\node_modules\jsdom\lib\jsdom\living\window\navigation.js:77:3)
+    at exports.navigate (<repo>\client\node_modules\jsdom\lib\jsdom\living\window\navigation.js:55:3)
+    at Timeout._onTimeout (<repo>\client\node_modules\jsdom\lib\jsdom\living\nodes\HTMLHyperlinkElementUtils-impl.js:81:7)
+    at listOnTimeout (node:internal/timers:605:17)
+    at processTimers (node:internal/timers:541:7) undefined
+
+ ✓ tests/lab-04/RequesterDashboard.test.tsx (11 tests) 1720ms
+   ✓ UI-06 the four cards > show each count as a sentence with its explanation, and link into My Tickets filtered 480ms
+   ✓ UI-06 the four cards > drill down: Waiting for me opens My Tickets already asking for that status 326ms
+stderr | tests/lab-04/DrillDownFilters.test.tsx > UI-07 My Tickets reads the status from the URL (issue #88) > a later status change replaces the URL, so Back returns to the dashboard
+Warning: An update to MemoryRouter inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at MemoryRouter (<repo>\client\node_modules\react-router\dist\umd\react-router.development.js:1097:7)
+
+ ✓ tests/lab-04/DrillDownFilters.test.tsx (19 tests) 2155ms
+   ✓ UI-07 the Ticket Queue reads a link's filters from the URL > requests exactly the four drill-down filters, and the controls show them 325ms
+ ✓ tests/lab-04/StaffDashboard.test.tsx (19 tests) 2222ms
+   ✓ UI-05 the four cards > show each count as a sentence, and link to the list each one counted, built from its query 439ms
+stderr | tests/lab-03/RequesterDiscussion.test.tsx > Requester Ticket Detail — the discussion > shows the comment thread and a composer
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ ✓ tests/lab-02/RequesterTicketDetail.test.tsx (15 tests) 3043ms
+   ✓ Ticket Detail — the read-only record > shows every ticket field as a read-only value, not as an editable control 532ms
+   ✓ Ticket Detail — removal > requires a confirmation and a typed reason before it will remove anything 807ms
+   ✓ Ticket Detail — removal > puts a server-side reason rejection on the reason field 550ms
+ ✓ tests/lab-04/RequesterConflict.test.tsx (7 tests) 3368ms
+   ✓ UI-09 the Requester's Ticket Detail catches up after a 409 (issue #89) > a comment refused because the Ticket was closed: the screen shows it Closed and stops offering the composer 1182ms
+   ✓ UI-09 the Requester's Ticket Detail catches up after a 409 (issue #89) > a re-read that fails says so with Retry, keeping the refusal and the draft; Retry catches up (Earth2509, PR #105) 644ms
+   ✓ UI-09 the Requester's Ticket Detail catches up after a 409 (issue #89) > anything but a 409 leaves the Ticket alone: a failed comment is reported and nothing is re-read 598ms
+ ✓ tests/lab-03/RequesterDiscussion.test.tsx (8 tests) 1343ms
+   ✓ Requester Ticket Detail — the discussion > posts a comment and shows it at the top of the thread 589ms
+stderr | tests/lab-03/ZenGreen.lab3.styles.test.tsx > STYLE-01 on the IT Staff Ticket Detail > shows the ticket information read-only and the Work panel editable
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+stderr | tests/lab-03/ZenGreen.lab3.styles.test.tsx > STYLE-01 on the IT Staff Ticket Detail > puts Internal Notes on the private surface, under the heading the spec gives it
+Warning: An update to StaffTicketDetail inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at StaffTicketDetail (<repo>\client\src\staff\StaffTicketDetail.tsx:26:51)
+    at RequireAuth (<repo>\client\src\auth\RequireAuth.tsx:11:24)
+    at RenderedRoute (<repo>\client\node_modules\react-router\dist\umd\react-router.development.js:535:7)
+    at Routes (<repo>\client\node_modules\react-router\dist\umd\react-router.development.js:1269:7)
+    at main
+    at div
+    at AppShell (<repo>\client\src\components\AppShell.tsx:8:3)
+    at Shell (<repo>\client\src\App.tsx:57:51)
+    at AuthProvider (<repo>\client\src\auth\AuthContext.tsx:8:25)
+    at App
+    at Router (<repo>\client\node_modules\react-router\dist\umd\react-router.development.js:1203:17)
+    at MemoryRouter (<repo>\client\node_modules\react-router\dist\umd\react-router.development.js:1097:7)
+
+ ✓ tests/lab-03/ZenGreen.lab3.styles.test.tsx (21 tests) 403ms
+stderr | tests/lab-03/AppShell.test.tsx > Application shell — who is signed in > shows the user's name, their role in words, and the way out
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+stderr | tests/lab-04/ZenGreen.lab4.styles.test.tsx > STYLE-01 MetricCard: a label, a value and a sentence-form name, with a focus ring > reads as a sentence and holds its label, value and explanation
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ ✓ tests/lab-03/StaffTicketQueue.test.tsx (22 tests) 4393ms
+   ✓ Ticket Queue — the table > shows the seven columns the contract names 449ms
+   ✓ Ticket Queue — the toolbar asks the right question > debounces typing into one request rather than one per keystroke 1027ms
+ ✓ tests/lab-04/ZenGreen.lab4.styles.test.tsx (11 tests) 450ms
+ ✓ tests/lab-03/AppShell.test.tsx (10 tests) 595ms
+ ✓ tests/lab-02/MyTickets.test.tsx (22 tests) 4714ms
+   ✓ My Tickets — the list > shows the requester's tickets with the columns the spec names 486ms
+   ✓ My Tickets — searching and filtering > debounces typing into one request rather than one per keystroke 1121ms
+   ✓ My Tickets — empty and no-results are different > offers Clear filters when a search matched nothing 478ms
+ ✓ tests/lab-03/ticket-rules.test.ts (11 tests) 12ms
+stderr | tests/lab-03/ChangePassword.test.tsx > Change Password — mandatory mode > explains why it cannot be skipped and offers only Log out
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ ✓ tests/lab-04/dashboard-links.test.ts (13 tests) 10ms
+ ✓ tests/lab-02/apiClient.test.ts (4 tests) 6ms
+ ✓ tests/lab-03/UserManagement.test.tsx (15 tests) 5822ms
+   ✓ User Management — the list > shows the five columns the contract names, with role and status in words 389ms
+   ✓ User Management — the list > sends the search and the role filter as query parameters 721ms
+   ✓ User Management — creating > will not submit until the rules are met, then posts the new account 1351ms
+   ✓ User Management — creating > puts a duplicate email beneath its field and keeps what was typed 1355ms
+   ✓ User Management — editing > sends only the fields that actually changed 381ms
+   ✓ User Management — editing > sets a new initial password from its own section 615ms
+ ✓ tests/lab-01/App.test.tsx (4 tests) 282ms
+ ✓ tests/lab-03/StaffTicketDetail.test.tsx (20 tests) 6810ms
+   ✓ IT Staff Ticket Detail — information is a record, the Work panel is not > shows the ticket facts read-only, with no control that would edit them 451ms
+   ✓ IT Staff Ticket Detail — confirmation, validation and conflict > will not confirm Resolved until the summary meets BR-30 716ms
+   ✓ IT Staff Ticket Detail — confirmation, validation and conflict > refreshes the thread after a status change, because the server posts the summary as a comment 776ms
+   ✓ IT Staff Ticket Detail — confirmation, validation and conflict > moves focus into the dialog, cycles Tab inside it, and returns focus to the trigger 696ms
+   ✓ IT Staff Ticket Detail — confirmation, validation and conflict > reports a stale version as a conflict, keeps the typed comment, and re-sends nothing 782ms
+   ✓ Internal notes are kept apart from public comments > keeps a separate draft per composer, so switching tabs never moves text 1018ms
+   ✓ Internal notes are kept apart from public comments > posts each composer to its own endpoint 506ms
+ ✓ tests/lab-04/TicketWorkflow.test.tsx (26 tests) 7204ms
+   ✓ UI-03 the status control offers exactly BR-18's next statuses > from NEW 348ms
+   ✓ UI-03 a stale screen meets the server's refusal > shows RESOLUTION_BLOCKED's unmet list in the dialog, keeps the summary, and re-reads the gate and Actions 1217ms
+   ✓ UI-03 the in-place Ticket re-read after an Action write > says when the re-read failed, offers Retry in place, and keeps the success message 781ms
+   ✓ UI-03 the in-place Ticket re-read after an Action write > ignores an older re-read that answers after a status change has landed 920ms
+   ✓ UI-03 the in-place Ticket re-read after an Action write > ignores an earlier re-read that answers after a later one, though the version is the same 1314ms
+   ✓ UI-03 the in-place Ticket re-read after an Action write > ignores a re-read that answers after the screen has moved to another Ticket 681ms
+ ✓ tests/lab-03/Login.test.tsx (11 tests) 8260ms
+   ✓ Login — validation > names each empty field beneath it and sends no request 418ms
+   ✓ Login — validation > rejects an address that is not an email before asking the server 666ms
+   ✓ Login — each refusal reads as the contract says > shows one message for invalid credentials, keeps the email and clears the password 1002ms
+   ✓ Login — each refusal reads as the contract says > names a deactivated account, because the server already decided to disclose it 1027ms
+   ✓ Login — each refusal reads as the contract says > turns Retry-After into minutes rather than showing a raw number of seconds 1023ms
+   ✓ Login — each refusal reads as the contract says > translates an unreachable API and never shows the browser's own words 975ms
+   ✓ Login — success > sends the credentials with the session cookie enabled and lands on the Dashboard 1054ms
+   ✓ Login — success > goes to Change Password first when the account still has its initial password 980ms
+   ✓ Login — success > disables the form while the request is in flight 1003ms
+ ✓ tests/lab-03/ChangePassword.test.tsx (6 tests) 5130ms
+   ✓ Change Password — the live checklist > ticks each rule only once it is genuinely met 1190ms
+   ✓ Change Password — the live checklist > refuses a whitespace-only password and one equal to the account's email 791ms
+   ✓ Change Password — saving > sends the three fields and continues to the role's landing page 1459ms
+   ✓ Change Password — saving > puts a wrong current password on its own field and keeps the user signed in 1495ms
+stderr | tests/lab-04/ActionsTaken.test.tsx > UI-01 on the IT Staff Ticket Detail screen > keeps the section, and its success message, through the Ticket re-read after a save
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ ✓ tests/lab-04/ActionsTaken.test.tsx (23 tests) 12799ms
+   ✓ UI-01 the list > renders every field, with Result beneath Description and the details behind a disclosure 317ms
+   ✓ UI-01 adding an action > shows the Follow-up note only while Follow-up required is ticked, and then requires it 1273ms
+   ✓ UI-01 adding an action > makes Result optional under Plan open work, and sends the plan as OPEN 926ms
+   ✓ UI-01 adding an action > shows a server field refusal beneath its field 850ms
+   ✓ UI-01 completing and cancelling > Complete requires a Result before it can be confirmed, then sends the version and result 419ms
+   ✓ UI-01 completing and cancelling > Cancel requires a reason of at least 5 characters and keeps the Action otherwise 425ms
+   ✓ UI-02 conflicts, failures and duplicate submits > a version conflict shows Reload, keeps the input, and Reload fetches the list again 782ms
+   ✓ UI-02 conflicts, failures and duplicate submits > a network failure keeps every field, and Retry re-sends the same Idempotency-Key 1265ms
+   ✓ UI-02 conflicts, failures and duplicate submits > a server error is treated like a network failure: input kept, Retry offered 1255ms
+   ✓ UI-02 conflicts, failures and duplicate submits > a double-click on Save sends one request 1258ms
+   ✓ UI-02 a reload after a conflict keeps the other user's changes > sends only what this user changed, against the new version, so a reassignment made meanwhile survives 810ms
+   ✓ UI-02 a reload after a conflict keeps the other user's changes > when the other user changed the same field, keeps this user's value and says what it replaces 695ms
+   ✓ UI-02 the assignee list can be retried without losing the form > shows the failure beside Assignee, retries on request, and the chosen assignee is saved 421ms
+   ✓ UI-01 on the IT Staff Ticket Detail screen > keeps the section, and its success message, through the Ticket re-read after a save 1074ms
+ ✓ tests/lab-04/FormPreservation.test.tsx (12 tests) 13599ms
+   ✓ UI-08 Create Ticket keeps everything after a 500 > keeps every value, shows the error, can retry, and only success moves on 1975ms
+   ✓ UI-08 Create Ticket keeps everything after a network failure > keeps every value, shows the error, can retry, and only success moves on 1540ms
+   ✓ UI-08 the Requester's comment composer keeps the comment after a 500 > keeps the draft, shows the error, can retry, and clears only on success 668ms
+   ✓ UI-08 the Requester's comment composer keeps the comment after a network failure > keeps the draft, shows the error, can retry, and clears only on success 648ms
+   ✓ UI-08 the internal note composer keeps the note after a 500 > keeps the draft, shows the error, can retry, and clears only on success 768ms
+   ✓ UI-08 the internal note composer keeps the note after a network failure > keeps the draft, shows the error, can retry, and clears only on success 673ms
+   ✓ UI-08 the Action form keeps every field after a 500 > keeps every field, offers Retry, and only success closes it 1729ms
+   ✓ UI-08 the Action form keeps every field after a network failure > keeps every field, offers Retry, and only success closes it 1789ms
+   ✓ UI-08 the Action form clears on an explicit Cancel > Cancel closes it, and the next Add action starts empty 545ms
+   ✓ UI-08 the user panel keeps every field after a 500 > keeps every field, shows the error, can retry, and only success closes it 1362ms
+   ✓ UI-08 the user panel keeps every field after a network failure > keeps every field, shows the error, can retry, and only success closes it 1367ms
+   ✓ UI-08 the user panel clears on an explicit Cancel > Cancel closes it, and the next Create user starts empty 528ms
+ ✓ tests/lab-02/CreateTicket.test.tsx (17 tests) 16342ms
+   ✓ Create Ticket — reference data and read-only values > loads Categories and Related Systems from the API 387ms
+   ✓ Create Ticket — submission > sends the session cookie and the idempotency key, and names no requester 2364ms
+   ✓ Create Ticket — submission > shows the backend Ticket Number and Ticket Date after a successful save 2318ms
+   ✓ Create Ticket — submission > keeps every entered value when the API fails, and shows no raw network text 2299ms
+   ✓ Create Ticket — submission > lands a server-side field error on the field it concerns 2346ms
+   ✓ Create Ticket — focus and cancel > focuses the field a server-side error names 2360ms
+   ✓ Create Ticket — focus and cancel > asks before discarding a part-written ticket, and can be waved off 435ms
+   ✓ Create Ticket — focus and cancel > discards and leaves once the discard is confirmed 416ms
+   ✓ Create Ticket — attachments > is honest that selected files are not uploaded yet 2362ms
+
+ Test Files  24 passed (24)
+      Tests  352 passed (352)
+   Start at  21:25:45
+   Duration  36.76s (transform 2.87s, setup 40.80s, collect 68.97s, tests 101.00s, environment 195.29s, prepare 9.09s)
+
