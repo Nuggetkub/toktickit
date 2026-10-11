@@ -1,6 +1,6 @@
 # Lab 4 Test Plan and Results
 
-**Status:** Executed on `main` at `316a8c0`: all 46 rows `Passed` (§6). Feature-branch runs are recorded in each pull request and in §7, and they moved no row.
+**Status:** Executed on `main` at `316a8c0`, and again at `0c34916` after the #111 fix: all 46 rows `Passed` (§6 and its addendum). Feature-branch runs are recorded in each pull request and in §7, and they moved no row.
 **Companion document:** [`specification.md`](./specification.md)
 **Status convention:** a row reads `Planned` until that test has actually run and passed on
 `main`. Nothing is marked `Passed` from a feature branch. At the release, every named file is
@@ -250,6 +250,36 @@ The Lab 3 rows that the Lab 3 §6 addendum said would become `Passed` only at th
 `client/tests/lab-02/MyTickets.test.tsx` and
 `client/tests/lab-03/ZenGreen.lab3.styles.test.tsx` are all listed in this run.
 
+### Addendum: run on `main` at `0c34916` (issue #113)
+
+The fix for issue #111 reached `main` through the release PR #114, merged on 2026-10-11 as
+**`0c349163705e2db1cb3d00956040b947528f33ca`**. Every command was run again there, from the repository root, and the
+captured output is published in [`artifacts/lab-04/main-run-0c34916/`](../../artifacts/lab-04/main-run-0c34916/README.md) in the same form as the
+`316a8c0` run: each log, its exit code, per-test browser results, the PERF-01 lines, and the
+row-to-run manifest. The `316a8c0` record above is unchanged.
+
+| Command | Exit | Result |
+|---|---:|---|
+| `npm --prefix server test` | 0 | Test Files 43 passed (43) · Tests 870 passed (870) |
+| `npm --prefix client test` | 0 | Test Files 24 passed (24) · Tests 352 passed (352) |
+| `npm --prefix server run build` | 0 | `tsc`, no output |
+| `npm --prefix client run build` | 0 | built in 780ms |
+| `npm run e2e` | 0 | 10 passed (33.4s) |
+| `npm run e2e:lab3` | 0 | 27 passed (1.1m) |
+| `npm run e2e:lab4` | 0 | 19 passed (59.1s) |
+| `lab4-tools/check_lab4_contract.py` | 0 | OK: every AC tested, matrix generated from rows, section-12 files and all levels planned, every citation defined |
+| `lab3-tools/check_lab3_contract.py` | 0 | prints its findings; has no failing exit code (see tests.md §6) |
+
+The only count that differs from `316a8c0` is the Lab 4 browser suite, 18 to **19**: the
+#111 self-test that plants a split Details label. Every other total is the same.
+The manifest repeats the file check above at this commit: 46 rows, 85 row-to-file
+entries, 66 distinct test files, each listed as passing in this run, so all 46 rows stay `Passed`.
+Nothing was skipped and no test is marked flaky.
+
+The published run started at 2026-10-11T11:20:58Z. An attempt at 2026-10-11T11:19:14Z found the local Postgres container
+stopped: the server suite and the three browser suites exited `1` before running a test. The
+container was started and every command run again from the start; the folder's README records both.
+
 ---
 
 ## 7. Known Limitations and Changed Suites
@@ -483,5 +513,5 @@ The Lab 3 rows that the Lab 3 §6 addendum said would become `Passed` only at th
   and requires the check to name it. Removing the CSS fix turns the suite red, and a no-op
   control stays green. The Lab 4 browser suite is now **19** tests.
 
-  §6 records the release at `316a8c0`, and it stays as written. This change reaches `main` in
-  a later release and is run there in its own post-merge evidence.
+  §6 records the release at `316a8c0`, and it stays as written. This change reached `main` in
+  #114 and was run there in its own evidence: the §6 addendum, `main` at `0c34916`.
